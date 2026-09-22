@@ -1,0 +1,43 @@
+# The tavern bundle patch: the world-card engine over the dsh web surface.
+# Applied after dsh-base and dsh-web-app; the profile's own cordis.patch.yml
+# and any --patch overlays still to come. A patch replaces the targeted row's
+# whole `config`, so each row below restates every key it owns.
+
+- insert:
+    # Host engine: workspaces, card prompts, runtime tools, tail scheduling.
+    - id: tavern-engine
+      name: 'dsh-tavern-fengyue-engine'
+
+    # Remote owner over the engine (ctx.remote.tavern namespace).
+    - id: tavern-api
+      name: 'dsh-tavern-fengyue-api'
+
+    # Browser half: the tavern takeover (session list, library, opening,
+    # save/load/clear header actions).
+    - id: ui-tavern
+      name: 'dsh-tavern-fengyue-ui'
+
+# Session titles are not part of the game loop yet; the first-prompt title
+# generator would fire a second model request per session (request #2 in the
+# mock log). Re-enable by removing this patch row.
+- id: session-title-llm
+  disabled: true
+
+# The card IS the whole world: main and tail agents run on the `empty`
+# preset (zero rows — no persona, no tools; the card's own system prompt and
+# tool face stand alone), while the card-writing agent runs on `standard` so
+# it keeps the full product tool face (fs read/write, shell, web, todo). The
+# preset-selection UI row stays out of the tavern composition entirely, and
+# the `empty` preset itself ships inside the engine package — its mount-time
+# mirror (syncShippedPresets) lands it on the profile preset root below, so
+# the roots row needs no cwd-relative assumption.
+- id: ui-agent-preset
+  disabled: true
+
+- id: agent-presets
+  name: '@deepseek-ai/dsh-agent-presets'
+  config:
+    default: standard
+    roots:
+      - path: !!js dshHomePath('profiles', 'tavern-fengyue', 'presets')
+        trust: system

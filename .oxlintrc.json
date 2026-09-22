@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "packages/vendor-ui-chat/**",
+    "packages/vendor-ui-renderer/**",
+    "packages/vendor-ui-session/**"
+  ],
+  "rules": {
+    "no-unused-expressions": ["warn", { "allowShortCircuit": true, "allowTernary": true }],
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "unicorn/no-useless-spread": "off"
+  }
+}

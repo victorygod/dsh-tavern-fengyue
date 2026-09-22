@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>开场</title>
+<style>
+  body{font-family:Georgia,"Songti SC","Noto Serif SC",serif;background:#fdfcf9;color:#29261f;margin:0;padding:36px 42px;line-height:2;font-size:15.5px}
+  h1{font-family:"PingFang SC",sans-serif;font-size:12px;letter-spacing:2px;color:#b3860a;margin:0 0 18px;font-weight:600}
+  em{font-style:normal;color:#b3860a}
+  .opts{margin-top:26px;padding-top:18px;border-top:1px dashed #e2ded2;font-family:"PingFang SC",sans-serif}
+  .opts h2{font-size:11px;color:#8b877c;letter-spacing:2px;margin:0 0 10px;font-weight:600}
+  button{display:block;width:100%;text-align:left;margin:0 0 8px;padding:10px 14px;border-radius:10px;border:1px solid #e2ded2;background:#fff;color:#3d3a33;font-size:13px;cursor:pointer}
+  button:hover{border-color:#d8c07a;background:rgba(212,160,23,0.08)}
+</style></head>
+<body>
+<h1>开场 · 第 1 夜 暮雨</h1>
+<p>雨下了一整天。你循着唯一亮着的灯，推开酒馆的大门——门很沉，风把它摔在你身后。<br>
+炉火把长桌照得半明半暗，三个佣兵在柜台尽头压低声音，说的是矿道塌方的事；角落里一个蒙面旅人端着没动过的酒。<br>
+守店人抬眼看了看你，把一只杯子放上柜台：<em>「想活命，就别踩进雾里去。」</em></p>
+<div class="opts"><h2>开场白选项 — 点击填入输入框；也可以自己写</h2>
+<button data-insert="我抖落斗篷上的雨水，向守店人要一杯热酒，顺便打听镇上最近的传闻。">要一杯热酒，打听传闻</button>
+<button data-insert="我不急着说话，先找炉边的空位坐下，观察那三个佣兵和蒙面旅人。">坐下观察酒馆里的人</button>
+<button data-insert="「守店人，问个事——这附近哪张床是空的？」我直接开口，把一枚铜板拍在柜台上。">直接开口问床位</button>
+</div>
+<script>document.addEventListener("click",function(e){var b=e.target.closest("[data-insert]");if(b){parent.postMessage({t:"tavern-insert",text:b.getAttribute("data-insert")},"*");}});</script>
+</body></html>

@@ -1,0 +1,62 @@
+{
+  "_doc": "官方纸质角色卡字段清单——出处 DnD_BasicRules_2018.pdf pp.177–179（WotC 2014 版空白卡三叶）。纯参考件：不参与出生流程，供与 character.tpl.json 做字段对照（缺口盘点见对话沉淀）。",
+  "_legal": "该 PDF 为纯印刷卡：无可填表单控件（AcroForm 空校验过），也无预生成角色页——『需要填写』= 打印后手抄填集。",
+  "_fmt": "键 = 卡面字段名 snake 化（枚举类用计数说明一行带过）；值 = 卡面上要填什么。括注为规则出处/换算式。",
+
+  "p177_main": {
+    "_title": "角色卡 · 主业页",
+    "header": [
+      "character_name 角色名",
+      "class_and_level 职业&等级（合写一格）",
+      "background 背景",
+      "player_name 玩家名（现实玩家；LLM 场景通常空置）",
+      "race 种族",
+      "alignment 阵营",
+      "experience_points XP 数值"
+    ],
+    "abilities": "六项各两格：属性值 + 调整值（调整值为卡面手抄非空缺）——str / dex / con / int / wis / cha",
+    "status_trio": ["armor_class", "initiative", "speed"],
+    "resources": [
+      "hit_point_maximum",
+      "current_hit_points",
+      "temporary_hit_points",
+      "hit_dice（骰型 + 已用计数，如 2d10 / ☑☑）",
+      "death_saves：successes 3 泡 + failures 3 泡",
+      "inspiration（圆泡）",
+      "proficiency_bonus（手抄值 = 2 + ⌊(等级−1)/4⌋）",
+      "passive_perception（= 10 + 察觉技能加值）"
+    ],
+    "saving_throws": "六项各两格：加值 + 熟练圆泡——str / dex / con / int / wis / cha",
+    "skills": "18 项各两格：加值 + 胜任圆泡——acrobatics, animal_handling, arcana, athletics, deception, history, insight, intimidation, investigation, medicine, nature, perception, performance, persuasion, religion, sleight_of_hand, stealth, survival",
+    "attacks_and_spellcasting": "空白行表：name / attack_bonus / damage_type（每次手抄当前武器攻击与伤害）",
+    "wealth": ["cp", "sp", "ep", "gp", "pp"],
+    "equipment": "装备自由文本区",
+    "other_proficiencies_and_languages": "其他熟练项+语言（盔甲/武器/工具熟练笼络在这一格）",
+    "features_traits": "特性 Traits 自由文本大区（职业特性/专长等的一切落点）",
+    "persona_foursome": ["personality_traits", "ideals", "bonds", "flaws"]
+  },
+
+  "p178_detail": {
+    "_title": "角色卡 · 细节页",
+    "appearance": ["age", "height", "weight", "eyes", "skin", "hair"],
+    "character_name": "页首再抄一遍角色名",
+    "symbol": "印记/纹章图标格",
+    "character_backstory": "背景故事自由文本",
+    "additional_features_traits": "特性增补区（p177 写不下时就近加纸）",
+    "allies_organizations": "盟友与组织",
+    "treasure": "财宝（非货币部分）"
+  },
+
+  "p179_spellcasting": {
+    "_title": "施法页",
+    "specs": [
+      "spellcasting_class",
+      "spellcasting_ability（施法主属性）",
+      "spell_save_dc（手抄 = 8 + 熟练 + 主属性调整）",
+      "spell_attack_bonus（手抄 = 熟练 + 主属性调整）",
+      "spells_known （已知法术计数指示）"
+    ],
+    "slot_tracker": "1–9 环每环两轨：slots_total + slots_expended（环形计量；0 环戏法无槽）",
+    "spell_lists": "cantrips 段 + 1–9 环各一段；每行 spell_name，可勾 prepared"
+  }
+}

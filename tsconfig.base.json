@@ -1,0 +1,51 @@
+{
+  // Doubles as the resolution facade for vite-tsconfig-paths (vitest config
+  // points here). NEVER add include/files to this file: it would leak into
+  // every extending package project and narrow the facade's match-all scope.
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "sourceMap": true,
+    "declarationMap": true,
+    "composite": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"],
+    // Source-level resolution for this repo's own packages: dev/tests compile
+    // against src. Host packages (@deepseek-ai/*) resolve through node_modules
+    // lib/types — the published compatibility surface this repo targets.
+    "paths": {
+      "dsh-tavern-fengyue": ["./packages/bundle/src"],
+      "dsh-tavern-fengyue-engine": ["./packages/engine/src"],
+      "dsh-tavern-fengyue-api": ["./packages/api/src"],
+      // The published dsh-client-ui-renderer ships no node-importable client
+      // plane (its ./client bundle is the browser closure factory), so test
+      // code resolving renderer CLIENT sources maps onto the vendored snapshot.
+      "@deepseek-ai/dsh-client-ui-renderer/client": ["./packages/vendor-ui-renderer/src/client"],
+      "@deepseek-ai/dsh-client-ui-renderer/src/client": ["./packages/vendor-ui-renderer/src/client"],
+      "@deepseek-ai/dsh-client-ui-renderer/src/client/*": ["./packages/vendor-ui-renderer/src/client/*"],
+      // Published ./client artifacts are browser closure bundles; test code
+      // (packages/client-runtime) maps these two onto vendored sources.
+      "@deepseek-ai/dsh-client-ui-session/client": ["./packages/vendor-ui-session/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-chat/client": ["./packages/vendor-ui-chat/client-shim.ts"],
+      "dsh-tavern-fengyue-api/types": ["./packages/api/src/types.ts"],
+      "dsh-tavern-fengyue-api/client": ["./packages/api/src/client/index.ts"],
+      "dsh-tavern-fengyue-ui": ["./packages/ui/src"],
+      "dsh-tavern-fengyue-ui/client": ["./packages/ui/src/client"],
+      "dsh-tavern-fengyue-mock": ["./packages/mock/src"]
+    }
+  }
+}

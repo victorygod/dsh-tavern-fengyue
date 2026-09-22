@@ -1,0 +1,119 @@
+# proficiencies — 117 entries
+
+- [Light Armor](light-armor.md) — Armor
+- [Medium Armor](medium-armor.md) — Armor
+- [Heavy Armor](heavy-armor.md) — Armor
+- [All armor](all-armor.md) — Armor
+- [Padded Armor](padded-armor.md) — Armor
+- [Leather Armor](leather-armor.md) — Armor
+- [Studded Leather Armor](studded-leather-armor.md) — Armor
+- [Hide Armor](hide-armor.md) — Armor
+- [Chain Shirt](chain-shirt.md) — Armor
+- [Scale Mail](scale-mail.md) — Armor
+- [Breastplate](breastplate.md) — Armor
+- [Half Plate Armor](half-plate-armor.md) — Armor
+- [Ring Mail](ring-mail.md) — Armor
+- [Chain Mail](chain-mail.md) — Armor
+- [Splint Armor](splint-armor.md) — Armor
+- [Plate Armor](plate-armor.md) — Armor
+- [Shields](shields.md) — Armor
+- [Simple Weapons](simple-weapons.md) — Weapons
+- [Martial Weapons](martial-weapons.md) — Weapons
+- [Clubs](clubs.md) — Weapons
+- [Daggers](daggers.md) — Weapons
+- [Greatclubs](greatclubs.md) — Weapons
+- [Handaxes](handaxes.md) — Weapons
+- [Javelins](javelins.md) — Weapons
+- [Light hammers](light-hammers.md) — Weapons
+- [Maces](maces.md) — Weapons
+- [Quarterstaffs](quarterstaffs.md) — Weapons
+- [Sickles](sickles.md) — Weapons
+- [Spears](spears.md) — Weapons
+- [Crossbows, light](crossbows-light.md) — Weapons
+- [Darts](darts.md) — Weapons
+- [Shortbows](shortbows.md) — Weapons
+- [Slings](slings.md) — Weapons
+- [Battleaxes](battleaxes.md) — Weapons
+- [Flails](flails.md) — Weapons
+- [Glaives](glaives.md) — Weapons
+- [Greataxes](greataxes.md) — Weapons
+- [Greatswords](greatswords.md) — Weapons
+- [Halberds](halberds.md) — Weapons
+- [Lances](lances.md) — Weapons
+- [Longswords](longswords.md) — Weapons
+- [Mauls](mauls.md) — Weapons
+- [Morningstars](morningstars.md) — Weapons
+- [Pikes](pikes.md) — Weapons
+- [Rapiers](rapiers.md) — Weapons
+- [Scimitars](scimitars.md) — Weapons
+- [Shortswords](shortswords.md) — Weapons
+- [Tridents](tridents.md) — Weapons
+- [War picks](war-picks.md) — Weapons
+- [Warhammers](warhammers.md) — Weapons
+- [Whips](whips.md) — Weapons
+- [Blowguns](blowguns.md) — Weapons
+- [Hand crossbows](hand-crossbows.md) — Weapons
+- [Crossbows, heavy](crossbows-heavy.md) — Weapons
+- [Longbows](longbows.md) — Weapons
+- [Nets](nets.md) — Weapons
+- [Alchemist's Supplies](alchemists-supplies.md) — Artisan's Tools
+- [Brewer's Supplies](brewers-supplies.md) — Artisan's Tools
+- [Calligrapher's Supplies](calligraphers-supplies.md) — Artisan's Tools
+- [Carpenter's Tools](carpenters-tools.md) — Artisan's Tools
+- [Cartographer's Tools](cartographers-tools.md) — Artisan's Tools
+- [Cobbler's Tools](cobblers-tools.md) — Artisan's Tools
+- [Cook's utensils](cooks-utensils.md) — Artisan's Tools
+- [Glassblower's Tools](glassblowers-tools.md) — Artisan's Tools
+- [Jeweler's Tools](jewelers-tools.md) — Artisan's Tools
+- [Leatherworker's Tools](leatherworkers-tools.md) — Artisan's Tools
+- [Mason's Tools](masons-tools.md) — Artisan's Tools
+- [Painter's Supplies](painters-supplies.md) — Artisan's Tools
+- [Potter's Tools](potters-tools.md) — Artisan's Tools
+- [Smith's Tools](smiths-tools.md) — Artisan's Tools
+- [Tinker's Tools](tinkers-tools.md) — Artisan's Tools
+- [Weaver's Tools](weavers-tools.md) — Artisan's Tools
+- [Woodcarver's Tools](woodcarvers-tools.md) — Artisan's Tools
+- [Disguise Kit](disguise-kit.md) — Artisan's Tools
+- [Forgery Kit](forgery-kit.md) — Artisan's Tools
+- [Dice Set](dice-set.md) — Gaming Sets
+- [Playing Card Set](playing-card-set.md) — Gaming Sets
+- [Bagpipes](bagpipes.md) — Musical Instruments
+- [Drum](drum.md) — Musical Instruments
+- [Dulcimer](dulcimer.md) — Musical Instruments
+- [Flute](flute.md) — Musical Instruments
+- [Lute](lute.md) — Musical Instruments
+- [Lyre](lyre.md) — Musical Instruments
+- [Horn](horn.md) — Musical Instruments
+- [Pan flute](pan-flute.md) — Musical Instruments
+- [Shawm](shawm.md) — Musical Instruments
+- [Viol](viol.md) — Musical Instruments
+- [Herbalism Kit](herbalism-kit.md) — Other
+- [Navigator's Tools](navigators-tools.md) — Other
+- [Poisoner's Kit](poisoners-kit.md) — Other
+- [Thieves' Tools](thieves-tools.md) — Other
+- [Land Vehicles](land-vehicles.md) — Vehicles
+- [Water Vehicles](water-vehicles.md) — Vehicles
+- [Saving Throw: STR](saving-throw-str.md) — Saving Throws
+- [Saving Throw: DEX](saving-throw-dex.md) — Saving Throws
+- [Saving Throw: CON](saving-throw-con.md) — Saving Throws
+- [Saving Throw: INT](saving-throw-int.md) — Saving Throws
+- [Saving Throw: WIS](saving-throw-wis.md) — Saving Throws
+- [Saving Throw: CHA](saving-throw-cha.md) — Saving Throws
+- [Skill: Acrobatics](skill-acrobatics.md) — Skills
+- [Skill: Animal Handling](skill-animal-handling.md) — Skills
+- [Skill: Arcana](skill-arcana.md) — Skills
+- [Skill: Athletics](skill-athletics.md) — Skills
+- [Skill: Deception](skill-deception.md) — Skills
+- [Skill: History](skill-history.md) — Skills
+- [Skill: Insight](skill-insight.md) — Skills
+- [Skill: Intimidation](skill-intimidation.md) — Skills
+- [Skill: Investigation](skill-investigation.md) — Skills
+- [Skill: Medicine](skill-medicine.md) — Skills
+- [Skill: Nature](skill-nature.md) — Skills
+- [Skill: Perception](skill-perception.md) — Skills
+- [Skill: Performance](skill-performance.md) — Skills
+- [Skill: Persuasion](skill-persuasion.md) — Skills
+- [Skill: Religion](skill-religion.md) — Skills
+- [Skill: Sleight of Hand](skill-sleight-of-hand.md) — Skills
+- [Skill: Stealth](skill-stealth.md) — Skills
+- [Skill: Survival](skill-survival.md) — Skills

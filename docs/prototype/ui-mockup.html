@@ -1,0 +1,2504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tavern RPG — 会话原型</title>
+<style>
+  :root {
+    --bg: #f7f6f1;
+    --bg-deep: #fdfcf9;
+    --surface: #ffffff;
+    --surface-2: #faf9f5;
+    --card: #f1efe8;
+    --card-hover: #eceae1;
+    --border: #e2ded2;
+    --border-soft: #eae7dd;
+    --fg: #3d3a33;
+    --fg-strong: #29261f;
+    --muted: #8b877c;
+    --muted-2: #a8a49a;
+    --gold: #b3860a;
+    --gold-bright: #d4a017;
+    --gold-soft: rgba(212, 160, 23, 0.12);
+    --gold-dim: #d8c07a;
+    --ok: #4d7c43;
+    --ok-soft: #e4efdf;
+    --ok-border: #cfe3c9;
+    --danger: #b05548;
+    --serif: Georgia, "Songti SC", "Noto Serif SC", serif;
+    --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.6;
+    overflow: hidden;
+  }
+  ::selection { background: rgba(212, 160, 23, 0.28); }
+  button { font-family: var(--sans); }
+  :is(button, [tabindex], .tree-item, .card, .sv-item, .ob-btn, .lib-row):focus-visible {
+    outline: 2px solid var(--gold-bright); outline-offset: 1px; border-radius: 8px;
+  }
+
+  :is(*, *::-webkit-scrollbar) { scrollbar-width: thin; scrollbar-color: #d6d2c6 transparent; }
+  *::-webkit-scrollbar { width: 8px; height: 8px; }
+  *::-webkit-scrollbar-thumb { background: #d6d2c6; border-radius: 4px; }
+  *::-webkit-scrollbar-thumb:hover { background: #c7c2b3; }
+  *::-webkit-scrollbar-track { background: transparent; }
+
+  .frame { display: flex; height: 100vh; }
+
+  /* ══════════════════ 侧栏：会话列表 ══════════════════ */
+  .sidebar {
+    width: 264px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, #fbfaf6, #f3f1ea);
+    border-right: 1px solid var(--border-soft);
+    overflow: hidden;
+  }
+  .sidebar-head {
+    padding: 18px 18px 12px;
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  .sidebar-head .t { font-size: 12px; font-weight: 600; color: var(--fg-strong); letter-spacing: 2px; }
+  .sidebar-head .n { font-size: 11px; color: var(--muted); }
+  .sidebar-head .head-right { display: inline-flex; align-items: center; gap: 8px; }
+  .sidebar-head .text-btn { padding: 3px 9px; font-size: 11px; }
+  .sidebar-list { flex: 1; overflow-y: auto; padding: 2px 10px 10px; }
+
+  .card {
+    position: relative;
+    padding: 11px 12px 10px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: border-color 0.15s, background 0.15s;
+    display: grid; grid-template-columns: 34px 1fr; gap: 10px;
+    align-items: start;
+  }
+  .card:hover { background: #ffffff; border-color: var(--border-soft); box-shadow: 0 1px 4px rgba(90, 76, 40, 0.07); }
+  .card.active { border-color: var(--gold-dim); background: linear-gradient(180deg, rgba(212,160,23,0.10), rgba(212,160,23,0.02)); box-shadow: 0 1px 4px rgba(90, 76, 40, 0.06); }
+  .card .mono {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600; color: var(--gold);
+    background: #ffffff; border: 1px solid var(--border-soft);
+    margin-top: 2px;
+  }
+  .card.active .mono { border-color: var(--gold-dim); background: #fdf6e2; }
+  .card-name { font-size: 13px; font-weight: 600; color: var(--fg-strong); }
+  .card-desc { font-size: 11px; color: var(--muted); margin-top: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-state {
+    margin-top: 6px; display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+  }
+  .card-state .phase { color: var(--gold); }
+  .card.active::after {
+    content: ""; position: absolute; left: -10px; top: 14px; bottom: 14px;
+    width: 2px; border-radius: 2px; background: var(--gold-bright);
+  }
+  .card .ws { margin-top: 2px; font-family: var(--mono); font-size: 10px; color: var(--muted-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .card-del {
+    position: absolute; top: 8px; right: 8px; width: 22px; height: 22px;
+    border-radius: 7px; border: none; background: rgba(20, 16, 8, 0.14);
+    color: var(--danger); font-size: 11px; line-height: 1; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s, background 0.15s;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .card:hover .card-del, .card:focus-within .card-del { opacity: 1; }
+  .card-del:hover { background: rgba(176, 85, 72, 0.16); }
+
+  .sidebar-foot { padding: 10px; border-top: 1px solid var(--border-soft); }
+  .new-btn {
+    width: 100%; padding: 9px 12px; border-radius: 9px;
+    border: 1px dashed #d8d3c6; background: transparent;
+    color: var(--muted); font-size: 12.5px; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .new-btn:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+  /* ══════════════════ 主区 ══════════════════ */
+  .main {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    background:
+      radial-gradient(1100px 480px at 50% 118%, rgba(212, 160, 23, 0.10), transparent 60%),
+      var(--bg);
+  }
+
+  /* ── header：纯文字标题（emoji-free） ── */
+  .chat-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 22px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0; z-index: 5;
+  }
+  .chat-title { font-size: 15px; font-weight: 600; color: var(--fg-strong); }
+  .head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .text-btn {
+    padding: 6px 14px; border-radius: 9px;
+    border: 1px solid var(--border); background: #ffffff; color: var(--fg);
+    font-size: 12.5px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .text-btn:hover { border-color: var(--gold-dim); background: var(--gold-soft); }
+  .text-btn.primary {
+    background: linear-gradient(180deg, #e2b32c, #c69413);
+    border-color: transparent; color: #1b1408; font-weight: 600;
+  }
+  .text-btn.primary:hover { opacity: 0.92; }
+  .text-btn.danger:hover { border-color: var(--danger); background: rgba(176, 85, 72, 0.10); color: var(--danger); }
+
+  /* ── 消息流 / 开局与流程视图 ── */
+  .chat-body {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    padding: 22px 22px 18px;
+    scroll-behavior: smooth;
+  }
+  .chat-column { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+  /* 开场页：无任何聊天历史时渲染 preset/setup/opening.html — iframe 整页平铺聊天区（无边框无圆角，页面内容自带滚动与内边距） */
+  .chat-body.full-bleed { padding: 0; overflow: hidden; }
+  .chat-body.full-bleed .chat-column { max-width: none; height: 100%; gap: 0; }
+  .chat-body.full-bleed .opening-wrap { flex: 1; min-height: 0; }
+  .opening-frame { display: block; width: 100%; height: 100%; border: none; background: var(--bg-deep); }
+
+  /* 用户气泡 */
+  .msg-user { display: flex; justify-content: flex-end; position: relative; }
+  .bubble-user {
+    position: relative; max-width: 72%;
+    padding: 9px 14px; border-radius: 14px; border-bottom-right-radius: 4px;
+    background: #f0ead9; color: #35312a;
+    border: 1px solid #e7dfc9;
+    font-size: 14px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word;
+    box-shadow: 0 1px 2px rgba(90, 76, 40, 0.08);
+  }
+  .bubble-user .stamp, .narrative .stamp {
+    position: absolute; bottom: -17px; right: 2px;
+    font-size: 10px; color: var(--muted-2); opacity: 0;
+    transition: opacity 0.2s; pointer-events: none;
+  }
+  .msg-user:hover .stamp, .narrative:hover .stamp { opacity: 1; }
+
+  /* 叙事段落（标记用色条，不用符号字符） */
+  .narrative {
+    position: relative; max-width: 92%;
+    padding: 4px 8px 20px 24px;
+    font-family: var(--serif);
+    font-size: 15px; line-height: 1.9; color: var(--fg-strong);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .narrative::before {
+    content: ""; position: absolute; left: 2px; top: 9px;
+    width: 12px; height: 3px; border-radius: 2px;
+    background: var(--gold-bright);
+  }
+  .narrative .scene {
+    display: block; font-family: var(--sans); font-size: 11px; font-weight: 600;
+    color: var(--gold); letter-spacing: 2px; margin-bottom: 7px;
+  }
+
+  /* ══════════ DSH web 流式行：思考 / 工具调用 / 尾代理（灰色小字，默认折叠） ══════════ */
+  .flow-row { position: relative; max-width: 92%; display: flex; flex-direction: column; }
+  .flow-row .rowline {
+    position: relative; display: flex; align-items: center; gap: 6px;
+    height: 24px; overflow: hidden; cursor: pointer; border-radius: 6px;
+  }
+  .flow-row.expandable .rowline:hover { background: rgba(90, 76, 40, 0.05); }
+  .flow-row .lb { flex-shrink: 0; font-size: 12.5px; font-weight: 400; color: var(--fg); }
+  .flow-row .lb.mono { font-family: var(--mono); font-size: 12px; color: var(--fg); }
+  .flow-row .sep { flex: none; width: 2px; height: 2px; margin: 0 8px; border-radius: 1px; background: var(--muted-2); }
+  .flow-row .sum {
+    min-width: 0; overflow: hidden; flex: 1 1 auto;
+    color: var(--muted); font-size: 12.5px; line-height: 20px;
+    white-space: nowrap;
+  }
+  .flow-row .sum .st { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .flow-row .sum.follow { display: flex; justify-content: flex-end; }
+  .flow-row .sum.follow .st { flex: 0 0 auto; width: max-content; min-width: 100%; overflow: visible; text-overflow: clip; text-align: start; }
+  .flow-row .chev { flex: none; color: var(--muted-2); font-size: 9px; transition: transform 0.15s; }
+  .flow-row.open .chev { transform: rotate(90deg); }
+
+  .flow-row.running .rowline::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 300px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.65) 55%, transparent 100%);
+    animation: rowSweep 2.6s ease-out infinite; pointer-events: none;
+  }
+  @keyframes rowSweep { 0% { left: -300px; } 90%, 100% { left: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .flow-row.running .rowline::after { animation: none; } }
+
+  .flow-row .body {
+    display: none; overflow: hidden;
+    padding: 4px 0 4px 22px;
+    color: var(--muted); font-size: 12.5px; line-height: 20px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .flow-row.open .body { display: block; }
+
+  .tool-io {
+    display: none; margin: 4px 0 4px 4px;
+    border: 0.5px solid var(--border); border-radius: 12px;
+    background: var(--bg-deep);
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+  }
+  .flow-row.open .tool-io { display: block; }
+  .tool-io .iso {
+    display: grid; grid-template-columns: max-content 1fr; column-gap: 14px;
+    align-items: baseline; padding: 10px 14px; max-height: 150px; overflow-y: auto;
+  }
+  .tool-io .iso + .iso { border-top: 0.5px solid var(--border-soft); }
+  .tool-io .ilbl { position: sticky; top: 0; align-self: start; color: var(--muted-2); font-size: 10px; letter-spacing: 1px; }
+  .tool-io .itxt { white-space: pre-wrap; word-break: break-all; color: var(--fg); }
+
+  /* ── 输入区 ── */
+  .composer-wrap { flex-shrink: 0; padding: 0 22px 8px; }
+  .tail-lock {
+    display: none; align-items: center; justify-content: center;
+    margin: 0 auto 10px; padding: 6px 16px; width: fit-content;
+    border-radius: 999px; font-size: 11.5px;
+    color: #8a6d1a; background: #fdf6e2;
+    border: 1px solid var(--gold-dim);
+  }
+  .tail-lock.show { display: flex; animation: fadeIn 0.2s ease; }
+  .composer {
+    max-width: 760px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+    padding: 10px 12px 10px 16px;
+    background: #ffffff;
+    border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: 0 2px 8px rgba(90, 76, 40, 0.06);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .composer:focus-within { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.12); }
+  .composer textarea {
+    width: 100%; border: none; background: transparent; color: var(--fg-strong);
+    font: 14px/1.6 var(--sans); resize: none; outline: none;
+    max-height: 128px; padding: 4px 0;
+  }
+  .composer textarea::placeholder { color: var(--muted-2); }
+  .composer .send {
+    height: 36px; flex-shrink: 0; padding: 0 14px;
+    border: none; border-radius: 12px;
+    background: linear-gradient(180deg, #e2b32c, #c69413);
+    color: #1b1408; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    transition: transform 0.1s, opacity 0.15s;
+  }
+  .composer .send:hover { transform: translateY(-1px); }
+  .composer .send:disabled { opacity: 0.35; cursor: default; transform: none; }
+  .composer { position: relative; }
+  /* 控制行：文本输入区下方、右对齐 — 模型席位 + 上下文占用环 + 发送（DSH InputBar 的
+     .row/.trailing 结构；加号/附件/权限 chip 不进酒馆原型）。菜单以 model-wrap 为锚右对齐向上弹 */
+  .composer-row { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+  .model-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  /* 模型席位触发器：对齐 DSH ui-model-selection 的 ToggleButton —— 28px 透明胶囊 chip，
+     次级色调文字「模型名 · 强度值 + 下箭头」，hover 浅底，open 时箭头翻转 */
+  .model-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    height: 28px; max-width: 220px; flex-shrink: 0;
+    padding: 0 5px 0 9px;
+    border: none; border-radius: 24px;
+    background: transparent; color: var(--muted);
+    font-size: 13px; line-height: 20px; font-weight: 500;
+    cursor: pointer; white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .model-btn:hover, .model-btn.open { background: var(--card); color: var(--fg-strong); }
+  .model-btn .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .model-btn .ef { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-2); }
+  .model-btn .cv { flex: 0 0 auto; font-size: 9px; color: var(--muted-2); transition: transform 0.15s; }
+  .model-btn.open .cv { transform: rotate(180deg); }
+  /* 弹出菜单：对齐 Menu 菜单卡 —— ±20px 圆角、无边框、大投影、4px 内衬、宽随内容 (min 240 / max 420)，
+     两级钻取：根面板两行 cell（标签 + 右对齐当前值 + 右箭头），子面板为分组列表行，选中 = 尾部勾选记号；
+     以 model-wrap 为锚、与触发器右缘对齐向上弹（DSH portal 的右对齐规则） */
+  .model-pop {
+    position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 40;
+    display: flex; flex-direction: column;
+    width: max-content; min-width: 240px; max-width: min(420px, calc(100vw - 32px));
+    max-height: min(360px, calc(100vh - 96px));
+    overflow: hidden;
+    padding: 4px;
+    background: #ffffff; border: none; border-radius: 20px;
+    box-shadow: 0 18px 48px rgba(80, 66, 30, 0.22), 0 2px 8px rgba(80, 66, 30, 0.10);
+  }
+  .model-pop[hidden] { display: none; } /* 类上的 display:flex 会盖过 UA 的 [hidden]，需显式压回 */
+  .mp-cell {
+    display: flex; align-items: center; gap: 8px; min-width: 100%;
+    height: 40px; padding: 0 10px;
+    border: none; border-radius: 10px;
+    background: transparent; color: var(--fg-strong);
+    font-size: 14px; line-height: 22px; text-align: left; cursor: pointer;
+  }
+  .mp-cell:hover { background: var(--card); }
+  .mp-cell .lab { flex: 0 0 auto; white-space: nowrap; }
+  .mp-cell .val { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--muted-2); }
+  .mp-cell .arr { flex: 0 0 auto; font-size: 10px; color: var(--muted-2); }
+  .mp-back {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; margin-bottom: 2px;
+    border: none; border-radius: 10px;
+    background: transparent; color: var(--muted);
+    font-size: 12px; cursor: pointer; text-align: left;
+  }
+  .mp-back:hover { background: var(--card); color: var(--fg-strong); }
+  .mp-group {
+    position: sticky; top: 0; z-index: 1;
+    padding: 5px 8px 3px; margin: 0;
+    background: #ffffff;
+    font-size: 12px; line-height: 18px; font-weight: 500; color: var(--muted-2);
+  }
+  .mp-option {
+    display: flex; align-items: center; gap: 8px; min-width: 100%;
+    min-height: 38px; padding: 6px 8px;
+    border: none; border-radius: 10px;
+    background: transparent; color: var(--fg);
+    font-size: 14px; line-height: 20px; font-weight: 500; text-align: left; cursor: pointer;
+  }
+  .mp-option:hover { background: var(--card); }
+  .mp-option .copy { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-option .chk { flex: 0 0 18px; display: grid; place-items: center; color: var(--fg-strong); font-size: 12px; visibility: hidden; }
+  .mp-option.selected .chk { visibility: visible; }
+
+  /* 上下文占用环：对齐 DSH ContextMeter —— 28px 圆形触发钮内嵌 14px SVG 圆环
+     （2px 轨道 + 2px 进度自 12 点顺时针、圆帽），点击弹出 264px 明细面板：
+     标题行（上下文已用 N% + ~已用/128K）+ 4px 分段占比条 + 三行明细（色块 + ~token 数）；
+     分段色沿用 DSH：系统提示词 中性偏蓝 / 工具 violet-400（DSH 无紫色静态令牌，字面量）/ 对话 blue-450 */
+  .ctx-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+  .ctx-btn {
+    display: grid; place-items: center; width: 28px; height: 28px;
+    border: none; border-radius: 999px; background: transparent;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .ctx-btn:hover, .ctx-btn.open { background: var(--card); }
+  .ctx-btn .tk { fill: none; stroke: var(--border); stroke-width: 2; }
+  .ctx-btn .fl { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .ctx-pop {
+    position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 40;
+    box-sizing: border-box; width: 264px; padding: 12px;
+    background: #ffffff; border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(80, 66, 30, 0.22), 0 2px 8px rgba(80, 66, 30, 0.10);
+    font-size: 12px; line-height: 20px; color: var(--fg);
+  }
+  .ctx-head { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .ctx-head .pct { font-weight: 600; color: var(--fg-strong); }
+  .ctx-head .figs { margin-left: auto; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--fg-strong); }
+  .ctx-bar { display: flex; gap: 1px; height: 4px; margin: 10px 0 12px; border-radius: 999px; background: var(--card); overflow: hidden; }
+  .ctx-bar .seg { flex: none; min-width: 2px; height: 100%; border-radius: 1px; }
+  .ctx-bar .s { background: rgb(173, 178, 184); }
+  .ctx-bar .t { background: rgb(167, 139, 250); }
+  .ctx-bar .m { background: rgb(77, 147, 248); }
+  .ctx-rows { margin: 6px 0 0; }
+  .ctx-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 0; }
+  .ctx-row dd { margin: 0; font-variant-numeric: tabular-nums; color: var(--fg-strong); }
+  .ctx-row .sw { display: inline-block; margin-right: 6px; width: 8px; height: 8px; border-radius: 2px; vertical-align: baseline; }
+  .ctx-row .s { background: rgb(173, 178, 184); }
+  .ctx-row .t { background: rgb(167, 139, 250); }
+  .ctx-row .m { background: rgb(77, 147, 248); }
+
+  /* 底部用量状态行：一行 ｜ 分隔的纯文本（DSH 默认 web 的形态 — 不可点、无 pill 无对话框），
+     贴聊天区下边缘；tabular-nums，占位常显（无数据写 0，四段宽度稳定不跳） */
+  .stats-line {
+    max-width: 760px; margin: 0 auto; box-sizing: border-box; padding: 2px 16px 6px;
+    text-align: center;
+    font-size: 11.5px; line-height: 18px; color: var(--muted-2);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .typing { display: none; padding: 6px 0 0 24px; }
+  .typing.show { display: block; }
+  .typing i {
+    display: inline-block; width: 5px; height: 5px; margin-right: 4px;
+    border-radius: 50%; background: var(--gold-dim);
+    animation: blink 1s infinite ease-in-out;
+  }
+  .typing i:nth-child(2) { animation-delay: 0.15s; }
+  .typing i:nth-child(3) { animation-delay: 0.3s; }
+
+  /* ══════════ 开局 / 流程视图（就地切换，无弹窗） ══════════ */
+  .ob-wrap { max-width: 560px; margin: 6vh auto 0; }
+  .ob-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: none; background: transparent; color: var(--muted);
+    font-size: 12.5px; cursor: pointer; padding: 4px 8px; border-radius: 8px;
+    margin-bottom: 14px;
+  }
+  .ob-back:hover { color: var(--gold); background: var(--gold-soft); }
+  .ob-title { font-size: 16px; font-weight: 600; color: var(--fg-strong); }
+  .ob-sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+  .ob-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .ob-btn {
+    padding: 13px 18px; border-radius: 14px; cursor: pointer; text-align: left;
+    background: #ffffff; border: 1px solid var(--border);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .ob-btn:hover { border-color: var(--gold-dim); box-shadow: 0 4px 14px rgba(90, 76, 40, 0.1); }
+  .ob-btn b { font-size: 14px; color: var(--fg-strong); font-weight: 600; }
+  .ob-btn .d { font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+
+  .ob-panel {
+    background: #ffffff; border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px; margin-top: 14px;
+  }
+  .ob-panel .row {
+    display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+    padding: 10px 4px; border-bottom: 1px solid var(--border-soft); cursor: pointer;
+  }
+  .ob-panel .row:last-child { border-bottom: none; }
+  .ob-panel .row:hover { background: var(--surface-2); }
+  .ob-panel .row .nm { font-size: 13px; font-weight: 600; color: var(--fg-strong); }
+  .ob-panel .row .nm.mono { font-family: var(--mono); font-weight: 400; font-size: 12px; }
+  .ob-panel .row .ds { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .ob-panel .row .go { font-size: 11.5px; color: var(--gold); }
+  .ob-panel .acts { display: flex; gap: 6px; }
+  .ob-panel .acts .btn { padding: 5px 12px; font-size: 11.5px; }
+
+  /* 书架式卡片平铺（封面 + 标题；元数据来自 preset/meta.json） */
+  .lib-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 16px; margin-top: 14px;
+  }
+  .lib-card {
+    position: relative; border: 1px solid var(--border); border-radius: 14px;
+    background: #ffffff; cursor: pointer; overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .lib-card:hover { border-color: var(--gold-dim); box-shadow: 0 10px 26px rgba(90, 76, 40, 0.14); transform: translateY(-2px); }
+  .lib-cover {
+    height: 130px; width: 100%;
+    display: flex; align-items: flex-end; padding: 10px 12px;
+    font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.85);
+  }
+  .lib-cover.tint-a { background: linear-gradient(140deg, #b3860a 0%, #6b4f06 55%, #2f2406 100%); }
+  .lib-cover.tint-b { background: linear-gradient(140deg, #4d6a8a 0%, #2b3f57 55%, #16202c 100%); }
+  .lib-cover.tint-c { background: linear-gradient(140deg, #7a5a8a 0%, #463252 55%, #201726 100%); }
+  .lib-cover.tint-d {
+    background:
+      radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16), transparent 55%),
+      radial-gradient(circle at 75% 70%, rgba(255,255,255,0.08), transparent 50%),
+      linear-gradient(140deg, #8f7b46 0%, #4f4322 55%, #241f10 100%);
+  }
+  .lib-body { padding: 10px 12px 12px; }
+  .lib-title { font-size: 13px; font-weight: 600; color: var(--fg-strong);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-desc { font-size: 11px; color: var(--muted); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-acts {
+    position: absolute; top: 8px; right: 8px; display: flex; gap: 6px;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .lib-card:hover .lib-acts, .lib-card:focus-within .lib-acts { opacity: 1; }
+  .lib-act {
+    width: 28px; height: 28px; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.35); background: rgba(20, 16, 8, 0.55);
+    color: #ffffff; cursor: pointer; font-size: 14px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .lib-act:hover { background: rgba(20, 16, 8, 0.75); }
+  .lib-act.ed:hover { border-color: var(--gold-bright); color: var(--gold-bright); }
+  .lib-act.del:hover { border-color: #e39b93; color: #e39b93; }
+  .lib-act svg { display: block; }
+  .ob-note {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border);
+    font-size: 11px; color: var(--muted); line-height: 1.7;
+  }
+  .ob-inputrow { display: flex; gap: 8px; margin-top: 6px; }
+  .ob-inputrow input {
+    flex: 1; padding: 9px 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg-deep); color: var(--fg-strong);
+    font-size: 12.5px; font-family: var(--mono); outline: none;
+  }
+  .ob-inputrow input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.1); }
+
+  /* 制作卡片页内编辑器（统一编辑器组件 + 顶栏控件） */
+  .draft-editor { margin-top: 14px; height: calc(100vh - 340px); min-height: 360px; }
+
+  /* ══════════ 编辑器（组件化，供设置模态与制作卡片页复用） ══════════ */
+  .editor-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  /* 统一顶栏：checkbox 控制组（左）+ 动作按钮（右）；工作空间模态不渲染 */
+  .editor-toolbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 8px 12px; margin-bottom: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft); border-radius: 12px;
+  }
+  .editor-toolbar .cb {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: var(--fg); cursor: pointer; user-select: none;
+  }
+  .editor-toolbar .cb:hover { color: var(--fg-strong); }
+  .editor-toolbar .cb input { width: 14px; height: 14px; margin: 0; accent-color: var(--gold-bright); cursor: pointer; }
+  .editor-toolbar .spacer { flex: 1; }
+  .editor-toolbar .btn { padding: 5px 14px; font-size: 12px; }
+  /* 停用态（尾代理关闭）：树行与编辑区灰显、只读 */
+  .tree-item.file.dim { color: var(--muted-2); font-style: italic; }
+  .tree-item.file.dim:hover { color: var(--muted); }
+  .editor-area.dim { color: var(--muted); background: var(--surface-2); }
+  .editor-layout {
+    display: flex; height: 100%; min-height: 0;
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  }
+  .file-tree {
+    width: 240px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--surface-2); border-right: 1px solid var(--border-soft);
+  }
+  /* 文件树：VS Code 风格 — 纯净行（左侧 chevron + 名字），无行内徽标，选中整行底色 */
+  .tree-hint {
+    padding: 8px 12px; font-size: 10.5px; color: var(--muted-2);
+    border-bottom: 1px solid var(--border-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-tree-list { flex: 1; overflow-y: auto; padding: 6px 4px; }
+  .tree-item {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 8px; border-radius: 6px;
+    font-size: 12.5px; line-height: 20px; cursor: pointer; color: var(--fg);
+  }
+  .tree-item .chev { width: 14px; flex-shrink: 0; text-align: center; font-size: 9px; color: var(--muted-2); transition: transform 0.12s; }
+  .tree-item.dir { color: var(--fg); font-weight: 600; }
+  .tree-item.dir:hover { background: var(--card); color: var(--fg-strong); }
+  .tree-item.dir.open .chev { transform: rotate(90deg); }
+  .tree-item.file { color: var(--fg); }
+  .tree-item.file:hover { background: var(--card); color: var(--fg-strong); }
+  .tree-item.file.active { color: var(--fg-strong); background: var(--card); }
+  .tree-item.file.dim { color: var(--muted-2); }
+  .tree-item .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tree-item.draggable { cursor: grab; }
+  .tree-item.dir.dropover { outline: 1.5px dashed var(--gold-bright); outline-offset: -2px; background: var(--gold-soft); }
+
+  .file-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .editor-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; background: var(--surface-2);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .editor-path { font-size: 12px; color: var(--fg-strong); font-family: var(--mono); }
+  .editor-badge {
+    font-size: 10.5px; padding: 2px 9px; border-radius: 999px;
+    border: 1px solid var(--border-soft); color: var(--muted);
+  }
+  .editor-badge.editable { color: var(--ok); border-color: var(--ok-border); background: var(--ok-soft); }
+  .editor-badge.ro { color: var(--gold); border-color: var(--gold-dim); }
+  .editor-body { flex: 1; min-height: 0; position: relative; }
+  .editor-area {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    border: none; outline: none; resize: none;
+    background: var(--bg-deep); color: var(--fg-strong);
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.7;
+    padding: 14px 16px;
+  }
+  .editor-area:focus { background: #ffffff; }
+  .preview-layer {
+    position: absolute; inset: 0; padding: 14px;
+    display: none; flex-direction: column; gap: 10px;
+    background: var(--bg-deep);
+  }
+  .preview-layer.show { display: flex; }
+  .preview-box {
+    flex: 1; min-height: 0; width: 100%;
+    border-radius: 12px;
+    border: 1px dashed #d8d3c6;
+    background:
+      radial-gradient(circle at 30% 25%, rgba(212,160,23,0.14), transparent 55%),
+      radial-gradient(circle at 75% 70%, rgba(212,160,23,0.08), transparent 50%),
+      #f6f3ea;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--muted); letter-spacing: 2px;
+  }
+  .preview-cap { font-size: 12px; color: var(--muted); }
+  .preview-cap b { color: var(--fg-strong); font-weight: 600; }
+
+  /* ══════════ 设置模态框 ══════════ */
+  .overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(58, 48, 26, 0.32); backdrop-filter: blur(4px);
+    animation: fadeIn 0.16s ease;
+  }
+  .modal {
+    width: min(880px, calc(100vw - 48px)); height: min(620px, calc(100vh - 48px));
+    background: #ffffff; border: 1px solid var(--border);
+    border-radius: 20px; box-shadow: 0 32px 90px rgba(80, 66, 30, 0.25);
+    display: flex; flex-direction: column; overflow: hidden;
+    animation: slideUp 0.2s ease;
+  }
+  .modal-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px 0; }
+  .modal-head h2 { font-size: 15px; font-weight: 600; color: var(--fg-strong); }
+  .modal-head .sub { font-size: 11px; color: var(--muted); }
+  .modal-close { margin-left: auto; border: none; background: transparent; color: var(--muted);
+    font-size: 15px; cursor: pointer; width: 30px; height: 30px; border-radius: 9px; }
+  .modal-close:hover { color: var(--fg-strong); background: var(--card); }
+
+  .tabs { display: flex; gap: 2px; padding: 12px 20px 0; border-bottom: 1px solid var(--border-soft); }
+  .tab {
+    padding: 8px 16px 10px; font-size: 13px; color: var(--muted);
+    background: transparent; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--fg-strong); }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold-bright); font-weight: 600; }
+
+  .tab-panel { flex: 1; min-height: 0; display: none; padding: 14px 20px 18px; }
+  .tab-panel.active { display: flex; }
+
+  /* ── 存档 tab ── */
+  .saves-panel { flex-direction: column; gap: 10px; overflow-y: auto; }
+  .saves-head .t { font-size: 12px; color: var(--muted); }
+  .btn {
+    padding: 7px 16px; border-radius: 9px; font-size: 12.5px; cursor: pointer;
+    border: 1px solid var(--border); background: #ffffff; color: var(--fg);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .btn:hover { border-color: var(--gold-dim); background: var(--gold-soft); }
+  .btn.primary {
+    background: linear-gradient(180deg, #e2b32c, #c69413);
+    border-color: transparent; color: #1b1408; font-weight: 600;
+  }
+  .btn.primary:hover { opacity: 0.9; }
+  .btn.danger:hover { border-color: var(--danger); background: rgba(176, 85, 72, 0.10); color: var(--danger); }
+  .saves-list { display: flex; flex-direction: column; gap: 6px; }
+  .save-row {
+    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    padding: 10px 14px; border: 1px solid var(--border-soft); border-radius: 11px;
+    background: var(--surface-2);
+  }
+  .save-row .nm { font-family: var(--mono); font-size: 12.5px; color: var(--fg-strong); }
+  .save-row .meta { font-size: 10.5px; color: var(--muted-2); margin-top: 1px; }
+  .save-row .acts { display: flex; gap: 6px; }
+  .save-row .acts .btn { padding: 5px 12px; font-size: 11.5px; }
+  .load-note {
+    display: flex; gap: 8px; align-items: flex-start;
+    font-size: 11px; color: var(--muted); line-height: 1.6;
+    border-left: 2px solid var(--gold-dim); padding: 2px 0 2px 10px;
+  }
+
+  /* ── 保存弹框 ── */
+  .sv-dialog { width: 420px; height: auto; max-height: calc(100vh - 48px); }
+  .sv-list {
+    max-height: 200px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface-2); margin-bottom: 12px;
+  }
+  .sv-item {
+    display: grid; grid-template-columns: 1fr; gap: 1px;
+    padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border-soft);
+  }
+  .sv-item:last-child { border-bottom: none; }
+  .sv-item:hover { background: var(--card); }
+  .sv-item .nm { font-family: var(--mono); font-size: 12px; color: var(--fg-strong); }
+  .sv-item .meta { font-size: 10.5px; color: var(--muted-2); }
+  .sv-empty { padding: 14px 12px; font-size: 11.5px; color: var(--muted-2); text-align: center; }
+  .sv-form { display: flex; gap: 8px; }
+  .sv-form input {
+    flex: 1; padding: 8px 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg-deep); color: var(--fg-strong);
+    font-size: 12.5px; font-family: var(--mono); outline: none;
+  }
+  .sv-form input:focus { border-color: var(--gold-dim); box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.1); }
+  .sv-hint { margin-top: 8px; font-size: 11px; color: var(--muted-2); line-height: 1.6; }
+
+  /* ── 右键菜单 ── */
+  .ctx-menu {
+    position: fixed; z-index: 3000; min-width: 160px;
+    background: #ffffff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 14px 40px rgba(80, 66, 30, 0.2);
+    padding: 5px; display: none;
+  }
+  .ctx-menu.show { display: block; animation: pop 0.12s ease; }
+  .ctx-item {
+    padding: 6px 12px; border-radius: 7px; font-size: 12px; color: var(--fg);
+    cursor: pointer; display: flex; gap: 8px; align-items: center;
+  }
+  .ctx-item:hover { background: var(--card); }
+  .ctx-item.danger { color: var(--danger); }
+  .ctx-item.danger:hover { background: rgba(176, 85, 72, 0.08); }
+  .ctx-item.disabled { color: var(--muted-2); cursor: default; text-decoration: line-through; }
+  .ctx-item.disabled:hover { background: transparent; }
+  .ctx-sep { height: 1px; background: var(--border-soft); margin: 4px 6px; }
+
+  .toasts {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    z-index: 4000; pointer-events: none;
+  }
+  .toast {
+    padding: 8px 18px; border-radius: 10px;
+    background: #ffffff; border: 1px solid var(--border);
+    color: var(--fg); font-size: 12px;
+    box-shadow: 0 10px 30px rgba(80, 66, 30, 0.16);
+    animation: toastIn 0.2s ease;
+  }
+  .toast.success { border-color: var(--ok-border); }
+  .toast.error { border-color: var(--danger); }
+  .toast.info { border-color: var(--gold-dim); }
+  .toast.out { opacity: 0; transition: opacity 0.4s; }
+
+  .proto-tag {
+    position: fixed; bottom: 8px; right: 10px; font-size: 10px;
+    color: var(--muted-2); opacity: 0.6; z-index: 50; user-select: none;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(14px) scale(0.99); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes blink { 0%, 70%, 100% { opacity: 0.25; } 35% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <!-- ══════════ 侧栏：会话列表 ══════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span class="t">会话</span>
+      <span class="head-right">
+        <span class="n" id="cardCount"></span>
+        <button class="text-btn" id="apiKeyBtn" title="配置 API Key（DEEPSEEK_API_KEY）">API Key</button>
+      </span>
+    </div>
+    <div class="sidebar-list" id="cardList"><!-- JS 渲染 --></div>
+    <div class="sidebar-foot">
+      <button class="new-btn" id="newSessionBtn" title="在当前目录创建 tavern_workspace/<时间戳>/ 作为干净的新工作空间">＋ 开启新会话</button>
+    </div>
+  </aside>
+
+  <!-- ══════════ 主区 ══════════ -->
+  <main class="main">
+    <header class="chat-head">
+      <h1 class="chat-title" id="chatTitle"></h1>
+      <div class="head-actions" id="headActions" style="display:none;">
+        <button class="text-btn primary" id="saveQuick" title="保存快照（同名提示覆盖）">保存</button>
+        <button class="text-btn" id="loadBtn" title="打开存档列表（设置 → 存档）">加载</button>
+        <button class="text-btn danger" id="resetBtn" title="回到初始卡片状态：runtime/ 重新从 preset/setup 播种">清空</button>
+        <button class="text-btn" id="gearBtn">设置</button>
+      </div>
+    </header>
+
+    <div class="chat-body" id="chatBody">
+      <div class="chat-column" id="chatColumn"><!-- JS 渲染：聊天 / 开局 / 流程视图 --></div>
+    </div>
+
+    <div class="composer-wrap" id="composerWrap" style="display:none;">
+      <div class="tail-lock" id="tailLock"><span id="tailLockText">记账中 — 发送暂不可用，输入不受影响</span></div>
+      <div class="composer" id="composer">
+        <textarea id="inputBox" rows="1" placeholder="你的行动…" aria-label="行动输入"></textarea>
+        <div class="composer-row">
+          <span class="model-wrap">
+            <button class="model-btn" id="modelBtn" aria-label="选择模型与思考强度" aria-haspopup="menu" aria-expanded="false" title="模型与思考强度">
+              <span class="nm" id="modelBtnName"></span><span class="ef" id="modelBtnEffort"></span><span class="cv">▾</span>
+            </button>
+            <div class="model-pop" id="modelPop" role="menu" aria-label="模型与思考强度" hidden></div>
+          </span>
+          <span class="ctx-wrap">
+            <button class="ctx-btn" id="ctxBtn" type="button" aria-label="上下文占用" aria-haspopup="dialog" aria-expanded="false" title="上下文占用">
+              <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+                <circle class="tk" cx="7" cy="7" r="5.5"/>
+                <circle class="fl" id="ctxFill" cx="7" cy="7" r="5.5" stroke-dasharray="0 34.558" transform="rotate(-90 7 7)"/>
+              </svg>
+            </button>
+            <div class="ctx-pop" id="ctxPop" role="dialog" aria-label="上下文占用" hidden>
+              <div class="ctx-head">
+                <span>上下文已用</span><span class="pct" id="ctxPct">0%</span>
+                <span class="figs" id="ctxFigs"></span>
+              </div>
+              <div class="ctx-bar">
+                <span class="seg s" id="segSys"></span>
+                <span class="seg t" id="segTools"></span>
+                <span class="seg m" id="segMsgs"></span>
+              </div>
+              <dl class="ctx-rows">
+                <div class="ctx-row"><dt><i class="sw s"></i>系统提示词（卡片）</dt><dd id="tokSys"></dd></div>
+                <div class="ctx-row"><dt><i class="sw t"></i>工具</dt><dd id="tokTools"></dd></div>
+                <div class="ctx-row"><dt><i class="sw m"></i>对话</dt><dd id="tokMsgs"></dd></div>
+              </dl>
+            </div>
+          </span>
+          <button class="send" id="sendBtn" aria-label="发送（Enter 发送 · Shift+Enter 换行）" title="Enter 发送 · Shift+Enter 换行">发送</button>
+        </div>
+      </div>
+      <!-- 底部用量状态行：一行 ｜ 分隔的纯文本（不可点），贴聊天区下边缘；占位常显，无数据写 0 -->
+      <div class="stats-line" id="statsLine">输入 0 tok ｜ 输出 0 tok ｜ 缓存命中 0% ｜ 0 tok/s</div>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════ 设置模态框：工作空间 / 存档 ══════════ -->
+<div class="overlay" id="settingsOverlay" style="display:none;" role="dialog" aria-modal="true" aria-label="工作空间设置">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="modalTitle"></h2>
+        <div class="sub" id="modalSub">工作空间 · 失焦即保存 · 右键目录/文件操作，拖动文件移动</div>
+      </div>
+      <button class="modal-close" id="closeModal" aria-label="关闭">×</button>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="workspace">工作空间</button>
+      <button class="tab" data-tab="saves">存档</button>
+    </div>
+
+    <div class="tab-panel active" data-panel="workspace">
+      <div id="modalEditorHost" style="flex:1 1 auto; min-width:0; width:100%; height:100%;"></div>
+    </div>
+
+    <!-- 存档 -->
+    <div class="tab-panel saves-panel" data-panel="saves">
+      <div class="saves-head">
+        <span class="t">savings/ 内每个目录 = 一个存档（目录名即存档名，内容为 runtime/ 完整快照）；autosave 以 autosave-&lt;时间戳&gt; 命名、保留最近 10 份；手动存档不参与清理</span>
+      </div>
+      <div class="saves-list" id="saveList"><!-- JS 渲染 --></div>
+      <div class="load-note">
+        <span>「载入」把选定快照恢复到 runtime/（世界状态回滚点，对话历史保留在活会话中）；快照文件只读。</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 保存弹框：列已有存档（点击填名=覆盖）+ 名称输入 ══════════ -->
+<div class="overlay" id="saveDialogOverlay" style="display:none;" role="dialog" aria-modal="true" aria-label="保存快照">
+  <div class="modal sv-dialog">
+    <div class="modal-head">
+      <div>
+        <h2>保存快照</h2>
+        <div class="sub">写入 savings/&lt;存档名&gt;/ · autosave 自动以 autosave-&lt;时间戳&gt; 命名 · 同名将提示覆盖</div>
+      </div>
+      <button class="modal-close" id="closeSaveDlg" aria-label="关闭">×</button>
+    </div>
+    <div style="padding: 14px 20px 20px;">
+      <div class="sv-list" id="dlgSaveList"></div>
+      <div class="sv-form">
+        <input type="text" id="saveNameInput" placeholder="存档名（即目录名）…" aria-label="存档名">
+        <button class="btn primary" id="confirmSaveBtn">保存</button>
+      </div>
+      <div class="sv-hint">点击上方条目即填入该名称 — 再次保存将覆盖该存档（有确认）。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ API Key 弹框（侧栏右上角入口） ══════════ -->
+<div class="overlay" id="apiKeyOverlay" style="display:none;" role="dialog" aria-modal="true" aria-label="配置 API Key">
+  <div class="modal sv-dialog">
+    <div class="modal-head">
+      <div>
+        <h2>API Key</h2>
+        <div class="sub">DEEPSEEK_API_KEY · 用于模型请求（缺 Key 时发送会被阻断并引到此处）</div>
+      </div>
+      <button class="modal-close" id="closeApiKey" aria-label="关闭">×</button>
+    </div>
+    <div style="padding: 14px 20px 20px;">
+      <div class="sv-form">
+        <input type="password" id="apiKeyInput" placeholder="sk-…" aria-label="API Key">
+        <button class="btn primary" id="confirmApiKey">保存</button>
+      </div>
+      <div class="sv-hint">原型仅演示配置界面 — 真实值存于本机 dsh credentials，不经原型保存。</div>
+    </div>
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctxMenu"></div>
+<div class="toasts" id="toasts"></div>
+<div class="proto-tag">DSH tavern prototype · 静态交互原型 · 无 emoji</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ══════════ 目录与数据 ══════════
+     - 工作空间：tavern_workspace/<时间戳>/
+     - 设定卡库：tavern_presets/（与 tavern_workspace 平级） */
+  const CARD_BASE = "tavern_workspace";
+  const LIB_BASE = "tavern_presets";
+
+  const CARDS = [
+    { id: "s1", mono: "酒", name: "火把酒馆的冒险", desc: "DND 5e · 小镇温馨酒馆",
+      state: "进行中", ws: CARD_BASE + "/20260909-2350", transcript: "tavern", tailOn: true, history: true, active: true },
+    { id: "s2", mono: "坑", name: "雾山矿坑", desc: "探险向 · 挖掘与夜宿循环",
+      state: "进行中", ws: CARD_BASE + "/20260908-1910", transcript: "mine", tailOn: true, history: true, active: false },
+    { id: "s3", mono: "新", name: "新会话 · 未导入卡片", desc: "干净工作空间 · 等待选择卡片来源",
+      state: "开局 · 先选卡片", ws: CARD_BASE + "/20260910-1801", transcript: "fresh", active: false }
+  ];
+
+  /* 设定卡库（tavern_presets/）— 每张卡的元数据来自其 preset/meta.json（标题 / 简介 / 封面图） */
+  const LIB = [
+    { nm: "tavern-tavern", tint: "tint-a", cover: "assets/town-map.png",
+      meta: { title: "小镇酒馆", desc: "一个小型奇幻城镇的温馨 DND 5e 酒馆。" },
+      adopt: { mono: "酒", name: "小镇酒馆", desc: "来自卡库 · tavern-tavern", state: "开场", transcript: "tavern", tailOn: true, history: false,
+        done: "已加载 tavern_presets/tavern-tavern/ · preset/ 就位 · runtime/ 已播种" } },
+    { nm: "mine-fog", tint: "tint-b", cover: "assets/mine-cover.png",
+      meta: { title: "雾山矿坑", desc: "探险向 · 挖掘与夜宿循环 · 含矿石检定脚本。" },
+      adopt: { mono: "坑", name: "雾山矿坑", desc: "来自卡库 · mine-fog", state: "开场", transcript: "mine", tailOn: true, history: false,
+        done: "已加载 tavern_presets/mine-fog/ · preset/ 就位 · runtime/ 已播种" } },
+    { nm: "pale-throne", tint: "tint-c", cover: "assets/throne-cover.png",
+      meta: { title: "苍白王座", desc: "史诗向 · 长线剧情 · 银军压境的第 7 章。" },
+      adopt: { mono: "座", name: "苍白王座", desc: "来自卡库 · pale-throne", state: "开场", transcript: "mine", tailOn: false, history: false,
+        done: "已加载 tavern_presets/pale-throne/ · preset/ 就位 · runtime/ 已播种（maintenancePrompt 为空 → 尾代理关闭）" } }
+  ];
+
+  /* 开场白页面：无聊天历史时以 iframe 渲染；选项点击 postMessage 给父页，填入输入框 */
+  const OPENING_HTML_SRC = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      'body{font-family:Georgia,"Songti SC","Noto Serif SC",serif;background:#fdfcf9;color:#29261f;margin:0;padding:36px 42px;line-height:2;font-size:15.5px;}' +
+      'h1{font-family:"PingFang SC",sans-serif;font-size:12px;letter-spacing:2px;color:#b3860a;margin:0 0 18px;font-weight:600;}' +
+      'em{font-style:normal;color:#b3860a;}' +
+      '.opts{margin-top:26px;padding-top:18px;border-top:1px dashed #e2ded2;font-family:"PingFang SC",sans-serif;}' +
+      '.opts h2{font-size:11px;color:#8b877c;letter-spacing:2px;margin:0 0 10px;font-weight:600;}' +
+      'button{display:block;width:100%;text-align:left;margin:0 0 8px;padding:10px 14px;border-radius:10px;' +
+      'border:1px solid #e2ded2;background:#fff;color:#3d3a33;font-size:13px;cursor:pointer;}' +
+      'button:hover{border-color:#d8c07a;background:rgba(212,160,23,0.08);}' +
+      '</style></head><body>' +
+      '<h1>开场 · 第 1 夜 暮雨</h1>' +
+      '<p>雨下了一整天。你循着唯一亮着的灯，推开酒馆的大门——门很沉，风把它摔在你身后。<br>' +
+      '炉火把长桌照得半明半暗，三个佣兵在柜台尽头压低声音，说的是矿道塌方的事；角落里一个蒙面旅人端着没动过的酒。<br>' +
+      '守店人抬眼看了看你，把一只杯子放上柜台：<em>「想活命，就别踩进雾里去。」</em></p>' +
+      '<div class="opts"><h2>开场白选项 — 点击填入输入框，再点发送；也可以自己写</h2>' +
+      '<button data-insert="我抖落斗篷上的雨水，向守店人要一杯热酒，顺便打听镇上最近的传闻。">要一杯热酒，打听传闻</button>' +
+      '<button data-insert="我不急着说话，先找炉边的空位坐下，观察那三个佣兵和蒙面旅人。">坐下观察酒馆里的人</button>' +
+      '<button data-insert="「守店人，问个事——这附近哪张床是空的？」我直接开口，把一枚铜板拍在柜台上。">直接开口问床位</button>' +
+      '</div>' +
+      '<scr' + 'ipt>document.addEventListener("click",function(e){var b=e.target.closest("[data-insert]");' +
+      'if(b){parent.postMessage({t:"tavern-insert",text:b.getAttribute("data-insert")},"*");}});<' + '/scr' + 'ipt></body></html>';
+
+  /* ══════════ 工作空间文件（演示卡：火把酒馆）══════════ */
+  const RO_TAIL = "尾代理维护";
+  const RO_SAVE = "存档快照";
+  const FS = {
+    "preset/meta.json": { content: "{\n  \"title\": \"小镇酒馆\",\n  \"desc\": \"一个小型奇幻城镇的温馨 DND 5e 酒馆。\",\n  \"cover\": \"assets/town-map.png\"\n}" },
+    "preset/prompt/systemPrompt": { content: "你是酒馆「火把酒馆」的守店人。\n\n用生动的散文风格描写场景、NPC 的反应与世界事件；屋外风暴庇护着小镇，炉火在店里噼啪作响。分歧点必须先掷骰，并尊重骰出的结果。" },
+    "preset/prompt/prefixPrompt": { content: "酒馆里传来低沉的人声。炉火噼啪作响，酒客们低声交谈。路上的传闻随风飘来：\n\n你做什么？" },
+    "preset/prompt/postPrompt": { content: "夜色渐浓，壁炉的火光在人脸上明明灭灭。\n\n你做什么？" },
+    "preset/prompt/maintenancePrompt": { content: "你是「火把酒馆」的记账员（维护代理）。\n\n每个回合结束后，根据刚发生的叙事更新工作空间文档：推进时间与地点；调整 NPC 立场与知情事项；必要时新增或归档场景条目。\n\n只使用引擎提供的固定 runtime* 工具；文档保持事实性与简洁。你吃不到 prefix/post 快照，也不回话给玩家。" },
+    "preset/setup/opening.html": { content: OPENING_HTML_SRC },
+    "preset/setup/state.md": { content: "# Game State\n\n- 位置：The Old Fang Tavern, Millhaven\n- 天数：1\n- 任务：无" },
+    "preset/setup/npcs/bartender.md": { content: "# 守店人 · 老獾\n\n沉默寡言，对陌生人保持警惕。态度：中立（会因玩家表现改变）" },
+    "preset/tools/roll.sh": { content: "#!/bin/bash\n# DND 5e Dice Roller — usage: roll.sh [n]d[sides] [modifier]\n# Example: roll.sh 2d6+3\nset -euo pipefail\nINPUT=\"${1:-1d20}\"\nDICE=$(echo \"$INPUT\" | grep -oP '\\d+d\\d+' || echo \"1d20\")\nMODIFIER=$(echo \"$INPUT\" | grep -oP '[+-]\\d+$' || echo \"+0\")\nCOUNT=$(echo \"$DICE\" | cut -d'd' -f1)\nSIDES=$(echo \"$DICE\" | cut -d'd' -f2)\nTOTAL=0\nfor i in $(seq 1 \"$COUNT\"); do ROLL=$((RANDOM % SIDES + 1)); TOTAL=$((TOTAL+ROLL)); done\nTOTAL=$((TOTAL + MODIFIER))\necho \"Rolled $INPUT -> $TOTAL\"" },
+    "preset/scripts/get_turn.sh": { content: "#!/bin/bash\n# 读 runtime/state.md，返回 {{get_turn}} 渲染用的时刻短句\nhead -n 4 runtime/state.md | tail -n 2" },
+    "runtime/state.md": { ro: RO_TAIL, content: "# 世界状态（尾代理维护）\n\n- 天数：2\n- 时刻：夜晚，火把摇曳\n- 进行中：蒙面旅人在角落饮着没动的酒；佣兵们低声议论矿道塌方" },
+    "runtime/npcs/bartender.md": { ro: RO_TAIL, content: "# 守店人 · 老獾（runtime）\n\n态度：中立 → 微暖\n知晓：矿道塌方、酒窖里睡了逃债人" },
+    "runtime/quests/mistside.md": { ro: RO_TAIL, content: "# 世界书 · 雾道之谜\n\n玩家已知：塌方并非事故；有人打开了「不该打开的门」。\n指引：寻找矿上最后一个回来的人。" },
+    "savings/autosave-20260910-0241/state.md": { ro: RO_SAVE, content: "# 快照 · autosave-20260910-0241\n\n天数 2 · 夜晚 · 火把摇曳" },
+    "savings/autosave-20260910-0241/quests/mistside.md": { ro: RO_SAVE, content: "# 快照 · 世界书\n\n玩家已知：塌方并非事故。" },
+    "savings/autosave-20260910-0107/state.md": { ro: RO_SAVE, content: "# 快照 · autosave-20260910-0107\n\n天数 1 · 暮雨" },
+    "savings/第一次抉择/state.md": { ro: RO_SAVE, content: "# 快照 · 第一次抉择\n\n玩家刚从老獾处得到雾道线索。天数 2 · 夜晚" }
+  };
+
+  /* 制作卡片骨架 FS：preset/setup、preset/scripts、preset/tools 各含一份 README 指南；仅 prompt/ 有四个空文件；runtime/、savings/ 为空 */
+  const DRAFT_FS = {
+    "preset/prompt/systemPrompt": { content: "" },
+    "preset/prompt/prefixPrompt": { content: "" },
+    "preset/prompt/postPrompt": { content: "" },
+    "preset/prompt/maintenancePrompt": { content: "" },
+    "preset/setup/opening.html": { content: OPENING_HTML_SRC },
+    "preset/meta.json": { content: "{\n  \"title\": \"\",\n  \"desc\": \"\",\n  \"cover\": \"\"\n}" },
+    "preset/setup/README.md": { content: "# setup/ — 初始可变状态模板\n\n存放卡片开局的世界状态模板。会话开始时，本目录整体复制为 runtime/，作为尾代理维护的基线。\n\n建议放置：\n- state.md — 世界 / 时间 / 地点的总状态\n- player.md — 玩家角色表\n- npcs/ — NPC 初始状态（每人一个文件）\n- scenes/ — 初始场景描述\n\n均为 Markdown，命名任意；runtime/ 中由尾代理持续更新。" },
+    "preset/scripts/README.md": { content: "# scripts/ — 提示词模板脚本\n\n存放 {{scriptName(args)}} 提示词模板脚本：纯 .sh，经 stdin/stdout 子进程执行。\n\n规则：\n- 文件名即引用名：{{get_turn}} 对应 get_turn.sh\n- 标准输出即替换文本，注入提示词\n- 渲染发生在提示词文本产出前；脚本缺失或失败时，占位符原样保留\n- 可读取 runtime/ 以反映当前世界状态" },
+    "preset/tools/README.md": { content: "# tools/ — 主代理 CLI 工具\n\n主代理可见的工具脚本：纯 .sh，经 executeTools(\"<名>\", [参数串]) 调用。\n\n规则：\n- `-h` 输出即工具自述（模型可见，随请求附带，按文件 mtime 缓存）\n- 路径围栏限定在本目录，拒绝路径穿越\n- 本目录只服务主代理；尾代理的 runtime* 工具由引擎写死，与本目录无关" }
+  };
+  let WORKSPACE_FS = FS; // 当前会话工作空间的文件表：演示卡 = 全局 FS，导入卡 = 各自解析结果
+  let CUR_FS = FS; // 编辑器当前文件源：聊天视图 = WORKSPACE_FS，制作卡片页 = 骨架，导入页 = 预览表
+
+  /* ══════════ 剧情 ══════════ */
+  const STORY = {
+    tavern: [
+      { u: "我推门走进火把酒馆，想找个落脚的地方。" },
+      { a: "沉重的木门在你身后合上，把一股冷雨关在外面。壁炉里的火噼啪作响，三个落籍佣兵压低声音谈着矿道塌方的事。\n\n守店人老獾把一杯浊酒搁上柜台，目光在你湿透的斗篷上停了停：「想活命，就别踩进雾里去。」" },
+      { u: "角落里那个蒙面旅人整晚没碰酒杯。我趁着添酒的时候压低声音，试着从老獾嘴里套点话。" },
+      { think: "先回想 runtime 里关于矿道塌方的两条线索，蒙面旅人的沉默是否与老獾的警告相扣。要不要让老獾松口——玩家在观察，适合先给他一个感知检定的机会，难度定在中档。" },
+      { tool: {
+          name: "roll.sh",
+          input: "executeTools(\"roll.sh\", [\"1d20\"])",
+          output: "Narrative checkpoint: 套话 · 老獾对矿道塌方的态度\nRolled 1d20 -> 17 (natural 17)\nDC 12 -> 成功\n代理必须同时尊重叙事检查点与骰面结果。"
+        } },
+      { a: "老獾的手在柜面敲了两下——那是他想了想的节奏。\n\n「塌方？不是塌的。」他往炉子里丢了块柴，「是有人把不该打开的门打开了。那扇门后头通哪儿，去问矿上最后一个回来的人——如果你找得到他。」\n\n火光一跳，蒙面旅人的杯沿轻轻磕了一声。" },
+      { tail: {
+          summary: "更新 3 个 runtime 文档 · autosave 已写入 savings/",
+          records: [
+            { tool: "runtimeUpdate", arg: "runtime/state.md", note: "天数 1 → 2 · 时刻：夜晚，火把摇曳" },
+            { tool: "runtimeUpdate", arg: "runtime/npcs/bartender.md", note: "态度：中立 → 微暖 · 知晓 ＋「蒙面旅人整晚未饮」" },
+            { tool: "runtimeCreate", arg: "runtime/quests/mistside.md", note: "新建世界书条目「雾道之谜」" }
+          ]
+        } }
+    ],
+    mine: [
+      { u: "我沿着矿道往下走，头灯照见前方的岔口。" },
+      { think: "开局回合：交代环境与第一处抉择，节奏放慢，不急着上检定。" },
+      { a: "头灯的光柱扫过岔口。左侧巷道留着新鲜的镐痕，泥地上有拖拽的印记；右侧巷道静得只听见水滴，一滴，又一滴。\n\n更远的黑暗里，好像有什么东西轻轻动了一下。" }
+    ]
+  };
+
+  const OPENING_STORY = {
+    tavern: "沉重的木门在你身后合上，把一股冷雨关在外面。壁炉里的火噼啪作响，三个落籍佣兵压低声音谈着矿道塌方的事。\n\n守店人老獾把一杯浊酒搁上柜台，目光在你湿透的斗篷上停了停：「想活命，就别踩进雾里去。」",
+    mine: "头灯的光柱扫过岔口。左侧巷道留着新鲜的镐痕，泥地上有拖拽的印记；右侧巷道静得只听见水滴，一滴，又一滴。\n\n更远的黑暗里，好像有什么东西轻轻动了一下。"
+  };
+
+  const THINK_LINE =
+    "玩家要的是故事而非搜证。回应三点：一、蒙面旅人主动暴露一分破绽，把悬念递出；二、老獾保持警惕但值得信任；三、把下一场景的钩子留在「最后一个回来的人」。语气承接炉火与夜。";
+  const REPLY_LINE =
+    "老獾把火钳往炉沿一搁，抬眼看了你半晌。\n\n「想去矿上，就等雾散。」他说，「散雾之前，这店里的每张床都被雨夜的债买断了——包括你身后那位。」\n\n蒙面旅人的兜帽极轻地偏过来一线。";
+
+  /* ══════════ 小工具 ══════════ */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function toast(msg, type) {
+    const box = document.createElement("div");
+    box.className = "toast " + (type || "info");
+    box.textContent = msg;
+    $("toasts").appendChild(box);
+    setTimeout(() => box.classList.add("out"), 2400);
+    setTimeout(() => box.remove(), 2900);
+  }
+
+  /* ══════════ 侧栏：会话列表（右键：重命名 / 彻底删除） ══════════ */
+  let current = CARDS.find((c) => c.active) || CARDS[0];
+
+  function renderCards() {
+    const list = $("cardList");
+    list.innerHTML = "";
+    CARDS.forEach((c) => {
+      const el = document.createElement("div");
+      el.className = "card" + (c === current ? " active" : "");
+      el.setAttribute("role", "button");
+      el.tabIndex = 0;
+      el.innerHTML =
+        '<div class="mono">' + esc(c.mono) + "</div>" +
+        '<div><div class="card-name">' + esc(c.name) + "</div>" +
+        '<div class="card-desc">' + esc(c.desc) + "</div>" +
+        '<div class="card-state"><span class="phase">' + (c.transcript === "fresh" ? "◇" : "◆") + "</span><span>" + esc(c.state) + "</span></div>" +
+        '<div class="ws">' + esc(c.ws) + "</div>" +
+        '<button class="card-del" title="彻底删除" aria-label="彻底删除">✕</button></div>';
+      el.addEventListener("click", (e) => {
+        if (e.target.closest(".card-del")) {
+          e.stopPropagation();
+          if (confirm("彻底删除「" + (c.name || c.ws) + "」？工作空间目录（含存档）一并移除，不可恢复。")) {
+            CARDS = CARDS.filter((x) => x !== c);
+            if (current === c) { current = null; renderView(); }
+            renderCards();
+          }
+          return;
+        }
+        if (c !== current) { current = c; renderCards(); renderView(); }
+      });
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter") { if (c !== current) { current = c; renderCards(); renderView(); } } });
+      list.appendChild(el);
+    });
+    $("cardCount").textContent = CARDS.length + " 个";
+  }
+
+  function newSession() {
+    const d = new Date();
+    const pad = (n) => ("0" + n).slice(-2);
+    const dir = CARD_BASE + "/" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+    const card = { id: "s" + Date.now(), mono: "新", name: "新会话 · 未导入卡片", desc: "干净工作空间 · 等待选择卡片来源",
+      state: "开局 · 先选卡片", ws: dir, transcript: "fresh", active: false };
+    CARDS.push(card);
+    current = card;
+    renderCards();
+    renderView();
+    toast("已创建干净工作空间 " + wsLayout(card) + "（mkdir -p：preset、runtime、savings 三个空目录）", "success");
+  }
+
+  function wsLayout(c) { return c.ws + "/{preset,runtime,savings}/"; }
+  $("newSessionBtn").addEventListener("click", newSession);
+
+  /* ══════════ 主区视图（就地切换，无弹窗） ══════════ */
+  let view = "chat"; // chat | onboard | importPreview | draft | empty
+  let turnEpoch = 0; // 回合代次：视图重渲即递增，进行中的回合动画链（setTimeout 闭包）凭代次自检作废
+
+  function syncChrome() {
+    $("chatTitle").textContent = current ? current.name : "没有会话";
+    $("modalTitle").textContent = current ? current.name : "";
+    const started = current && current.transcript !== "fresh" && (view === "chat" || view === "opening");
+    $("headActions").style.display = started ? "flex" : "none";
+    $("composerWrap").style.display = started ? "block" : "none";
+    // 开场页整页平铺：清掉聊天栏 760px 列与内边距（离开开场页的路径也统一经过这里恢复）
+    $("chatBody").classList.toggle("full-bleed", view === "opening");
+  }
+
+  function renderView() {
+    const col = $("chatColumn");
+    col.innerHTML = "";
+    // 切换视图 = 旧回合动画全部作废；输入/记账状态一并复位，不把上一会话的阶段残迹带进新视图
+    turnEpoch++;
+    tailBusy = false;
+    resetTurnStats();
+    $("tailLock").classList.remove("show");
+    input.placeholder = "你的行动…";
+    sendBtn.disabled = !input.value.trim();
+    // 导入卡加载后其工作空间文件表随会话走（卡库演示卡沿用全局演示 FS）
+    WORKSPACE_FS = current && current.fs ? current.fs : FS;
+    view = !current ? "empty" : (current.transcript === "fresh" && view !== "draft" && view !== "importPreview" ? "onboard" : view);
+    if (current && current.transcript !== "fresh") view = current.history ? "chat" : "opening";
+    if (view === "importPreview" && IMPORT) CUR_FS = IMPORT.fs;
+    else if (view !== "draft") CUR_FS = FS;
+
+    if (view === "empty") {
+      col.innerHTML = '<div class="ob-wrap"><div class="ob-title">没有会话</div>' +
+        '<div class="ob-sub">点击左下「＋ 开启新会话」在当前目录创建 tavern_workspace/&lt;时间戳&gt;/</div></div>';
+      syncChrome();
+      return;
+    }
+
+    if (view === "onboard") {
+      col.innerHTML = onboardHTML();
+      wireOnboard();
+      syncChrome();
+      return;
+    }
+    if (view === "importPreview") {
+      if (!IMPORT) { view = "onboard"; renderView(); return; }
+      col.innerHTML = importPreviewHTML();
+      wireImportPreview();
+      syncChrome();
+      return;
+    }
+    if (view === "draft") {
+      col.innerHTML = draftHTML();
+      wireDraft();
+      syncChrome();
+      return;
+    }
+
+    if (view === "opening") {
+      col.innerHTML = openingHTMLView();
+      syncChrome();
+      return;
+    }
+
+    // chat
+    const story = STORY[current.transcript] || [];
+    story.forEach((m) => {
+      if (m.u) col.insertAdjacentHTML("beforeend", userHTML(m.u));
+      if (m.a) col.insertAdjacentHTML("beforeend", narrativeHTML(current.transcript === "mine" ? "雾山矿坑 · 矿道" : "火把酒馆 · 夜", m.a));
+      if (m.think) col.insertAdjacentHTML("beforeend", flowRowHTML("think", "思考", m.think.split("\n")[0], { text: m.think }));
+      if (m.tool) col.insertAdjacentHTML("beforeend", flowRowHTML("tool", m.tool.name, m.tool.output.split("\n").find((l) => l.indexOf("Rolled") === 0) || "", m.tool));
+      if (m.tail) col.insertAdjacentHTML("beforeend", tailRowHTML(m.tail.summary, m.tail.records, false));
+    });
+    wireFlowRows(col);
+    syncChrome();
+    scrollBottom();
+  }
+
+  function backHTML(target) {
+    return '<button class="ob-back" data-back="' + target + '">← 返回</button>';
+  }
+
+  function onboardHTML() {
+    const tiles = LIB.map((c) =>
+      '<div class="lib-card" data-lib="' + esc(c.nm) + '" tabindex="0" role="button" aria-label="加载 ' + esc(c.meta.title) + '">' +
+        '<div class="lib-acts">' +
+          '<button class="lib-act del" data-act="del" title="从卡库删除" aria-label="删除">' +
+            '<svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>' +
+          "</button>" +
+          '<button class="lib-act ed" data-act="edit" title="编辑卡" aria-label="编辑">' +
+            '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M11.2 1.8l3 3L5.4 13.6 1.5 14.5l.9-3.9z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/></svg>' +
+          "</button>" +
+        "</div>" +
+        '<div class="lib-cover ' + c.tint + '">' + esc(c.cover) + "</div>" +
+        '<div class="lib-body"><div class="lib-title">' + esc(c.meta.title) + '</div>' +
+        '<div class="lib-desc">' + esc(c.meta.desc || "（简介待补）") + "</div></div>" +
+      "</div>").join("");
+    const grid = LIB.length
+      ? '<div class="lib-grid">' + tiles + "</div>" +
+        '<div class="ob-note" style="margin-top:12px;">点击卡片即加载进本会话；悬停显示右上角的删除与编辑。卡片元数据来自其 preset/meta.json（标题 / 简介 / 封面图）。</div>'
+      : '<div class="ob-panel"><div class="sv-empty">卡库为空 — 右上角「创建新卡」，或从其他目录 / 酒馆卡导入</div></div>';
+    return (
+      '<div class="ob-wrap" style="max-width: none;">' +
+        '<div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">' +
+          '<div><div class="ob-title">卡库 · ' + esc(LIB_BASE) + '/</div>' +
+          '<div class="ob-sub">' + esc(current.ws) + "/ · 点击一张卡直接加载</div></div>" +
+          '<div class="head-actions">' +
+            '<button class="text-btn" data-flow="draft">创建新卡</button>' +
+            '<button class="text-btn" data-flow="dirimport" title="弹出系统目录选择框 — 选定后进入只读导入预览">从其他目录导入</button>' +
+            '<button class="text-btn" data-flow="json" title="弹出系统文件选择框 — 选一张酒馆卡 .json，解析后进入只读导入预览">从酒馆卡导入</button>' +
+          "</div>" +
+        "</div>" + grid + "</div>"
+    );
+  }
+
+  let draftCtx = { title: "创建新卡", loc: LIB_BASE + "/untitled-card/" };
+
+  function wireOnboard() {
+    col_qsa("[data-flow]").forEach((b) => {
+      b.addEventListener("click", () => {
+        if (b.dataset.flow === "draft") {
+          draftCtx = { title: "创建新卡", loc: LIB_BASE + "/untitled-card/" };
+          view = "draft";
+          renderView();
+          return;
+        }
+        // 两个导入入口：直接弹系统选择框（目录 / .json 文件），选定后进入导入预览页
+        if (b.dataset.flow === "dirimport") pickCardDir();
+        else pickJsonFile();
+      });
+    });
+    col_qsa(".lib-card").forEach((card) => {
+      const lib = LIB.find((x) => x.nm === card.dataset.lib);
+      if (!lib) return;
+      card.addEventListener("click", () => adoptCard(lib.adopt));
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); adoptCard(lib.adopt); }
+      });
+      col_qsa_in(card, "[data-act]").forEach((b) => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (b.dataset.act === "edit") {
+            draftCtx = { title: "编辑卡", loc: LIB_BASE + "/" + lib.nm + "/" };
+            view = "draft";
+            renderView();
+            return;
+          }
+          if (!window.confirm("从卡库删除 " + LIB_BASE + "/" + lib.nm + "/ ？此操作不可恢复。")) return;
+          LIB.splice(LIB.indexOf(lib), 1);
+          renderView();
+          toast("已从卡库删除 " + lib.nm, "info");
+        });
+      });
+    });
+  }
+
+  function col_qsa_in(root, sel) { return root.querySelectorAll(sel); }
+
+  const col_qsa = (sel) => $("chatColumn").querySelectorAll(sel);
+
+  /* ══════════ 导入：弹系统选择框 → 解析为标准卡结构 → 只读预览 → 保存并开始 ══════════
+     kind = "dir"  → webkitdirectory 目录选择框，目录内容实读后归一化为标准卡结构
+     kind = "json" → .json 文件选择框，读取酒馆卡三字段（system_prompt / pre_prompt / post_prompt） */
+  let IMPORT = null;
+
+  const IMPORT_TINTS = ["tint-a", "tint-b", "tint-c", "tint-d"];
+  // 文本优先：提示词文件（systemPrompt 等）没有扩展名，之外按黑名单识别二进制
+  const BINARY_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "icns", "tiff",
+    "mp3", "wav", "ogg", "flac", "m4a", "aac", "mp4", "mov", "avi", "mkv", "webm",
+    "woff", "woff2", "ttf", "otf", "eot", "zip", "gz", "tar", "7z", "rar", "bz2", "xz",
+    "pdf", "exe", "dll", "bin", "wasm", "class", "pyc", "so", "dylib", "db", "sqlite", "sqlite3"]);
+  const IMPORT_FILE_LIMIT = 300; // 原型防御：误选巨型目录时终止而不是卡死
+  const IMPORT_TEXT_LIMIT = 1024 * 1024; // 与工作空间预览规则一致：>1 MB 不读入内容
+
+  /* 临时触发系统选择框；用户取消（未触发 change）则停留卡库页 */
+  function pickCardDir() {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.setAttribute("webkitdirectory", "");
+    inp.setAttribute("multiple", "");
+    inp.addEventListener("change", async () => {
+      const files = Array.from(inp.files || []);
+      inp.remove();
+      if (files.length) await buildDirImport(files);
+    });
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.click();
+  }
+
+  function pickJsonFile() {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".json,application/json";
+    inp.addEventListener("change", async () => {
+      const f = inp.files && inp.files[0];
+      inp.remove();
+      if (!f) return;
+      let obj = null;
+      try { obj = JSON.parse(await f.text()); } catch { /* 解析失败 → 按无效卡处理 */ }
+      if (!obj || typeof obj !== "object") { toast("不是有效的 JSON 卡文件：" + f.name, "error"); return; }
+      buildJsonImport(f.name, obj);
+    });
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.click();
+  }
+
+  /* 酒馆卡三字段读取：顶层优先，SillyTavern v2 的 data.* 嵌套兼容 */
+  function cardField(obj, key) {
+    if (typeof obj[key] === "string") return obj[key];
+    if (obj.data && typeof obj.data[key] === "string") return obj.data[key];
+    return null;
+  }
+
+  function buildJsonImport(fileName, obj) {
+    const base = fileName.replace(/\.json$/i, "");
+    const fields = {
+      systemPrompt: cardField(obj, "system_prompt"),
+      prefixPrompt: cardField(obj, "pre_prompt"),
+      postPrompt: cardField(obj, "post_prompt")
+    };
+    const missing = Object.keys(fields).filter((k) => fields[k] === null)
+      .map((k) => (k === "systemPrompt" ? "system_prompt" : k === "prefixPrompt" ? "pre_prompt" : "post_prompt"));
+    const fs = {
+      "preset/meta.json": { content: JSON.stringify({ title: cardField(obj, "name") || base, desc: cardField(obj, "description") || "", cover: "" }, null, 2) },
+      "preset/prompt/systemPrompt": { content: fields.systemPrompt || "" },
+      "preset/prompt/prefixPrompt": { content: fields.prefixPrompt || "" },
+      "preset/prompt/postPrompt": { content: fields.postPrompt || "" },
+      "preset/prompt/maintenancePrompt": { content: "" } // 酒馆卡不携带维护提示词 → 尾代理默认关闭
+    };
+    let note = "读取 system_prompt / pre_prompt / post_prompt → 分别写入 preset/prompt/{systemPrompt, prefixPrompt, postPrompt} · maintenancePrompt 留空（尾代理关闭）· setup / scripts / tools 以空目录补齐";
+    if (missing.length) note += " · 未找到 " + missing.join(" / ") + " → 留空";
+    IMPORT = { kind: "json", label: fileName, name: base, fs: fs, dirs: ["preset/prompt", "preset/setup", "preset/scripts", "preset/tools"], note: note, coverText: "（无封面图）" };
+    showImportPreview();
+  }
+
+  async function buildDirImport(list) {
+    if (list.length > IMPORT_FILE_LIMIT) { toast("原型一次最多读入 " + IMPORT_FILE_LIMIT + " 个文件（所选目录超限）", "error"); return; }
+    const files = list.filter((f) => !f.name.startsWith(".")); // .DS_Store 等隐藏文件不属于卡片内容
+    if (!files.length) { toast("所选目录没有可导入的文件：" + (list[0] ? (list[0].webkitRelativePath || list[0].name).split("/")[0] : ""), "error"); return; }
+    const rootName = (files[0].webkitRelativePath || files[0].name).split("/")[0];
+    const rels = files.map((f) => {
+      const rp = f.webkitRelativePath || f.name;
+      return rp.indexOf(rootName + "/") === 0 ? rp.slice(rootName.length + 1) : rp;
+    });
+    // 结构归一化：已含 preset/ 照搬；平铺的 prompt/setup/scripts/tools 映射进 preset/；两者皆无 → 拒绝
+    const hasPreset = rels.some((p) => p.indexOf("preset/") === 0);
+    const isFlat = rels.some((p) => p === "meta.json" || /^(prompt|setup|scripts|tools)\//.test(p));
+    if (!hasPreset && !isFlat) { toast("所选目录需含 preset/（或平铺的 prompt / setup / scripts / tools 结构）：" + rootName, "error"); return; }
+    const dest = (p) => (hasPreset ? p : "preset/" + p);
+    const fs = {};
+    let skippedMedia = 0, skippedLarge = 0;
+    await Promise.all(files.map(async (f, i) => {
+      const path = dest(rels[i]);
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (BINARY_EXT.has(ext)) {
+        skippedMedia++;
+        fs[path] = { media: true, cap: "二进制文件（原型不渲染内容）· " + (f.size > 1024 ? Math.round(f.size / 1024) + " KB" : f.size + " B") };
+      } else if (f.size > IMPORT_TEXT_LIMIT) {
+        skippedLarge++;
+        fs[path] = { media: true, toolarge: path };
+      } else {
+        fs[path] = { content: await f.text() };
+      }
+    }));
+    // 标准结构自动填充：缺失的目录以空目录补齐，缺失的提示词以空文件补齐
+    const present = (d) => Object.keys(fs).some((p) => p === d || p.indexOf(d + "/") === 0);
+    const dirs = ["preset/prompt", "preset/setup", "preset/scripts", "preset/tools"].filter((d) => !present(d));
+    for (const p of ["systemPrompt", "prefixPrompt", "postPrompt", "maintenancePrompt"]) {
+      if (!fs["preset/prompt/" + p]) fs["preset/prompt/" + p] = { content: "" };
+    }
+    if (!fs["preset/meta.json"]) fs["preset/meta.json"] = { content: JSON.stringify({ title: rootName, desc: "", cover: "" }, null, 2) };
+    let note = "目录 " + rootName + "/ → 标准卡结构（" + Object.keys(fs).length + " 项）· 缺失的 setup / scripts / tools 以空目录补齐、缺失的提示词留空";
+    if (skippedMedia) note += " · " + skippedMedia + " 个二进制文件仅登记不预览";
+    if (skippedLarge) note += " · " + skippedLarge + " 个文件超过 1 MB 不读入";
+    IMPORT = { kind: "dir", label: rootName + "/", name: rootName, fs: fs, dirs: dirs, note: note, coverText: "（无封面图）" };
+    showImportPreview();
+  }
+
+  function showImportPreview() { view = "importPreview"; renderView(); }
+
+  /* 导入编辑页：统一编辑器（可直接修改解析结果），「保存并开始」存入卡库并加载进会话 */
+  function importPreviewHTML() {
+    return (
+      '<div class="ob-wrap" style="max-width: none;">' + backHTML("onboard") +
+        '<div style="display:flex; align-items:center; gap:10px;">' +
+          '<div class="ob-title">导入 · ' + esc(IMPORT.label) + '</div>' +
+        "</div>" +
+        '<div class="ob-sub">' + esc(IMPORT.note) + '</div>' +
+        '<div class="draft-editor"><div id="importEditorHost" style="height:100%;"></div></div>' +
+      "</div>"
+    );
+  }
+
+  function wireImportPreview() {
+    mountEditor($("importEditorHost"), {
+      fs: IMPORT.fs,
+      hint: "导入结果 · 可直接编辑 · 保存并开始后存入卡库并进本会话",
+      controls: [tailControl()],
+      actions: [{ id: "importSaveBtn", label: "保存并开始", primary: true, onClick: commitImport }],
+    });
+    selectedPath = IMPORT.fs["preset/prompt/systemPrompt"] && IMPORT.fs["preset/prompt/systemPrompt"].content
+      ? "preset/prompt/systemPrompt" : "preset/meta.json";
+    IMPORT.dirs.forEach((p) => {
+      p.split("/").forEach((seg, i) => openDirs.add(i + "/" + seg));
+    });
+    openFile(selectedPath);
+    col_qsa("[data-back]").forEach((b) => b.addEventListener("click", () => { IMPORT = null; view = "onboard"; renderView(); }));
+  }
+
+  /* 保存并开始：解析结果存入卡库（重名自动后缀），随即加载进当前会话 → 开场页 */
+  function commitImport() {
+    if (!IMPORT) return;
+    let nm = IMPORT.name;
+    if (LIB.some((x) => x.nm === nm)) { let i = 2; while (LIB.some((x) => x.nm === nm + "-" + i)) i++; nm = nm + "-" + i; }
+    // 保存版卡 FS：剥掉编辑态标记（dim 等；media 登记保留）；尾代理停用（checkbox 关或内容空）→ maintenancePrompt 以空串入库
+    // dim 判定必须读编辑缓冲（strip 副本不带标记）
+    const tailOn = !!(IMPORT.fs[TAIL_PATH] && !IMPORT.fs[TAIL_PATH].dim && IMPORT.fs[TAIL_PATH].content.trim().length > 0);
+    const fs = {};
+    Object.keys(IMPORT.fs).forEach((k) => {
+      const m = IMPORT.fs[k];
+      fs[k] = m.media ? { media: true, cap: m.cap, toolarge: m.toolarge } : { content: m.content };
+    });
+    const mp = fs[TAIL_PATH];
+    if (mp && !tailOn) mp.content = "";
+    let meta = null;
+    try { meta = JSON.parse((fs["preset/meta.json"].content || "{}")); } catch { /* meta.json 异常时用目录名兜底 */ }
+    meta = meta && typeof meta === "object" ? meta : {};
+    meta.title = meta.title || nm;
+    meta.desc = meta.desc || "";
+    meta.cover = meta.cover || IMPORT.coverText;
+    const adopt = {
+      mono: "导", name: meta.title,
+      desc: (IMPORT.kind === "json" ? "来自酒馆卡 · " : "来自目录导入 · ") + IMPORT.label,
+      state: "开场", transcript: "import", tailOn: tailOn, fs: fs,
+      done: "已保存卡库 " + LIB_BASE + "/" + nm + "/ · preset/ 就位 · runtime/ 已从 setup 播种 · " + (tailOn ? "尾代理启用" : "尾代理关闭（maintenancePrompt 为空）")
+    };
+    LIB.unshift({ nm: nm, tint: IMPORT_TINTS[LIB.length % IMPORT_TINTS.length], cover: meta.cover, meta: meta, fs: fs, adopt: adopt });
+    IMPORT = null;
+    adoptCard(adopt);
+  }
+
+  /* ── 制作卡片页（统一编辑器 + 顶栏控件） ── */
+  function draftHTML() {
+    return (
+      '<div class="ob-wrap" style="max-width: none;">' + backHTML("onboard") +
+        '<div style="display:flex; align-items:center; gap:10px;">' +
+          '<div class="ob-title">' + esc(draftCtx.title) + '</div>' +
+        "</div>" +
+        '<div class="ob-sub">' + esc(draftCtx.loc) + ' · preset/prompt/ 四张空提示词已就位 · 空目录附 README · meta.json 记录标题/简介/封面 · 失焦即保存</div>' +
+        '<div class="draft-editor"><div id="draftEditorHost" style="height:100%;"></div></div>' +
+      "</div>"
+    );
+  }
+
+  /* 尾代理开关（统一编辑器顶栏 checkbox，制作卡 / 导入页共用）：
+     关闭 → maintenancePrompt 灰显只读（内容保留在编辑缓冲），保存并开始时以空串入库（运行时语义：空 = 不派生尾代理） */
+  const TAIL_PATH = "preset/prompt/maintenancePrompt";
+
+  function tailControl() {
+    const mp = CUR_FS[TAIL_PATH];
+    const on = !!(mp && mp.content.trim().length > 0);
+    if (mp) mp.dim = !on;
+    return {
+      id: "tailToggle", label: "启用尾代理",
+      title: "回合间记账代理。关闭后 maintenancePrompt 灰显、保存时写入空 — 不派生记账代理、无回合闸门、无自动存档",
+      checked: on,
+      onChange: (checked) => {
+        if (mp) mp.dim = !checked;
+        renderTree();
+        if (selectedPath === TAIL_PATH) openFile(TAIL_PATH);
+      },
+    };
+  }
+
+  function wireDraft() {
+    CUR_FS = DRAFT_FS;
+    selectedPath = "preset/prompt/systemPrompt";
+    mountEditor($("draftEditorHost"), {
+      fs: DRAFT_FS,
+      hint: "卡片骨架 · setup / scripts / tools 各含 README · runtime/ 与 savings/ 开局为空",
+      controls: [tailControl()],
+      actions: [{ id: "draftSaveBtn", label: "保存并开始", primary: true, onClick: commitDraft }],
+    });
+    openFile(selectedPath);
+    col_qsa("[data-back]").forEach((b) => b.addEventListener("click", () => { view = "onboard"; renderView(); }));
+  }
+
+  /* 保存并开始（制作/编辑卡）：骨架内容落库 — 新卡入卡库，已有卡更新原条目 — 随即加载进当前会话 */
+  function commitDraft() {
+    const nm = draftCtx.loc.replace(/\/$/, "").split("/").pop();
+    // dim 判定读编辑缓冲（strip 副本不带标记）；尾代理停用（checkbox 关或内容空）→ maintenancePrompt 以空串入库
+    const srcMp = DRAFT_FS[TAIL_PATH];
+    const tailOn = !!(srcMp && !srcMp.dim && srcMp.content.trim().length > 0);
+    const fs = {};
+    Object.keys(DRAFT_FS).forEach((k) => {
+      const m = DRAFT_FS[k];
+      fs[k] = m.media ? { media: true, cap: m.cap, toolarge: m.toolarge } : { content: m.content };
+    });
+    if (!tailOn) fs[TAIL_PATH].content = "";
+    let meta = null;
+    try { meta = JSON.parse((fs["preset/meta.json"].content || "{}")); } catch { /* meta.json 异常时用目录名兜底 */ }
+    meta = meta && typeof meta === "object" ? meta : {};
+    meta.title = meta.title || nm;
+    meta.desc = meta.desc || "";
+    meta.cover = meta.cover || "（无封面图）";
+    const existing = LIB.find((x) => x.nm === nm);
+    const adopt = {
+      mono: existing ? existing.adopt.mono : ((meta.title.charAt(0) || "卡")),
+      name: meta.title,
+      desc: (existing ? "编辑卡 · " : "制作新卡 · ") + LIB_BASE + "/" + nm,
+      state: "开场", transcript: "import", tailOn: tailOn, fs: fs,
+      done: "已保存卡库 " + LIB_BASE + "/" + nm + "/ · preset/ 就位 · runtime/ 已从 setup 播种 · " + (tailOn ? "尾代理启用" : "尾代理关闭（maintenancePrompt 为空）")
+    };
+    if (existing) {
+      existing.meta = meta;
+      existing.cover = meta.cover;
+      existing.fs = fs;
+      existing.adopt = adopt;
+    } else {
+      LIB.unshift({ nm: nm, tint: IMPORT_TINTS[LIB.length % IMPORT_TINTS.length], cover: meta.cover, meta: meta, fs: fs, adopt: adopt });
+    }
+    adoptCard(adopt);
+  }
+
+  function adoptCard(sel) {
+    Object.assign(current, {
+      mono: sel.mono, name: sel.name, desc: sel.desc, state: sel.state,
+      transcript: sel.transcript, tailOn: sel.tailOn, fs: sel.fs
+    });
+    view = "chat";
+    renderCards();
+    renderView();
+    toast(sel.done + " · " + escFooter(sel), "success");
+  }
+  function escFooter(sel) { return sel.ws ? ("工作空间 " + sel.ws) : ("工作空间 " + current.ws); }
+
+  /* ══════════ 消息渲染 ══════════ */
+  function userHTML(text) {
+    return '<div class="msg-user"><div class="bubble-user">' + esc(text) +
+      '<span class="stamp">玩家 · 原文入日志</span></div></div>';
+  }
+  function narrativeHTML(scene, text) {
+    return '<div class="narrative"><span class="scene">' + esc(scene) + "</span>" + esc(text) +
+      '<span class="stamp">叙事 · prefix/post 已随请求注入（不显示）</span></div>';
+  }
+
+  /* DSH web 样式的灰色折叠行（思考 / 工具 / 尾代理） */
+  function flowRowHTML(kind, label, summary, props) {
+    const labelCls = kind === "tool" ? " mono" : "";
+    const body = kind === "tool"
+      ? '<div class="tool-io">' +
+          '<div class="iso"><span class="ilbl">IN</span><span class="itxt">' + esc(props.input) + '</span></div>' +
+          '<div class="iso"><span class="ilbl">OUT</span><span class="itxt">' + esc(props.output) + '</span></div>' +
+        '</div>'
+      : '<div class="body">' + esc(props.text || "") + "</div>";
+    return (
+      '<div class="flow-row" data-kind="' + kind + '">' +
+        '<div class="rowline" role="button" tabindex="0" aria-expanded="false">' +
+          '<span class="lb' + labelCls + '">' + esc(label) + "</span>" +
+          '<span class="sep" aria-hidden="true"></span>' +
+          '<span class="sum"><span class="st">' + esc(summary) + "</span></span>" +
+          '<span class="chev">▸</span>' +
+        "</div>" + body +
+      "</div>"
+    );
+  }
+  function tailBodyHTML(records) {
+    return records.map((r) => r.tool + " " + r.arg + " — " + r.note).join("\n") +
+      "\n— fork 会话 · 上下文 = 最近一个回合的叙事 · 工具为引擎写死的 runtime* 集合";
+  }
+  function tailRowHTML(summary, records, running) {
+    return (
+      '<div class="flow-row' + (running ? " running" : "") + '" data-kind="tail">' +
+        '<div class="rowline" role="button" tabindex="0" aria-expanded="false">' +
+          '<span class="lb">记账 · 尾代理</span>' +
+          '<span class="sep" aria-hidden="true"></span>' +
+          '<span class="sum"><span class="st">' + esc(summary) + "</span></span>" +
+          '<span class="chev">▸</span>' +
+        "</div>" +
+        '<div class="body">' + (running ? "…" : esc(tailBodyHTML(records))) + "</div>" +
+      "</div>"
+    );
+  }
+
+  function wireFlowRows(root) {
+    root.querySelectorAll(".flow-row:not([data-wired])").forEach((row) => {
+      row.setAttribute("data-wired", "1");
+      const line = row.querySelector(".rowline");
+      const toggle = () => {
+        const open = row.classList.toggle("open");
+        line.setAttribute("aria-expanded", open ? "true" : "false");
+      };
+      line.addEventListener("click", toggle);
+      line.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+    });
+  }
+
+  /* 卡未提供 opening.html 时的默认开场页（酒馆卡导入 / 无 setup 内容的目录导入）：展示卡片标题与简介的大卡页 */
+  function fallbackOpeningHTML() {
+    let meta = null;
+    try { meta = JSON.parse((WORKSPACE_FS["preset/meta.json"] || { content: "{}" }).content); } catch { /* meta.json 异常时用会话名兜底 */ }
+    const title = (meta && typeof meta.title === "string" && meta.title) || (current ? current.name : "新冒险");
+    const desc = (meta && typeof meta.desc === "string" && meta.desc) || "";
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      'body{font-family:Georgia,"Songti SC","Noto Serif SC",serif;background:#fdfcf9;color:#29261f;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;}' +
+      '.cardbox{max-width:640px;padding:56px 64px;text-align:center;}' +
+      '.kick{font-family:"PingFang SC",sans-serif;font-size:11px;letter-spacing:6px;color:#b3860a;margin-bottom:24px;font-weight:600;}' +
+      'h1{font-size:34px;line-height:1.45;margin:0 0 20px;font-weight:600;letter-spacing:1px;}' +
+      '.rule{width:56px;height:3px;border-radius:2px;background:#d4a017;margin:0 auto 24px;}' +
+      'p{font-size:14.5px;line-height:2.1;color:#5b564a;margin:0;white-space:pre-wrap;}' +
+      '.hint{margin-top:34px;font-family:"PingFang SC",sans-serif;font-size:11.5px;color:#a8a49a;}' +
+      '</style></head><body><div class="cardbox">' +
+      '<div class="kick">开 场</div>' +
+      '<h1>' + esc(title) + '</h1>' +
+      '<div class="rule"></div>' +
+      (desc ? '<p>' + esc(desc) + '</p>' : "") +
+      '<div class="hint">在下方输入你的第一个行动，冒险即刻开始</div>' +
+      '</div></body></html>';
+  }
+
+  function openingHTMLView() {
+    const meta = WORKSPACE_FS["preset/setup/opening.html"];
+    const src = meta && meta.content && meta.content.trim() ? meta.content : fallbackOpeningHTML();
+    const attr = src.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    return '<div class="opening-wrap"><iframe class="opening-frame" title="开场白" srcdoc="' + attr + '"></iframe></div>';
+  }
+
+  function scrollBottom() {
+    const body = $("chatBody");
+    body.scrollTop = body.scrollHeight;
+  }
+
+  /* ══════════ 发送 → 思考 → 叙事 → （可选）记账 ══════════ */
+  const input = $("inputBox");
+  const sendBtn = $("sendBtn");
+  let tailBusy = false;
+
+  function tailEnabled() {
+    if (current.tailOn === false) return false;
+    const mp = CUR_FS["preset/prompt/maintenancePrompt"];
+    return !mp || mp.content.trim().length > 0;
+  }
+
+  function autosize() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 128) + "px";
+  }
+  input.addEventListener("input", () => { autosize(); sendBtn.disabled = !input.value.trim(); });
+
+  function send() {
+    const text = input.value.trim();
+    if (!text || tailBusy) return;
+    input.value = ""; autosize(); sendBtn.disabled = true;
+
+    const col = $("chatColumn");
+    const epoch = turnEpoch; // 动画链自检凭据：视图/会话切换后逐跳中止
+    if (view === "opening") {
+      current.history = true;
+      current.state = "进行中";
+      const openingText = OPENING_STORY[current.transcript];
+      if (openingText) {
+        const scene = current.transcript === "mine" ? "雾山矿坑 · 矿道" : current.transcript === "import" ? current.name : "火把酒馆 · 夜";
+        col.innerHTML = narrativeHTML(scene, openingText);
+      } else {
+        col.innerHTML = ""; // 导入卡没有内置开场叙事 — 直接进入聊天
+      }
+      view = "chat";
+      renderCards();
+      syncChrome();
+    }
+    col.insertAdjacentHTML("beforeend", userHTML(text));
+    turnInput = ctxEstimate().used; // 请求上下文 = 此刻占用（历史 + 刚入列的用户消息）
+    scrollBottom();
+
+    const rowWrap = document.createElement("div");
+    rowWrap.className = "flow-row running";
+    rowWrap.innerHTML =
+      '<div class="rowline" role="button" tabindex="0" aria-expanded="false">' +
+        '<span class="lb">思考</span>' +
+        '<span class="sep" aria-hidden="true"></span>' +
+        '<span class="sum follow"><span class="st"></span></span>' +
+        '<span class="chev">▸</span>' +
+      "</div>" +
+      '<div class="body"></div>';
+    col.appendChild(rowWrap); scrollBottom();
+    wireFlowRows(rowWrap);
+    const sumEl = rowWrap.querySelector(".st");
+    const bodyEl = rowWrap.querySelector(".body");
+
+    let ti = 0;
+    (function tickThink() {
+      if (epoch !== turnEpoch) return;
+      ti = Math.min(THINK_LINE.length, ti + 3);
+      const shown = THINK_LINE.slice(0, ti);
+      bodyEl.textContent = shown;
+      const lines = shown.split("\n");
+      sumEl.textContent = lines[lines.length - 1] || "…";
+      scrollBottom();
+      if (ti < THINK_LINE.length) setTimeout(tickThink, 18);
+      else collapseThink();
+    })();
+
+    function collapseThink() {
+      if (epoch !== turnEpoch) return;
+      rowWrap.classList.remove("running");
+      rowWrap.querySelector(".sum").classList.remove("follow");
+      sumEl.textContent = THINK_LINE.split("\n")[0];
+      setTimeout(() => { if (epoch === turnEpoch) streamReply(); }, 450);
+    }
+
+    function streamReply() {
+      if (epoch !== turnEpoch) return;
+      const typing = document.createElement("div");
+      typing.className = "typing show";
+      typing.innerHTML = "<i></i><i></i><i></i>";
+      col.appendChild(typing); scrollBottom();
+
+      setTimeout(() => {
+        if (epoch !== turnEpoch) return;
+        typing.remove();
+        const wrap = document.createElement("div");
+        wrap.className = "narrative";
+        col.appendChild(wrap);
+        let i = 0;
+        (function tick() {
+          if (epoch !== turnEpoch) return;
+          i = Math.min(REPLY_LINE.length, i + 3);
+          wrap.textContent = "";
+          const sc = document.createElement("span");
+          sc.className = "scene";
+          sc.textContent = "火把酒馆 · 夜";
+          wrap.appendChild(sc);
+          wrap.appendChild(document.createTextNode(REPLY_LINE.slice(0, i)));
+          if (i < REPLY_LINE.length) { scrollBottom(); setTimeout(tick, 16); }
+          else { wrap.insertAdjacentHTML("beforeend", '<span class="stamp">叙事 · prefix/post 已随请求注入（不显示）</span>'); afterReply(); }
+        })();
+      }, 700);
+    }
+  }
+
+  function afterReply() {
+    settleTurnStats();
+    if (!tailEnabled()) { unlock(); return; }   // maintenancePrompt 为空 → 回合间完全跳过
+    tail();
+  }
+  function unlock() {
+    input.placeholder = "你的行动…";
+    tailBusy = false;
+    sendBtn.disabled = !input.value.trim();
+  }
+
+  function tail() {
+    tailBusy = true;
+    sendBtn.disabled = true;
+    input.placeholder = "记账中 — 可继续输入，发送需等记账完成…";
+    $("tailLock").classList.add("show");
+    const epoch = turnEpoch;
+
+    const records = [
+      { tool: "runtimeUpdate", arg: "runtime/state.md", note: "天数 2 → 3 · 时刻：夜晚，火把摇曳" },
+      { tool: "runtimeUpdate", arg: "runtime/npcs/bartender.md", note: "态度：中立 → 微暖" }
+    ];
+    const holder = document.createElement("div");
+    holder.innerHTML = tailRowHTML("正在按 preset/prompt/maintenancePrompt 维护世界状态…", records, true);
+    const trow = holder.firstElementChild;
+    $("chatColumn").appendChild(trow);
+    wireFlowRows(trow);
+    scrollBottom();
+
+    setTimeout(() => {
+      if (epoch !== turnEpoch) return;
+      trow.classList.remove("running");
+      trow.querySelector(".st").textContent = "更新 " + records.length + " 个 runtime 文档";
+      trow.querySelector(".body").textContent = tailBodyHTML(records);
+      setTimeout(() => {
+        if (epoch !== turnEpoch) return;
+        autoSnapshot();
+        $("tailLock").classList.remove("show");
+        unlock();
+        scrollBottom();
+      }, 900);
+    }, 2400);
+  }
+
+  sendBtn.addEventListener("click", send);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  /* ══════════ 模型与思考强度选择（原型：mock 目录；产品侧读 Host 模型目录） ══════════
+     形态对齐 DSH ui-model-selection：28px 透明胶囊触发器（模型名 · 强度值 ▾）+ 两级钻取菜单 —
+     根面板「模型 / 思考强度」两行 cell（标签 + 右对齐当前值 + 右箭头），钻入各自的列表；
+     分组粘性小标题；选中记号是尾部 ✓（非填充色）；Esc 先退回根面板再关闭 */
+  const MODEL_GROUPS = [
+    { id: "deepseek", name: "DeepSeek", models: [
+      { id: "deepseek-chat", name: "DeepSeek Chat", desc: "对话叙事", reasoning: null },
+      { id: "deepseek-reasoner", name: "DeepSeek Reasoner", desc: "深度推理", reasoning: { efforts: ["off", "low", "high", "max"], default: "high" } },
+    ] },
+  ];
+  const EFFORT_NAMES = { off: "关闭", low: "低", high: "高", max: "最高" };
+  const ALL_MODELS = MODEL_GROUPS.flatMap((g) => g.models);
+  let modelPick = { model: "deepseek-chat", effort: null };
+  try {
+    const saved = JSON.parse(localStorage.getItem("tavern.model") || "null");
+    if (saved && ALL_MODELS.some((m) => m.id === saved.model)) modelPick = saved;
+  } catch { /* 存储不可用时用默认选择 */ }
+
+  const modelBtn = $("modelBtn");
+  const modelPop = $("modelPop");
+  let modelPane = "root"; // root | model | effort
+  const effName = (id) => EFFORT_NAMES[id] || id;
+  const pickModel = () => ALL_MODELS.find((m) => m.id === modelPick.model) || ALL_MODELS[0];
+  const curEffortLabel = (m) => (m.reasoning && modelPick.effort ? effName(modelPick.effort) : "");
+
+  const mpEl = (tag, cls, txt) => {
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (txt !== undefined) el.textContent = txt;
+    return el;
+  };
+  const mpOption = (label, selected, onClick, title) => {
+    const opt = mpEl("button", "mp-option" + (selected ? " selected" : ""));
+    opt.type = "button";
+    opt.setAttribute("role", "menuitemradio");
+    opt.setAttribute("aria-checked", selected ? "true" : "false");
+    if (title) opt.title = title;
+    opt.append(mpEl("span", "copy", label), mpEl("span", "chk", "✓"));
+    opt.addEventListener("click", onClick);
+    return opt;
+  };
+
+  function saveModelPick() {
+    try { localStorage.setItem("tavern.model", JSON.stringify(modelPick)); } catch { /* 忽略 */ }
+    const cur = pickModel();
+    const effort = curEffortLabel(cur);
+    $("modelBtnName").textContent = cur.name;
+    $("modelBtnEffort").textContent = effort ? " · " + effort : "";
+  }
+
+  function renderModelMenu() {
+    const cur = pickModel();
+    modelPop.innerHTML = "";
+    if (modelPane === "root") {
+      const modelCell = mpEl("button", "mp-cell");
+      modelCell.type = "button";
+      modelCell.append(mpEl("span", "lab", "模型"), mpEl("span", "val", cur.name), mpEl("span", "arr", "▸"));
+      modelCell.addEventListener("click", () => { modelPane = "model"; renderModelMenu(); });
+      modelPop.appendChild(modelCell);
+      if (cur.reasoning) {
+        const effCell = mpEl("button", "mp-cell");
+        effCell.type = "button";
+        effCell.append(mpEl("span", "lab", "思考强度"), mpEl("span", "val", curEffortLabel(cur) || effName(cur.reasoning.default)), mpEl("span", "arr", "▸"));
+        effCell.addEventListener("click", () => { modelPane = "effort"; renderModelMenu(); });
+        modelPop.appendChild(effCell);
+      }
+    } else if (modelPane === "model") {
+      modelPop.appendChild(mpBackCell("模型"));
+      for (const group of MODEL_GROUPS) {
+        modelPop.appendChild(mpEl("div", "mp-group", group.name));
+        for (const m of group.models) {
+          modelPop.appendChild(mpOption(m.name, m.id === modelPick.model, () => {
+            modelPick = { model: m.id, effort: m.reasoning ? (modelPick.effort && m.reasoning.efforts.indexOf(modelPick.effort) !== -1 ? modelPick.effort : m.reasoning.default) : null };
+            saveModelPick();
+            closeModelMenu();
+          }, m.desc || m.name));
+        }
+      }
+    } else {
+      modelPop.appendChild(mpBackCell("思考强度"));
+      for (const e of (cur.reasoning ? cur.reasoning.efforts : [])) {
+        modelPop.appendChild(mpOption(effName(e), modelPick.effort === e, () => {
+          modelPick = { ...modelPick, effort: e };
+          saveModelPick();
+          closeModelMenu();
+        }));
+      }
+    }
+  }
+
+  /* 子面板顶部的返回行（原型补的鼠标路径；DSH 侧靠 Esc / 重开退回） */
+  function mpBackCell(label) {
+    const b = mpEl("button", "mp-back");
+    b.type = "button";
+    b.append(mpEl("span", null, "‹"), mpEl("span", null, label));
+    b.addEventListener("click", () => { modelPane = "root"; renderModelMenu(); });
+    return b;
+  }
+
+  function openModelMenu() {
+    modelPane = "root";
+    renderModelMenu();
+    modelPop.hidden = false;
+    modelBtn.classList.add("open");
+    modelBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeModelMenu() {
+    modelPop.hidden = true;
+    modelBtn.classList.remove("open");
+    modelBtn.setAttribute("aria-expanded", "false");
+  }
+  modelBtn.addEventListener("click", () => { modelPop.hidden ? openModelMenu() : closeModelMenu(); });
+  document.addEventListener("mousedown", (e) => { // 与 DSH 同款 mousedown 判定：click 里重建菜单会摘除被点元素，冒泡到 click 时 contains 已失效
+    if (modelPop.hidden || modelPop.contains(e.target) || modelBtn.contains(e.target)) return;
+    closeModelMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || modelPop.hidden) return;
+    e.stopImmediatePropagation(); // Esc 先供菜单逐级退回，不再同时关掉底下的模态框
+    if (modelPane === "root") closeModelMenu();
+    else { modelPane = "root"; renderModelMenu(); }
+  });
+  saveModelPick();
+
+  /* ══════════ 上下文占用环（原型：按聊天 DOM 估算 mock 占用；产品侧接 token-meter
+     的 contextPressure / contextBreakdown 投影，容量与分段随真实装配变化） ══════════
+     形态对齐 DSH ContextMeter：14px SVG 圆环（2px 轨道 + 2px 进度自 12 点顺时针、圆帽）
+     + 点击弹出的 264px 明细面板（标题行 + 分段占比条 + 系统提示词 / 工具 / 对话 三行）。
+     占用估算 = 固定底数（卡片提示词 2.6K + 工具 schema 1.4K）+ 聊天 DOM（用户气泡与
+     叙事段落按 1.7 chars/token、每个折叠行 +90）—— MutationObserver 盯聊天列，
+     发送 / 流式 / 记账 / 历史 / 清空 / 切会话全路径自动覆盖，流式逐字 tick 以 150ms 合并 */
+  const CTX_WINDOW = 131072; // 128K：原型固定窗口
+  const CTX_SYSTEM = 2600;
+  const CTX_TOOLS = 1400;
+  const RING_C = 2 * Math.PI * 5.5; // 圆环周长（r=5.5），stroke-dasharray 的进度基准
+  const ctxBtn = $("ctxBtn");
+  const ctxFill = $("ctxFill");
+  const ctxPop = $("ctxPop");
+  const fmtK = (n) => n < 1024 ? String(Math.round(n)) : (Math.round(n / 102.4) / 10) + "K";
+  // 聊天 DOM → mock 占用（上下文环与统计行共用）
+  function ctxEstimate() {
+    let chars = 0;
+    document.querySelectorAll("#chatColumn .msg-user, #chatColumn .narrative").forEach((el) => { chars += el.textContent.length; });
+    const rows = document.querySelectorAll("#chatColumn .flow-row").length;
+    const messages = Math.round(chars * 1.7 + rows * 90);
+    return { system: CTX_SYSTEM, tools: CTX_TOOLS, messages, used: CTX_SYSTEM + CTX_TOOLS + messages };
+  }
+
+  function updateCtxMeter() {
+    const ctx = ctxEstimate();
+    const percent = Math.min(100, Math.round(ctx.used / CTX_WINDOW * 100));
+    ctxFill.style.strokeDasharray = (RING_C * percent / 100).toFixed(3) + " " + RING_C.toFixed(3);
+    ctxBtn.setAttribute("aria-label", "上下文已用 " + percent + "%");
+    $("ctxPct").textContent = percent + "%";
+    $("ctxFigs").textContent = "~" + fmtK(ctx.used) + " / 128K";
+    for (const [segId, tokId, tokens] of [["segSys", "tokSys", ctx.system], ["segTools", "tokTools", ctx.tools], ["segMsgs", "tokMsgs", ctx.messages]]) {
+      // 零宽分段整个不画（.seg 的 min-width 会在 0% 时留一条 2px 细线，DSH 同款丢弃）
+      $(segId).style.display = tokens > 0 ? "" : "none";
+      $(segId).style.width = (percent * tokens / ctx.used) + "%";
+      $(tokId).textContent = "~" + fmtK(tokens);
+    }
+  }
+  function openCtxPop() {
+    ctxPop.hidden = false;
+    ctxBtn.classList.add("open");
+    ctxBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeCtxPop() {
+    ctxPop.hidden = true;
+    ctxBtn.classList.remove("open");
+    ctxBtn.setAttribute("aria-expanded", "false");
+  }
+  ctxBtn.addEventListener("click", () => { ctxPop.hidden ? openCtxPop() : closeCtxPop(); });
+  document.addEventListener("mousedown", (e) => {
+    if (ctxPop.hidden || ctxPop.contains(e.target) || ctxBtn.contains(e.target)) return;
+    closeCtxPop();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !ctxPop.hidden) closeCtxPop();
+  });
+  let ctxTick = 0;
+  new MutationObserver(() => { clearTimeout(ctxTick); ctxTick = setTimeout(updateCtxMeter, 150); })
+    .observe($("chatColumn"), { childList: true, subtree: true, characterData: true });
+  updateCtxMeter();
+
+  /* ══════════ 底部用量状态行（原型：回合结算时累计 mock 用量；产品侧接 token-meter 的
+     tokenUsage 投影） ══════════
+     DSH 默认 web 的形态：一行 ｜ 分隔的纯文本、不可点、贴聊天区下边缘 —
+     「输入 X tok ｜ 输出 Y tok ｜ 缓存命中 Z% ｜ W tok/s」。占位常显，无数据写 0；
+     结算挂 afterReply 每轮一次：input = send 时捕获的请求上下文占用（首轮大头记缓存
+     写入，之后 ~94% 记缓存读取），output = 结算时的占用增量 */
+  const turnAcc = { uncached: 0, cacheRead: 0, cacheWrite: 0, output: 0, decodeMs: 0, decodeTokens: 0 };
+  let prevCtxUsed = CTX_SYSTEM + CTX_TOOLS;
+  let turnInput = 0; // send 时捕获的请求上下文占用（含刚入列的用户消息）
+  const statsLine = $("statsLine");
+
+  function settleTurnStats() {
+    const used = ctxEstimate().used;
+    const input = turnInput || prevCtxUsed;
+    const output = Math.max(0, used - input);
+    if (turnAcc.cacheWrite + turnAcc.cacheRead === 0) {
+      // 首轮：前缀大头进缓存写，命中从第二轮起跳升
+      turnAcc.cacheWrite = Math.round(input * 0.9);
+      turnAcc.uncached += input - turnAcc.cacheWrite;
+    } else {
+      const hit = Math.round(input * 0.94);
+      turnAcc.cacheRead += hit;
+      turnAcc.uncached += input - hit;
+    }
+    turnAcc.output += output;
+    // mock 速度随输出长度在 38–56 tok/s 间确定性波动（恒定值看起来像写死）
+    const decodeMs = Math.round(output / (38 + (output % 19)) * 1000);
+    turnAcc.decodeMs += decodeMs;
+    turnAcc.decodeTokens += output;
+    prevCtxUsed = used;
+    turnInput = 0;
+    renderStatsLine();
+  }
+
+  function renderStatsLine() {
+    const billed = turnAcc.uncached + turnAcc.cacheRead + turnAcc.cacheWrite;
+    const parts = [
+      "输入 " + fmtK(billed) + " tok",
+      "输出 " + fmtK(turnAcc.output) + " tok",
+      "缓存命中 " + (billed > 0 ? Math.round(turnAcc.cacheRead / billed * 100) : 0) + "%",
+      (turnAcc.decodeMs > 0 ? Math.round(turnAcc.decodeTokens / (turnAcc.decodeMs / 1000)) : 0) + " tok/s",
+    ];
+    statsLine.textContent = parts.join(" ｜ ");
+  }
+
+  function resetTurnStats() {
+    for (const k of Object.keys(turnAcc)) turnAcc[k] = 0;
+    prevCtxUsed = CTX_SYSTEM + CTX_TOOLS;
+    renderStatsLine();
+  }
+  renderStatsLine();
+
+  /* 开场页选项 → 填入输入框（opening.html 经 postMessage 与父页通信） */
+  window.addEventListener("message", (e) => {
+    if (!e.data || e.data.t !== "tavern-insert") return;
+    input.value = String(e.data.text || "");
+    autosize();
+    sendBtn.disabled = !input.value.trim();
+    input.focus();
+  });
+
+  /* ══════════ 统一编辑器组件（工作空间模态 / 制作卡 / 导入预览共用） ══════════
+     左树右侧编辑。opts: {
+       fs: 文件表（挂载即设 CUR_FS），
+       hint: 树顶提示，
+       controls: [{ id, label, title, checked, onChange }] — 顶栏 checkbox 控制组（可扩展，当前仅尾代理开关），
+       actions: [{ id, label, primary, onClick }] — 顶栏右侧动作按钮
+     }
+     controls 与 actions 均不传时不渲染顶栏（工作空间模态）。 */
+  let dirty = false;
+  let selectedPath = "preset/prompt/systemPrompt";
+  const openDirs = new Set();
+  let E = null; // 当前活动挂载
+
+  function mountEditor(host, opts) {
+    opts = opts || {};
+    const controls = opts.controls || [];
+    const actions = opts.actions || [];
+    const bar = (controls.length || actions.length)
+      ? '<div class="editor-toolbar">' +
+          controls.map((c) =>
+            '<label class="cb" title="' + (c.title || "") + '">' +
+              '<input type="checkbox" id="' + c.id + '"' + (c.checked ? " checked" : "") + ">" +
+              "<span>" + esc(c.label) + "</span></label>").join("") +
+          '<span class="spacer"></span>' +
+          actions.map((a) =>
+            '<button class="btn' + (a.primary ? " primary" : "") + '" id="' + a.id + '">' + esc(a.label) + "</button>").join("") +
+        "</div>"
+      : "";
+    host.innerHTML =
+      (bar ? '<div class="editor-shell">' + bar : "") +
+      '<div class="editor-layout">' +
+        '<div class="file-tree">' +
+          '<div class="tree-hint">' + (opts.hint ||
+            "preset/ 用户可编辑 · runtime/ 尾代理维护 · savings/ 存档快照") + "</div>" +
+          '<div class="file-tree-list"></div>' +
+          '<div class="editor-header" style="background: transparent; border-bottom: none;">' +
+            '<span class="editor-path" style="font-size:10.5px; color: var(--muted-2);">preset/prompt/ 恰四文件 · 快照只读</span>' +
+          "</div>" +
+        "</div>" +
+        '<div class="file-editor">' +
+          '<div class="editor-header">' +
+            '<span class="editor-path"></span>' +
+            '<span class="editor-badge">可编辑</span>' +
+          "</div>" +
+          '<div class="editor-body">' +
+            '<textarea class="editor-area" spellcheck="false"></textarea>' +
+            '<div class="preview-layer"><div class="preview-box">图片预览</div><div class="preview-cap"></div></div>' +
+          "</div>" +
+        "</div>" +
+      "</div>" +
+      (bar ? "</div>" : "");
+    E = {
+      treeList: host.querySelector(".file-tree-list"),
+      pathEl: host.querySelector(".file-editor .editor-path"),
+      badgeEl: host.querySelector(".file-editor .editor-badge"),
+      area: host.querySelector(".editor-area"),
+      previewLayer: host.querySelector(".preview-layer"),
+      previewCap: host.querySelector(".preview-cap"),
+    };
+    if (opts.fs) CUR_FS = opts.fs;
+    controls.forEach((c) => {
+      const box = host.querySelector("#" + c.id);
+      if (box && c.onChange) box.addEventListener("change", () => c.onChange(box.checked));
+    });
+    actions.forEach((a) => {
+      const btn = host.querySelector("#" + a.id);
+      if (btn && a.onClick) btn.addEventListener("click", a.onClick);
+    });
+    E.area.addEventListener("input", () => { dirty = true; });
+    E.area.addEventListener("blur", () => {
+      if (E.area.readOnly || !dirty) return;
+      dirty = false;
+      CUR_FS[selectedPath].content = E.area.value;
+      toast("已保存 " + selectedPath, "success");
+    });
+  }
+
+  function buildTree(extraDirs) {
+    const root = { dirs: {}, files: [] };
+    Object.keys(CUR_FS).forEach((p) => {
+      let node = root;
+      const segs = p.split("/");
+      const file = segs.pop();
+      segs.forEach((s) => {
+        node.dirs[s] = node.dirs[s] || { dirs: {}, files: [] };
+        node = node.dirs[s];
+      });
+      node.files.push({ name: file, path: p });
+    });
+    // 空目录注入（导入预览的 setup / scripts / tools 等无文件目录也要出现在树里）
+    (extraDirs || []).forEach((p) => {
+      let node = root;
+      p.split("/").forEach((s) => {
+        node.dirs[s] = node.dirs[s] || { dirs: {}, files: [] };
+        node = node.dirs[s];
+      });
+    });
+    return root;
+  }
+
+  function isReadOnlyPath(p) {
+    return p.startsWith("savings/") || p.startsWith("runtime/");
+  }
+
+  function renderTree() {
+    if (!E) return;
+    selectedPath in CUR_FS || (selectedPath = "preset/prompt/systemPrompt");
+    const root = buildTree(IMPORT ? IMPORT.dirs : null);
+    const list = E.treeList;
+    list.innerHTML = "";
+
+    function wireDrop(row, dirPath) {
+      row.addEventListener("dragover", (e) => {
+        if (isReadOnlyPath(dirPath + "/")) return;
+        e.preventDefault();
+        row.classList.add("dropover");
+      });
+      row.addEventListener("dragleave", () => row.classList.remove("dropover"));
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("dropover");
+        if (isReadOnlyPath(dirPath + "/")) { toast("不能移动到 " + dirPath + "/（只读区域）", "error"); return; }
+        const src = e.dataTransfer.getData("text/dsh-path");
+        if (!src) return;
+        const nm = src.split("/").pop();
+        const dst = dirPath + "/" + nm;
+        if (dst === src) return;
+        if (CUR_FS[dst]) { toast("目标已存在：" + dst, "error"); return; }
+        if (!window.confirm("把「" + src + "」移动到「" + dirPath + "/」？")) return;
+        renamePath(src, dst);
+      });
+    }
+
+    function walk(node, depth, prefix) {
+      Object.keys(node.dirs).sort().forEach((d) => {
+        const dirPath = (prefix ? prefix + "/" : "") + d;
+        const open = openDirs.has(depth + "/" + d);
+        const row = document.createElement("div");
+        row.className = "tree-item dir" + (open ? " open" : "");
+        row.style.paddingLeft = 6 + depth * 10 + "px";
+        row.innerHTML = '<span class="chev">▸</span><span class="nm">' + esc(d) + "</span>";
+        row.addEventListener("click", () => {
+          open ? openDirs.delete(depth + "/" + d) : openDirs.add(depth + "/" + d);
+          renderTree();
+        });
+        row.addEventListener("contextmenu", (e) => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, dirPath, true); });
+        wireDrop(row, dirPath);
+        list.appendChild(row);
+        if (open) walk(node.dirs[d], depth + 1, dirPath);
+      });
+      node.files.sort((a, b) => a.name.localeCompare(b.name)).forEach((f) => {
+        const meta = CUR_FS[f.path];
+        const row = document.createElement("div");
+        row.className = "tree-item file" + (f.path === selectedPath ? " active" : "") + (meta && meta.dim ? " dim" : "");
+        row.style.paddingLeft = 6 + depth * 10 + "px";
+        if (!isReadOnlyPath(f.path) && !(meta && meta.media)) {
+          row.draggable = true;
+          row.classList.add("draggable");
+          row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/dsh-path", f.path);
+            e.dataTransfer.effectAllowed = "move";
+          });
+        }
+        row.innerHTML = '<span class="chev"></span><span class="nm">' + esc(f.name) + "</span>";
+        row.addEventListener("click", () => openFile(f.path));
+        row.addEventListener("contextmenu", (e) => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, f.path, false); });
+        list.appendChild(row);
+      });
+    }
+    walk(root, 0, "");
+  }
+
+  function renamePath(src, dst) {
+    if (CUR_FS[src] !== undefined) {
+      CUR_FS[dst] = CUR_FS[src];
+      delete CUR_FS[src];
+    } else {
+      Object.keys(CUR_FS).forEach((k) => {
+        if (k === src || k.indexOf(src + "/") === 0) {
+          CUR_FS[dst + k.slice(src.length)] = CUR_FS[k];
+          delete CUR_FS[k];
+        }
+      });
+    }
+    if (CUR_FS[selectedPath] === undefined) selectedPath = dst;
+    renderTree();
+    openFile(selectedPath);
+    toast("已移动/重命名 → " + dst, "success");
+  }
+
+  function openFile(path) {
+    if (!E) return;
+    if (dirty && CUR_FS[selectedPath] && !CUR_FS[selectedPath].media) toast("已保存 " + selectedPath, "success");
+    dirty = false;
+    selectedPath = path;
+    const meta = CUR_FS[path];
+    E.pathEl.textContent = path;
+    E.previewLayer.classList.remove("show");
+    E.area.style.display = "block";
+
+    if (!meta) { renderTree(); setEditor("", false, "—"); return; }
+    E.area.classList.toggle("dim", !!meta.dim); // 尾代理停用 → 编辑区灰显
+    if (meta.media) {
+      E.area.style.display = "none";
+      E.previewCap.innerHTML = meta.toolarge
+        ? "文件 " + esc(meta.toolarge) + "，超过 1 MB 预览上限"
+        : "<b>" + esc(meta.cap) + "</b>";
+      E.previewLayer.classList.add("show");
+      setEditor("", true, "预览 · 只读");
+    } else if (meta.ro) {
+      setEditor(meta.content, true, meta.ro);
+    } else if (meta.dim) {
+      setEditor(meta.content, true, "停用 · 只读");
+    } else {
+      setEditor(meta.content, false, "可编辑");
+    }
+    renderTree();
+  }
+  function setEditor(text, readOnly, badge) {
+    E.area.value = text;
+    E.area.readOnly = readOnly;
+    E.badgeEl.textContent = badge;
+    E.badgeEl.className = "editor-badge " + (readOnly ? "ro" : "editable");
+  }
+
+  /* ── 右键菜单（文件树 + 会话共用容器，两处分别渲染） ── */
+  const ctx = $("ctxMenu");
+  function closeCtxMenu() { ctx.classList.remove("show"); }
+  document.addEventListener("click", () => closeCtxMenu());
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCtxMenu(); });
+
+  function openCtxMenu(x, y, path, isDir) {
+    ctx.innerHTML = "";
+    const ro = isReadOnlyPath(path + "/") || isReadOnlyPath(path);
+    const addItem = (label, cls, fn, disabled) => {
+      const el = document.createElement("div");
+      el.className = "ctx-item " + cls + (disabled ? " disabled" : "");
+      el.textContent = label;
+      if (!disabled) el.addEventListener("click", () => { closeCtxMenu(); fn(); });
+      else el.addEventListener("click", (e2) => { e2.stopPropagation(); });
+      ctx.appendChild(el);
+    };
+    if (isDir) {
+      addItem("在此新建文件", "", () => {
+        const base = window.prompt("新文件路径（相对工作空间根）：", path + "/untitled.md");
+        if (!base) return;
+        createPath(base);
+      }, ro);
+      addItem("在此新建目录", "", () => {
+        const base = window.prompt("新建目录下的首个文件路径（以创建目录）：", path + "/readme.md");
+        if (!base) return;
+        createPath(base);
+      }, ro);
+      const sep = document.createElement("div");
+      sep.className = "ctx-sep";
+      ctx.appendChild(sep);
+    }
+    addItem("重命名", "", () => {
+      const nn = window.prompt("重命名（相对工作空间根的路径）：", path);
+      if (!nn || nn === path) return;
+      if (CUR_FS[nn]) { toast("目标路径已存在：" + nn, "error"); return; }
+      renamePath(path, nn);
+    }, ro);
+    addItem("删除", "danger", () => {
+      let msg = "删除 " + path + (isDir ? "（含其下全部内容）" : "") + "？";
+      if (path.indexOf("preset/prompt/") === 0) msg = "preset/prompt/ 恰承载四张提示词，删除会破坏卡牌主体。\n\n仍要删除 " + path + "？";
+      if (!window.confirm(msg)) return;
+      if (!isDir) delete CUR_FS[path];
+      else Object.keys(CUR_FS).forEach((k) => { if (k === path || k.indexOf(path + "/") === 0) delete CUR_FS[k]; });
+      renderTree();
+      if (CUR_FS[selectedPath]) openFile(selectedPath); else if (CUR_FS["preset/meta.json"]) openFile("preset/meta.json");
+      toast("已删除 " + path, "info");
+    }, ro);
+    ctx.classList.add("show");
+    ctx.style.left = Math.min(x, window.innerWidth - ctx.offsetWidth - 10) + "px";
+    ctx.style.top = Math.min(y, window.innerHeight - ctx.offsetHeight - 10) + "px";
+  }
+
+  function createPath(base) {
+    if (CUR_FS[base]) { toast("路径已存在：" + base, "error"); return; }
+    if (isReadOnlyPath(base)) { toast("runtime/ 与 savings/ 只读 — 不能在此新建", "error"); return; }
+    CUR_FS[base] = { content: "" };
+    renderTree();
+    openFile(base);
+    toast("已创建 " + base, "success");
+  }
+
+  /* ── 会话右键菜单 ── */
+  const overlay = $("settingsOverlay");
+  function openModal() {
+    mountEditor($("modalEditorHost"), { fs: WORKSPACE_FS }); // 统一编辑器组件 · 工作空间模态无顶栏控件
+    overlay.style.display = "flex";
+    openFile(selectedPath);
+  }
+  function closeModal() { overlay.style.display = "none"; }
+  $("gearBtn").addEventListener("click", openModal);
+  $("closeModal").addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+  function activateTab(name) {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.dataset.panel === name));
+    if (name === "saves") renderSaves();
+  }
+  document.querySelectorAll(".tab").forEach((t) => {
+    t.addEventListener("click", () => activateTab(t.dataset.tab));
+  });
+  $("loadBtn").addEventListener("click", () => { activateTab("saves"); openModal(); });
+
+  /* 清空：回到初始卡片状态 */
+  $("resetBtn").addEventListener("click", () => {
+    if (!window.confirm("清空会话并回到初始卡片状态？runtime/ 将重新从 preset/setup 播种，聊天记录清空（savings/ 存档保留）。")) return;
+    current.history = false;
+    current.state = "开场";
+    view = "opening";
+    renderCards();
+    renderView();
+    toast("已清空 → 回到初始卡片状态（重新显示开场页）", "success");
+  });
+
+  /* 存档 */
+  let saves = [
+    { type: "auto", nm: "autosave-20260910-0241", meta: "自动 · 2026-09-10 02:41" },
+    { type: "auto", nm: "autosave-20260910-0107", meta: "自动 · 2026-09-10 01:07" },
+    { type: "manual", nm: "第一次抉择", meta: "手动 · 2026-09-09 23:47" }
+  ];
+  const AUTOSAVE_KEEP = 10;
+  function dateStamp() {
+    const d = new Date();
+    const pad = (n) => ("0" + n).slice(-2);
+    return "" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+  }
+  const clockNow = () => { const d = new Date(); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); };
+  const savesTabActive = () => document.querySelector('[data-panel="saves"]').classList.contains("active");
+  function autosCount() { return saves.filter((s) => s.type === "auto").length; }
+  function pruneAutosaves() {
+    const autos = saves.filter((s) => s.type === "auto");
+    if (autos.length <= AUTOSAVE_KEEP) return 0;
+    const doomed = autos.slice(AUTOSAVE_KEEP);
+    saves = saves.filter((s) => !(s.type === "auto" && doomed.indexOf(s) !== -1));
+    return doomed.length;
+  }
+  function autoSnapshot() {
+    const nm = "autosave-" + dateStamp();
+    saves.unshift({ type: "auto", nm: nm, meta: "自动 · 今晚 " + clockNow() });
+    const pruned = pruneAutosaves();
+    toast("已自动保存 → savings/" + nm + "/ · 保留 " + autosCount() + "/" + AUTOSAVE_KEEP + " 份", "success");
+    if (pruned > 0) toast("autosave 超出上限 — 已清理 " + pruned + " 份旧档（手动存档不受影响）", "info");
+    if (savesTabActive()) renderSaves();
+  }
+  function manualSnapshot(name, replaced) {
+    saves.unshift({ type: "manual", nm: name, meta: "手动 · " + clockNow() + (replaced ? " · 同名覆盖" : "") });
+    if (savesTabActive()) renderSaves();
+  }
+  function renderSaves() {
+    const list = $("saveList");
+    list.innerHTML = "";
+    saves.forEach((s) => {
+      const row = document.createElement("div");
+      row.className = "save-row";
+      row.innerHTML =
+        "<div><div class=\"nm\">" + esc(s.nm) + '</div><div class="meta">' + esc(s.meta) + "</div></div>" +
+        '<div class="acts"><button class="btn load">载入</button><button class="btn danger">删除</button></div>';
+      row.querySelector(".load").addEventListener("click", () => {
+        toast("已把 savings/" + s.nm + "/ 恢复到 runtime/（世界状态回滚）", "success");
+      });
+      row.querySelector(".danger").addEventListener("click", () => {
+        if (!window.confirm("删除存档 savings/" + s.nm + "/ ？此操作不可恢复。")) return;
+        saves.splice(saves.indexOf(s), 1);
+        renderSaves();
+        toast("已删除存档 " + s.nm, "info");
+      });
+      list.appendChild(row);
+    });
+  }
+
+  /* 保存弹框 */
+  const dlg = $("saveDialogOverlay");
+  function renderDlgList() {
+    const list = $("dlgSaveList");
+    list.innerHTML = "";
+    if (!saves.length) { list.innerHTML = '<div class="sv-empty">还没有存档 — 输入名称保存第一个快照</div>'; return; }
+    saves.forEach((s) => {
+      const item = document.createElement("div");
+      item.className = "sv-item";
+      item.innerHTML = '<div class="nm">' + esc(s.nm) + '</div><div class="meta">' + esc(s.meta) + "</div>";
+      item.addEventListener("click", () => { $("saveNameInput").value = s.nm; });
+      list.appendChild(item);
+    });
+  }
+  function openSaveDialog() {
+    $("saveNameInput").value = "";
+    renderDlgList();
+    dlg.style.display = "flex";
+    $("saveNameInput").focus();
+  }
+  function closeSaveDialog() { dlg.style.display = "none"; }
+  $("saveQuick").addEventListener("click", openSaveDialog);
+  $("closeSaveDlg").addEventListener("click", closeSaveDialog);
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) closeSaveDialog(); });
+  $("confirmSaveBtn").addEventListener("click", () => {
+    const name = $("saveNameInput").value.trim();
+    if (!name) { toast("请输入存档名", "error"); return; }
+    if (name.indexOf("/") !== -1 || name.charAt(0) === ".") { toast("存档名即目录名 — 不能包含 / 或以 . 开头", "error"); return; }
+    const existing = saves.find((s) => s.nm === name);
+    if (existing && !window.confirm("已存在同名存档 savings/" + name + "/ ，覆盖？")) return;
+    manualSnapshot(name, !!existing);
+    closeSaveDialog();
+    toast("已保存 → savings/" + name + "/（runtime 完整快照）", "success");
+  });
+  $("saveNameInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("confirmSaveBtn").click(); }
+  });
+
+  /* API Key 弹框（侧栏右上角入口；Esc/遮罩/× 关闭） */
+  const apiKeyOverlay = $("apiKeyOverlay");
+  $("apiKeyBtn").addEventListener("click", () => {
+    $("apiKeyInput").value = "";
+    apiKeyOverlay.style.display = "flex";
+    $("apiKeyInput").focus();
+  });
+  function closeApiKeyDialog() { apiKeyOverlay.style.display = "none"; }
+  $("closeApiKey").addEventListener("click", closeApiKeyDialog);
+  apiKeyOverlay.addEventListener("click", (e) => { if (e.target === apiKeyOverlay) closeApiKeyDialog(); });
+  $("confirmApiKey").addEventListener("click", () => {
+    const v = $("apiKeyInput").value.trim();
+    if (!v) { toast("请输入 API Key", "error"); return; }
+    closeApiKeyDialog();
+    toast("API Key 已保存（原型演示 — 真实值存于 dsh credentials）", "success");
+  });
+  $("apiKeyInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); $("confirmApiKey").click(); }
+  });
+
+  /* Esc 逐层关闭 */
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { closeModal(); closeSaveDialog(); closeApiKeyDialog(); }
+  });
+
+  /* ══════════ 启动 ══════════ */
+  ["0/preset", "0/preset/prompt", "0/runtime", "0/savings", "1/prompt", "1/setup", "1/tools", "2/npcs", "1/quests", "1/npcs"].forEach((d) => openDirs.add(d));
+  renderCards();
+  renderView();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+/* chat.css — 聊天区精修(选择器自动前缀 .tavern-stage)。
+   整页配色交给 theme.css 的 token 面;这里只做叙事排版与局部字形。
+
+   注意:消息行距/行高不要在这里叠宿主已有的排版——
+   .col 已有 16px gap,再给 .tavern-message 加 margin-bottom 会叠成 32px;
+   .tavern-body 行高宿主已定为 1,这里写了则覆盖宿主。 */
+
+/* 叙事正文:衬线、两端对齐,像摊开的冒险日志(行高走宿主的 1) */
+.tavern-body {
+  font-family: var(--t-serif);
+  text-align: justify;
+}
+
+/* 折叠行与落款:褪色墨水印 */
+.tavern-thinking {
+  color: var(--t-muted);
+}
+.tavern-timestamp {
+  color: var(--t-muted2);
+}
+.tavern-usage-line {
+  color: var(--t-muted2);
+}
+
+/* 输入区:墨水字、金棕光标 */
+.tavern-textarea {
+  color: var(--t-fg);
+  caret-color: var(--t-gold-deep);
+}
+
+/* composer 让位:composer(含其内部的用量行)是舞台级横贯元素,不参与 cardStageMid
+   的分栏,右栏面板(320px+16 间距)在场时会盖住它——index.js 挂 codex-shift 类时左移。 */
+.tavern-composer.codex-shift {
+  margin-right: 336px;
+}
+
+/* 开场页满铺:宿主的 .openingFull 高度链断在父列(auto 高)上,calc(100%) 塌成 60vh 兜底,
+   开场页下方到 input 之间留一大段空。开场态(index.js 挂 opening-live)把转写容器变成
+   flex 纵栏,唯一子列(消息列) flex 撑满转写视口,宿主自己的 flex:1 链随之通到 iframe。 */
+.tavern-transcript.opening-live {
+  display: flex;
+  flex-direction: column;
+}
+.tavern-transcript.opening-live > * {
+  flex: 1 0 auto;
+}

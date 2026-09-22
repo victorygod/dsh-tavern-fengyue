@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-14-tavern-sidebar-collapse-toggle.md
+2026-09-14-tavern-sidebar-collapse-toggle.md: b36880260652b5f7b4b487908630bce79780a73c
+2026-09-14-tavern-sidebar-collapse-toggle.zh.md: d6fff6dc0f4b5b1c8939fef2c8c8c60381e235b2

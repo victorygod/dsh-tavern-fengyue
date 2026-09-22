@@ -1,0 +1,4 @@
+/* galgame 形态聊天区改造(自动作用域 .tavern-stage):
+   转写区恒隐;composer 默认隐(gal-ui 形态),输入态(gal-input)由 ui.css 停靠显示。 */
+
+.tavern-transcript { opacity: 0; pointer-events: none; }

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>dnd5e · 开局创角</title>
+<style>
+/* ═══ 开局创角表单（v7 视觉：深色皮革+金；iframe 沙箱内自绘，经 postMessage 与宿主通信）═══
+   流程（一键全包,零跳转）：①创角表单 ②确认场景 ③「落盘并开始冒险」→opening-commit→落盘→
+   ack→tavern-insert 把开场白填进宿主输入框并原地收束(按钮变已完成态)——无完成页,发送在输入框 */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg1: #3a2b1b; --bg3: #1d140a; --ink: #f5e7c8; --ink2: #f2e3c2; --ink3: #b09a70;
+  --gold: #c9a24b; --gold2: #f0d28a; --hp: #d8483a;
+  --serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+body {
+  min-height: 100vh; font-family: var(--serif); color: var(--ink); overflow-y: auto;
+  background: radial-gradient(120% 90% at 50% 30%, var(--bg1) 0%, #2a1e12 45%, var(--bg3) 100%);
+  display: flex; justify-content: center; padding: 40px 18px 48px;
+}
+.wrap { width: 560px; max-width: 100%; }
+h1 { font-size: 22px; font-weight: 800; letter-spacing: .04em; color: var(--gold2); text-align: center; }
+.sub { font: 500 12px var(--sans); color: var(--ink3); text-align: center; margin: 8px 0 22px; letter-spacing: .12em; }
+.card { background: rgba(0,0,0,.28); border: 1px solid rgba(201,162,75,.4); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; }
+.lbl { font: 700 10px var(--sans); color: var(--gold); letter-spacing: .14em; margin: 14px 0 6px; text-transform: uppercase; }
+.lbl:first-child { margin-top: 0; }
+input[type=text], textarea, select {
+  width: 100%; font: 600 13px var(--sans); color: var(--ink2); background: rgba(0,0,0,.35);
+  border: 1px solid rgba(201,162,75,.3); border-radius: 8px; padding: 8px 11px; outline: none;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--gold2); }
+select option { background: #2a1e12; color: var(--ink2); }
+.row { display: flex; gap: 10px; } .row > * { flex: 1; }
+/* 属性：标准数组分配（六选框互斥取值） */
+.abilities { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.abilities .ab { display: flex; align-items: center; gap: 6px; }
+.abilities .k { font: 700 12px var(--serif); color: var(--gold2); width: 18px; }
+.abilities select { flex: 1; }
+/* 技能：18 选 2 */
+.skills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.skills .sk { display: flex; align-items: center; gap: 5px; font: 600 12px var(--sans); color: var(--ink2); cursor: pointer; padding: 4px 6px; border: 1px solid rgba(201,162,75,.18); border-radius: 6px; user-select: none; }
+.skills .sk.on { border-color: var(--gold); background: rgba(201,162,75,.14); }
+.skills .sk input { display: none; }
+.hint { font: 500 10px var(--sans); color: var(--ink3); margin-top: 5px; }
+/* 场景 */
+.scn { cursor: pointer; border: 1px solid rgba(201,162,75,.3); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.scn.on { border-color: var(--gold); background: rgba(201,162,75,.1); }
+.scn .t { font-size: 15px; font-weight: 800; color: var(--ink); }
+.scn .g { font: 500 12px var(--sans); color: var(--ink3); margin-top: 4px; line-height: 1.6; }
+/* 底部动作 */
+.actions { display: flex; gap: 10px; margin-top: 18px; }
+button.act {
+  flex: 1; padding: 11px; border-radius: 10px; cursor: pointer; font: 700 14px var(--sans); letter-spacing: .06em;
+  border: 1px solid var(--gold); background: linear-gradient(180deg, var(--gold2), var(--gold)); color: #1a130c;
+}
+button.act.ghost { background: transparent; color: var(--gold2); }
+button.act:disabled { opacity: .35; pointer-events: none; }
+.msg { font: 600 12px var(--sans); color: var(--hp); margin-top: 10px; text-align: center; min-height: 16px; }
+.msg.ok { color: #86cf6c; }
+summary { cursor: pointer; }
+/* 性别两段(男/女) + 头像预览(经宿主桥 opening-avatar 应答;宿主缺席静默隐藏) */
+.gseg { display: flex; gap: 6px; }
+.gseg button {
+  flex: 1; padding: 8px 4px; border-radius: 8px; cursor: pointer; font: 700 13px var(--sans);
+  border: 1px solid rgba(201,162,75,.3); background: rgba(0,0,0,.35); color: var(--ink3);
+}
+.gseg button.on { border-color: var(--gold); background: rgba(201,162,75,.16); color: var(--gold2); }
+.row2 { display: flex; gap: 14px; margin-top: 12px; align-items: center; }
+.row2 .gcol { flex: 1; }
+.avbox { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.av-prev {
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden;
+  border: 2px solid var(--gold); background: radial-gradient(circle at 36% 30%, #4d3822, #241a10);
+  display: none; align-items: center; justify-content: center;
+  box-shadow: 0 0 0 3px rgba(201,162,75,.15), 0 2px 8px rgba(0,0,0,.5);
+}
+.av-prev.show { display: flex; }
+.av-prev img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.av-letter { font: 800 26px/1 var(--serif); color: var(--gold2); text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.av-cap { font: 500 9px var(--sans); color: var(--ink3); letter-spacing: .1em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>dnd5e · 开局创角</h1>
+  <div class="sub">CREATE YOUR ADVENTURER</div>
+  <div class="actions" style="margin:0 0 14px"><button class="act ghost" id="roll" title="随机生成一套完整的角色（可再手动微调）">◆ 随机分配（骰一次全填好）</button></div>
+
+  <div id="form">
+    <div class="card">
+      <div class="lbl">身份</div>
+      <div class="row">
+        <input type="text" id="name" placeholder="姓名（如：洛克）" maxlength="12">
+        <select id="race"></select>
+        <select id="cls"></select>
+      </div>
+      <div class="row2">
+        <div class="gcol">
+          <div class="lbl" style="margin-top:0">性别</div>
+          <div class="gseg" id="gseg">
+            <button data-g="male" class="on">♂ 男</button>
+            <button data-g="female">♀ 女</button>
+          </div>
+        </div>
+        <div class="avbox">
+          <div class="av-prev" id="avprev"></div>
+          <div class="av-cap">头像预览</div>
+        </div>
+      </div>
+      <div class="lbl">出身背景</div>
+      <input type="text" id="bg" placeholder="如：士兵 / 侍僧 / 罪犯 / 佣兵" maxlength="12">
+    </div>
+
+    <div class="card">
+      <div class="lbl">六维属性 · 标准数组分配（15 14 13 12 10 8）</div>
+      <div class="abilities" id="abilities"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">技能熟练 · 选二</div>
+      <div class="skills" id="skills"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">人设</div>
+      <div class="row" style="margin-bottom:6px">
+        <input type="text" id="p1" placeholder="个性特点" maxlength="20">
+        <input type="text" id="p2" placeholder="理想" maxlength="20">
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <input type="text" id="p3" placeholder="羁绊" maxlength="20">
+        <input type="text" id="p4" placeholder="缺点" maxlength="20">
+      </div>
+      <select id="align">
+        <option value="">阵营（可选）</option>
+        <option>守序善良</option><option>中立善良</option><option>混乱善良</option>
+        <option>守序中立</option><option>绝对中立</option><option>混乱中立</option>
+        <option>守序邪恶</option><option>中立邪恶</option><option>混乱邪恶</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <div class="lbl">场景</div>
+      <div id="scenes"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">开场白（可改）</div>
+      <textarea id="narr" rows="4"></textarea>
+    </div>
+
+    <div class="actions"><button class="act" id="go">落盘并开始冒险</button></div>
+    <div class="msg" id="msg"></div>
+  </div>
+</div>
+
+<script>
+'use strict'
+// ── 静态数据（沙箱无网络；场景库以 preset/setup/openings.json 为单源经 opening-init 桥拉活,
+//    此内嵌副本仅兜底——手动 fork 本页时同步它的场景即可；dnd5e-srd-lorebook 键一致）──
+const RACES = [['human','人类'],['half-elf','半精灵'],['elf','精灵'],['dwarf','矮人'],['halfling','半身人'],['gnome','地侏'],['half-orc','半兽人'],['tiefling','提夫林'],['dragonborn','龙裔']]
+const CLASSES = [['fighter','战士'],['rogue','盗贼'],['wizard','法师'],['cleric','牧师'],['barbarian','野蛮人'],['bard','吟游诗人'],['druid','德鲁伊'],['monk','武僧'],['paladin','圣骑士'],['ranger','游侠'],['sorcerer','术士'],['warlock','契术师']]
+const SKILLS = [['athletics','运动'],['acrobatics','杂技'],['sleight_of_hand','巧手'],['stealth','隐匿'],['arcana','奥秘'],['history','历史'],['investigation','调查'],['nature','自然'],['religion','宗教'],['insight','洞悉'],['medicine','医药'],['perception','察觉'],['survival','生存'],['animal_handling','驯兽'],['deception','欺瞒'],['intimidation','威吓'],['performance','表演'],['persuasion','游说']]
+const ARRAY = [15, 14, 13, 12, 10, 8]
+const ATTRS = [['力','str'],['敏','dex'],['体','con'],['智','int'],['感','wis'],['魅','cha']]
+const SCENARIOS = [
+  { id: 'border-town', title: '边境小镇', tagline: '文明尽头的泥泞街道，酒馆里传闻山林有异动',
+    narration: '薄雾散去，石板路的尽头浮现出猎猎作响的旗幡——边境小镇的轮廓。你踏着暮色迈过门槛，身后山林的窸窣声似乎仍在追索着你的踪迹。酒馆灯火在石壁上投射出巨大的摇曳光影，麦酒的酸气与湿柴的烟味混杂在一起。镇上的人行色匆匆，没人主动搭话——直到你推开门，柜台后的独眼老者抬起头，目光在你身上的武器上停了一瞬。「生面孔。」他说，「要么过路，要么来找活干的。前者喝酒走人，后者……坐下聊聊。」' },
+  { id: 'abandoned-mine', title: '废弃矿坑', tagline: '矿坑口的铁门虚掩着，里面的黑暗比夜更深',
+    narration: '矿坑口的铁门锈迹斑斑，虚掩着——像是有人匆忙离开，又像是……不想让里面的东西出来。你举起火把，光焰在潮湿的石壁上跳动，照亮了铁轨延伸进黑暗的方向。空气里弥漫着铁锈与腐水的气味。远处，一滴水落在金属上的回声在隧道里反复弹跳。你握紧武器，迈出了第一步。' },
+  { id: 'wilderness-road', title: '荒野古道', tagline: '商队的车轮在泥泞中碾出深辙，远处的山林沉默不语',
+    narration: '商队的车轮在泥泞中碾出深辙，马匹喷着白气，步伐迟缓。你在队伍末端，手不离武器——这段路太安静了。带队的老商人策马靠近，压低声音：「三天前前面那支队伍就是在这儿没的。连车带人，什么都没剩下。」他顿了顿，「今晚你守后半夜。」暮色降临，营火在风中摇曳。远处的树林像一堵沉默的墙。' },
+  { id: 'port-tavern', title: '海港酒馆', tagline: '盐腥的风吹过码头的灯柱，酒杯里晃着别人的秘密',
+    narration: '海风裹挟着盐腥与鱼腥扑面而来，码头的灯柱在夜色中摇晃，像一排醉汉。你推开「歪桅杆」酒馆的门，嘈杂声浪几乎将你顶回去——水手、佣兵、走私贩子和几个你判断不出来的角色挤在昏暗的灯光下。吧台后的半身人擦着酒杯，头也不抬：「想喝的排队，想打听事的买 bottle，想找人的——」他终于抬眼打量你，「那得看你找的是谁了。」' },
+]
+
+// ── 随机分配池（一键 roll 全套,可再手动微调）──
+const NAMES = ['洛克', '艾德温', '莉娜', '卡姆', '希尔瓦', '布兰', '露西亚', '格雷', '芙雅', '达伦', '岚', '塞西尔', '薇拉', '奥托', '绯月', '卡尔文', '伊芙', '雷恩', '苏茉', '巴德']
+const BACKGROUNDS = ['士兵', '佣兵', '罪犯', '侍僧', '学者', '工匠', '流浪儿', '没落贵族', '渔夫', '猎人', '酒保', '商队护卫', '矿工', '吟游学徒']
+const PERSONALITY = ['谨慎多疑', '豪爽仗义', '沉默寡言', '油嘴滑舌', '心思缜密', '暴烈易怒', '乐观豁达', '冷若冰霜', '古道热肠', '玩世不恭']
+const IDEALS = ['自由', '正义', '财富', '知识', '力量', '守护', '享乐', '秩序', '复仇', '扬名立万']
+const BONDS = ['为同伴而战', '欠了一屁股债', '寻找失踪的亲人', '向雇主证明自己', '守护一件信物', '为死去的朋友复仇', '还乡的路被断了', '一本没写完的书']
+const FLAWS = ['贪杯', '多疑', '好赌', '嘴硬', '见钱眼开', '嗜睡', '怕黑', '管不住手', '记仇', '嘴上没把门']
+const pick = arr => arr[Math.floor(Math.random() * arr.length)]
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] } return a }
+
+// ── 表单构建 ──
+const $ = id => document.getElementById(id)
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const fill = (sel, list, ph) => { sel.innerHTML = (ph ? `<option value="">${ph}</option>` : '') + list.map(([v, n]) => `<option value="${v}">${n}</option>`).join('') }
+fill($('race'), RACES, '种族')
+fill($('cls'), CLASSES, '职业')
+
+const abSel = {}
+for (const [cn, key] of ATTRS) {
+  const wrap = document.createElement('div'); wrap.className = 'ab'
+  wrap.innerHTML = `<span class="k">${cn}</span>`
+  const s = document.createElement('select'); s.dataset.attr = key
+  s.innerHTML = `<option value="">—</option>` + ARRAY.map(v => `<option>${v}</option>`).join('')
+  s.onchange = () => {
+    const v = s.value
+    if (v !== '') for (const other of Object.values(abSel)) {
+      if (other !== s && other.value === v) other.value = ''  // 互斥：撞值者清空
+    }
+  }
+  abSel[key] = s; wrap.append(s); $('abilities').append(wrap)
+}
+
+const skState = new Set()
+for (const [key, cn] of SKILLS) {
+  const lab = document.createElement('label'); lab.className = 'sk'
+  lab.innerHTML = `<input type="checkbox"><span>${cn}</span>`
+  lab.onclick = e => {
+    e.preventDefault()
+    if (skState.has(key)) { skState.delete(key); lab.classList.remove('on') }
+    else if (skState.size >= 2) { flash('最多选两项熟练') }
+    else { skState.add(key); lab.classList.add('on') }
+  }
+  $('skills').append(lab)
+}
+
+// ── 性别（male/female 两选一——opening 不出 unknown;头像预览经宿主桥，宿主缺席静默隐藏）──
+let gender = 'male'
+for (const b of document.querySelectorAll('#gseg button')) {
+  b.onclick = () => {
+    gender = b.dataset.g
+    for (const o of document.querySelectorAll('#gseg button')) o.classList.toggle('on', o === b)
+    askAvatar()
+  }
+}
+let avTimer = 0
+function askAvatar() {
+  const race = $('race').value
+  const d = $('race').dataset.av ?? 0
+  clearTimeout(avTimer)
+  if (!race) { delete $('avprev').dataset.img; renderAvPreview(); return }   // 无种族=首字预览
+  try { window.parent.postMessage({ t: 'opening-avatar', race, gender }, '*') } catch { }
+  avTimer = setTimeout(() => { delete $('avprev').dataset.img; renderAvPreview() }, 800)  // 桥不应答→首字兜底
+}
+// 预览兜底=名字首字（图片槽命中才换图；名字改动即时回落首字——2026-09-21 用户定案）
+function renderAvPreview() {
+  const el = $('avprev')
+  el.classList.add('show')
+  if (!el.dataset.img) el.innerHTML = `<span class="av-letter">${esc(($('name').value.trim()[0] ?? '？'))}</span>`
+}
+window.addEventListener('message', ev => {
+  const d = ev.data
+  if (!d || d.t !== 'opening-avatar-data') return
+  clearTimeout(avTimer)
+  const el = $('avprev')
+  if (d.ok !== true) { renderAvPreview(); return }
+  if (d.dataUrl) { el.dataset.img = d.dataUrl; el.innerHTML = `<img src="${d.dataUrl}" alt="">` }
+  else { delete el.dataset.img; renderAvPreview() }
+})
+$('name').addEventListener('input', renderAvPreview)
+$('race').addEventListener('change', askAvatar)
+renderAvPreview()
+askAvatar()
+
+let scnId = SCENARIOS[0].id
+let narrDirty = false
+$('narr').addEventListener('input', () => { narrDirty = true })
+function renderScen() {
+  $('scenes').innerHTML = ''
+  for (const s of SCENARIOS) {
+    const d = document.createElement('div')
+    d.className = s.id === scnId ? 'scn on' : 'scn'
+    d.dataset.id = s.id
+    d.innerHTML = `<div class="t">◆ ${s.title}</div><div class="g">${s.tagline}</div>`
+    d.onclick = () => {
+      scnId = s.id
+      renderScen()
+      $('narr').value = s.narration
+    }
+    $('scenes').append(d)
+  }
+}
+renderScen()
+$('narr').value = SCENARIOS[0].narration
+
+// ── openings.json 单源拉活：表单加载即向父页桥要场景库（桥经脚本直读 runtime/openings.json）,
+// 内嵌副本只在桥缺席/应答失败时兜底,桥一应答就以库里场景为准重建——改 openings.json 即生效。
+function askScen() { window.parent.postMessage({ t: 'opening-init' }, '*') }
+askScen()
+let scenTries = 0
+const scenTimer = setInterval(() => { scenTries += 1; if (scenTries >= 6) clearInterval(scenTimer); else askScen() }, 400)
+window.addEventListener('message', ev => {
+  const d = ev.data
+  if (!d || d.t !== 'opening-init-data') return
+  clearInterval(scenTimer)
+  if (d.ok !== true || !Array.isArray(d.data?.scenarios)) return  // 保底:维持内嵌副本
+  const fresh = d.data.scenarios
+    .map(s => ({ id: String(s.id ?? ''), title: String(s.title ?? ''), tagline: String(s.tagline ?? ''), narration: String(s.narration ?? '') }))
+    .filter(s => s.id !== '' && s.narration !== '')
+  if (!fresh.length) return
+  SCENARIOS.length = 0
+  SCENARIOS.push(...fresh)
+  if (!SCENARIOS.some(s => s.id === scnId)) scnId = SCENARIOS[0].id
+  renderScen()
+  if (!narrDirty) $('narr').value = SCENARIOS.find(s => s.id === scnId).narration
+})
+
+let flashTimer
+function flash(text, ok = false) {
+  const m = $('msg'); m.textContent = text; m.classList.toggle('ok', ok); clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => { m.textContent = '' }, 2600)
+}
+
+// ── 随机分配：全套 roll——姓名/种族/职业/背景/六维(标准数组随机排布)/技能选二/人设/阵营 ──
+$('roll').onclick = () => {
+  $('name').value = pick(NAMES)
+  $('race').value = pick(RACES)[0]
+  $('cls').value = pick(CLASSES)[0]
+  gender = pick(['male', 'female'])
+  for (const b of document.querySelectorAll('#gseg button')) b.classList.toggle('on', b.dataset.g === gender)
+  askAvatar()
+  $('bg').value = pick(BACKGROUNDS)
+  const rolled = shuffle(ARRAY)
+  ATTRS.forEach(([, key], i) => { abSel[key].value = String(rolled[i]) })
+  skState.clear()
+  for (const lab of document.querySelectorAll('.sk')) lab.classList.remove('on')
+  for (const sk of shuffle(SKILLS).slice(0, 2)) {
+    skState.add(sk[0])
+    const lab = Array.from(document.querySelectorAll('.sk')).find(l => l.textContent === sk[1])
+    if (lab) lab.classList.add('on')
+  }
+  $('p1').value = pick(PERSONALITY)
+  $('p2').value = pick(IDEALS)
+  $('p3').value = pick(BONDS)
+  $('p4').value = pick(FLAWS)
+  $('align').value = pick(Array.from($('align').options).slice(1).map(o => o.value || o.textContent))
+  delete $('avprev').dataset.img
+  renderAvPreview()
+  flash('已随机分配——可再手动微调', true)
+}
+
+// ── 提交：opening-commit → 宿主桥 → opening_commit.mjs 落盘 → ack ──
+// 宿主（卡 UI 桥）回执 {t:'opening-commit-ack', ok, detail}；detail=脚本 stdout JSON 串
+window.addEventListener('message', ev => {
+  const d = ev.data
+  if (!d || d.t !== 'opening-commit-ack') return
+  let who = null
+  if (typeof d.detail === 'string') { try { who = JSON.parse(d.detail).who ?? null } catch { } }
+  window.__commitAck = { ok: !!d.ok, detail: typeof d.detail === 'string' ? d.detail : String(d.detail ?? ''), who }
+})
+
+$('go').onclick = () => {
+  const name = $('name').value.trim()
+  const race = $('race').value, cls = $('cls').value
+  const abilities = {}
+  for (const [, key] of ATTRS) if (abSel[key].value !== '') abilities[key] = Number(abSel[key].value)
+  if (!name) return flash('缺姓名')
+  if (!race) return flash('选一个种族')
+  if (!cls) return flash('选一个职业')
+  if (!$('bg').value.trim()) return flash('写一句出身背景')
+  if (Object.keys(abilities).length < 6) return flash('六维属性分配未完成')
+  if (skState.size !== 2) return flash('技能熟练须选二')
+  const payload = {
+    character: {
+      name, race, class: cls, gender,
+      background: $('bg').value.trim(),
+      abilities,
+      skills: Array.from(skState),
+      persona: { personality: $('p1').value.trim(), ideals: $('p2').value.trim(), bonds: $('p3').value.trim(), flaws: $('p4').value.trim(), alignment: $('align').value || null },
+      backstory: '',
+    },
+    scenario: scnId,
+    narration: $('narr').value.trim() || SCENARIOS.find(s => s.id === scnId).narration,
+  }
+  const narration = payload.narration
+  $('go').disabled = true
+  window.parent.postMessage({ t: 'opening-commit', payload }, '*')
+  let waited = 0
+  const wait = setInterval(() => {
+    waited += 300
+    if (window.__commitAck) {
+      clearInterval(wait)
+      const ack = window.__commitAck
+      if (ack.ok) {
+        // 一键全包且零跳转:落盘成功即把开场白填进输入框——页面原地不动,
+        // 按钮原地变已完成态(禁点) + flash 一句提示,完成感全在输入框里。
+        window.parent.postMessage({ t: 'tavern-insert', text: narration }, '*')
+        $('go').textContent = '✓ 已落盘——开场白已填入下方输入框'
+        flash('已落盘——开场白已填入下方输入框，直接发送开始冒险', true)
+      } else {
+        $('go').disabled = false
+        flash('落盘失败：' + (ack.detail ?? '未知错误'))
+      }
+    } else if (waited > 15000) { clearInterval(wait); $('go').disabled = false; flash('落盘超时——重试一次') }
+  }, 300)
+}
+</script>
+</body>
+</html>

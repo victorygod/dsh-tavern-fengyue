@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "src",
+    "css-modules.d.ts"
+  ],
+  "references": [
+    {
+      "path": "../api/tsconfig.client.json"
+    },
+    {
+      "path": "../vendor-ui-renderer"
+    },
+    {
+      "path": "../vendor-ui-session"
+    }
+  ]
+}

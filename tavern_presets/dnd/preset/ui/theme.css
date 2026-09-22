@@ -1,0 +1,21 @@
+/* theme.css — 整页主题:羊皮纸暖调,走 guide「整页主题」的 token 面。
+   选「卡片主题」时本段拼在 parchment 基座之后,同名 token 覆盖生效;
+   金色族沿用宿主默认(与羊皮纸同源),只换底/字/边/气泡/衬线。 */
+.tavern-root {
+  --t-bg: #f5eedd;
+  --t-bg-deep: #efe5cf;
+  --t-surface-2: #f2ead6;
+  --t-surface-card: #faf5e7;
+  --t-card: #f3ecd9;
+  --t-veil: rgba(246, 240, 224, 0.9);
+  --t-fg: #3f3626;
+  --t-fg-strong: #2e2716;
+  --t-muted: #7d6c4e;
+  --t-muted2: #9b8a66;
+  --t-border: #d9c9a4;
+  --t-border-soft: #e8dec4;
+  --t-serif: "Songti SC", "Noto Serif SC", Georgia, serif;
+  --t-bubble-bg: #f1e5c6;
+  --t-bubble-border: #dcc495;
+  --t-bubble-fg: #4a3f2a;
+}

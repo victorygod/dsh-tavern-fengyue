@@ -1,0 +1,3 @@
+name: 空白模式
+description: 不挂载任何工具与 persona 的空白 Agent（酒馆主/尾代理专用，卡片自带全部系统提示词与工具）。
+order: 9

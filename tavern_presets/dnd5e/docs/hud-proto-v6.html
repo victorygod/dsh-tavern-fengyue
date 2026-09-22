@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>dnd5e HUD v6r3</title>
+<style>
+:root {
+  --bg: #f0ebe0; --parch: #faf6ec; --parch2: #f5f0e0;
+  --ink: #3d3020; --ink2: #2a2218; --ink3: #7a6a4a;
+  --gold: #8a6d20; --gold2: #b8960a; --gold3: #e6ce7a;
+  --crim: #c43838; --azur: #4a90d9;
+  --serif: "Songti SC", "Noto Serif SC", Georgia, serif;
+  --sans: -apple-system, "Helvetica Neue", sans-serif;
+  --glass: rgba(250, 246, 236, .93);
+  --bd: #b8a070;
+  --spring: cubic-bezier(.4, 0, .2, 1);
+}
+* { margin: 0; box-sizing: border-box; }
+html { color-scheme: light; }
+body { background: var(--bg); min-height: 100vh; font-family: var(--serif); overflow: hidden; }
+
+.stage { position: fixed; inset: 0; overflow-y: auto; padding: 50px 16px 90px; }
+.stage-prose { font-size: 16px; line-height: 2; text-align: justify; color: var(--ink); max-width: 640px; margin: 0 auto; }
+.stage-prose strong { color: var(--ink2); }
+.stage-prose em { font-style: normal; text-decoration: underline dotted; color: var(--ink3); }
+
+/* ═══ 统一角色卡解剖:头像突出 + 身体(名/条×2/元信息) ═══
+   hero = 华丽放大版; mate/enemy = 同构成缩小版 —— 结构完全一致 */
+.pcard {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  transition: transform .25s var(--spring), opacity .25s;
+}
+.pcard .av {
+  border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-weight: 800; color: var(--ink2);
+  background: linear-gradient(135deg, var(--gold3), var(--gold) 70%, var(--bg));
+  border: 2px solid var(--gold2);
+  box-shadow: 0 2px 8px rgba(138,109,32,.25), 0 0 0 2px var(--parch);
+  position: relative; z-index: 2;
+  text-shadow: 0 1px 2px rgba(255,255,255,.5);
+}
+.pcard .av .lv {
+  position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+  font: 600 7px var(--sans); color: var(--gold); background: var(--parch);
+  border-radius: 3px; padding: 0 4px; border: .5px solid var(--gold2);
+  white-space: nowrap; letter-spacing: .04em;
+}
+.pcard .body {
+  display: flex; flex-direction: column;
+  margin-left: -12px;
+  background: var(--glass); border: 1px solid var(--bd);
+  border-radius: 5px 7px 7px 5px;
+  box-shadow: 0 1px 5px rgba(138,109,32,.12);
+}
+
+.pcard .id { display: flex; align-items: baseline; gap: 3px; line-height: 1.15; }
+.pcard .nm { font-weight: 700; color: var(--ink2); white-space: nowrap; }
+.pcard .cl { font-family: var(--sans); color: var(--gold); white-space: nowrap; }
+
+/* 双行条:数字叠条上 */
+.pcard .bh { display: flex; align-items: center; }
+.pcard .bh .lbl { font: 700 6px var(--sans); flex-shrink: 0; text-align: right; }
+.pcard .bh .tk { flex: 1; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,.05); border: .5px solid rgba(138,109,32,.15); position: relative; }
+.pcard .bh .fl { display: block; height: 100%; transition: width .7s var(--spring); }
+.pcard .bh.hp .lbl { color: var(--crim); }
+.pcard .bh.hp .fl { background: linear-gradient(90deg, #b03030, #e05040, #ff7a6a); }
+.pcard .bh.mp .lbl { color: var(--azur); }
+.pcard .bh.mp .fl { background: linear-gradient(90deg, #3a70b0, #4a90d9, #6ab5ff 70%); }
+.pcard .bh.rage .lbl { color: #a08020; }
+.pcard .bh.rage .fl { background: linear-gradient(90deg, #a08020, #d0a030); }
+.pcard .bh .n {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 600 7px var(--sans); color: #fff; text-shadow: 0 0 2px rgba(0,0,0,.45);
+  font-variant-numeric: tabular-nums;
+}
+.pcard .bh.hp .fl.crit { background: #b03030; animation: dc 1.2s infinite; }
+@keyframes dc { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* 元信息行:AC/感官/状态chips */
+.pcard .meta { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+.pcard .m { font-family: var(--sans); color: var(--ink3); white-space: nowrap; }
+.pcard .m b { color: var(--ink2); font-variant-numeric: tabular-nums; font-weight: 600; }
+.stc {
+  font: 8px/1 var(--sans); padding: 1px 3px; border-radius: 2px;
+  border: .5px solid rgba(0,0,0,.06); white-space: nowrap; flex-shrink: 0;
+}
+.stc.b { background: rgba(86,139,48,.1); color: #568030; }
+.stc.d { background: rgba(196,56,56,.07); color: var(--crim); }
+.stc.i { background: rgba(0,0,0,.03); color: var(--gold); }
+.stc.dying { background: rgba(196,56,56,.18); animation: dc 1.2s infinite; }
+
+/* ── hero:华丽放大 ── */
+.hero { position: fixed; top: 10px; left: 10px; z-index: 101; }
+.hero .av { width: 56px; height: 56px; font-size: 24px; }
+.hero .body { padding: 6px 9px 6px 20px; gap: 3px; min-width: 196px; }
+.hero .nm { font-size: 15px; }
+.hero .cl { font-size: 9px; }
+.hero .bh { height: 10px; gap: 3px; }
+.hero .bh .lbl { width: 12px; }
+.hero .bh .tk { height: 7px; }
+.hero .meta { gap: 5px; }
+.hero .m { font-size: 9px; }
+
+/* ── mate/enemy:同构成缩小 ── */
+.hud-left {
+  position: fixed; top: 84px; left: 10px; z-index: 100;
+  display: flex; flex-direction: column; gap: 4px;
+  transition: transform .3s var(--spring), opacity .3s;
+}
+.hud-left.hidden { transform: translateX(-220px); opacity: 0; pointer-events: none; }
+.hero.hidden { transform: translateX(-240px); opacity: 0; pointer-events: none; }
+
+.mate .av { width: 40px; height: 40px; font-size: 17px; }
+.mate .body { padding: 4px 7px 4px 16px; gap: 2px; min-width: 168px; }
+.mate .nm { font-size: 12px; }
+.mate .cl { font-size: 8px; }
+.mate .bh { height: 8px; gap: 2px; }
+.mate .bh .lbl { width: 10px; }
+.mate .bh .tk { height: 5px; }
+.mate .meta { gap: 4px; }
+.mate .m { font-size: 8px; }
+
+.mate.enemy .av { border-color: #a05040; background: linear-gradient(135deg, #d8c8a8, #a08060); color: #5a3828; }
+.mate.enemy .av .lv { display: none; }
+.mate.enemy .nm { color: #8a4438; }
+.mate.enemy .bh.hp .fl { background: linear-gradient(90deg, #904030, #b05040); }
+.mate.dying .av { border-color: var(--crim); color: var(--crim); }
+.mate.dying .nm { color: var(--crim); }
+
+.zone-tag {
+  font: 600 8px var(--sans); letter-spacing: .4em; text-indent: .4em;
+  color: rgba(106,90,64,.3); padding: 3px 0 1px 2px; text-transform: uppercase;
+}
+
+/* ═══ 右侧 ═══ */
+.hud-right {
+  position: fixed; top: 10px; right: 10px; z-index: 100;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px; max-width: 190px;
+  transition: transform .3s var(--spring), opacity .3s;
+}
+.hud-right.hidden { transform: translateX(210px); opacity: 0; pointer-events: none; }
+.map-disc { width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--gold2);
+  background: radial-gradient(circle at 40% 30%, var(--parch), var(--parch2));
+  box-shadow: 0 2px 6px rgba(0,0,0,.1); position: relative; cursor: pointer; flex-shrink: 0; }
+.map-disc::before { content: ""; position: absolute; inset: 3px; border-radius: 50%; border: 1px dashed rgba(138,109,32,.15); }
+.map-disc .compass { position: absolute; top: 2px; right: 5px; font: 700 8px var(--sans); color: rgba(138,109,32,.3); }
+.map-info { text-align: right; }
+.map-info .place { font-size: 12px; font-weight: 700; color: var(--ink2); line-height: 1.1; }
+.map-info .when { font: 9px var(--sans); color: var(--ink3); margin-top: 1px; }
+.map-info .terr { display: inline-block; font: 8px var(--sans); color: var(--ink3); background: var(--glass); border: 1px solid rgba(138,109,32,.1); padding: 0 4px; border-radius: 3px; margin-top: 1px; }
+.q-zone { width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.q-tag { font: 600 8px var(--sans); letter-spacing: .25em; text-align: right; color: rgba(106,90,64,.25); }
+.q-item { cursor: pointer; background: var(--glass); border-left: 2px solid var(--gold3); border-radius: 0 3px 3px 0; padding: 2px 5px; }
+.q-item.main { border-left-color: var(--gold2); }
+.q-item.done { opacity: .4; }
+.q-title { font-size: 11px; color: var(--ink2); font-weight: 600; white-space: nowrap; overflow: hidden; }
+.q-item.done .q-title { text-decoration: line-through; font-weight: 400; }
+.q-deet { display: none; padding: 1px 2px 2px 4px; }
+.q-item.open .q-deet { display: block; }
+.q-step { font-size: 10px; color: var(--ink3); }
+.q-step.done { text-decoration: line-through; opacity: .3; }
+.q-step.cur { color: var(--gold2); font-weight: 600; }
+
+/* ═══ 底部按钮 ═══ */
+.hud-btns { position: fixed; bottom: 84px; right: 10px; z-index: 100; display: flex; flex-direction: column; gap: 4px; }
+.hud-btn { width: 30px; height: 30px; background: var(--parch); border: 1.5px solid var(--gold2); border-radius: 5px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.hud-btn:hover { border-color: var(--gold); }
+.hud-btn svg { width: 14px; height: 14px; }
+
+/* ═══ 详情卡(tab;头像突出) ═══ */
+.ctx-card { position: fixed; left: 10px; z-index: 200; display: none; width: 250px;
+  background: var(--parch); border: 1.5px solid var(--gold2); border-radius: 8px; box-shadow: 0 6px 24px rgba(138,109,32,.2); }
+.ctx-card.open { display: flex; flex-direction: column; }
+.ctx-card .ch { display: flex; align-items: center; padding: 8px 10px 0 4px; background: linear-gradient(180deg, #fff, var(--parch)); border-radius: 8px 8px 0 0; border-bottom: 1px solid rgba(138,109,32,.1); position: relative; }
+.ctx-av { width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold3), var(--gold)); border: 2px solid var(--gold2);
+  box-shadow: 0 1px 6px rgba(0,0,0,.12), 0 0 0 2px var(--parch);
+  display: flex; align-items: center; justify-content: center;
+  font: 800 18px var(--serif); color: var(--ink2); margin: -4px 0 0 -16px; position: relative; z-index: 1; }
+.ctx-av::after { content: attr(data-lv); position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+  font: 600 7px var(--sans); color: var(--gold); background: var(--parch); border-radius: 3px; padding: 0 3px; border: .5px solid var(--gold2); }
+.ctx-ti { flex: 1; display: flex; flex-direction: column; padding-left: 12px; }
+.ctx-nm { font-size: 15px; font-weight: 700; color: var(--ink2); }
+.ctx-sub { font: 10px var(--sans); color: var(--gold); margin-top: 1px; }
+.ctx-x { position: absolute; top: 6px; right: 8px; background: none; border: none; color: rgba(106,90,64,.3); font-size: 12px; cursor: pointer; }
+.ctx-x:hover { color: var(--crim); }
+.ctx-tabs { display: flex; gap: 1px; padding: 0 8px; border-bottom: 1px solid rgba(138,109,32,.2); }
+.ctx-tab { font: 10px var(--sans); cursor: pointer; color: var(--ink3); background: transparent; border: 1px solid rgba(138,109,32,.1); border-bottom: none; border-radius: 4px 4px 0 0; padding: 3px 8px 2px; flex: 1; text-align: center; }
+.ctx-tab.on { background: var(--parch); color: var(--ink2); font-weight: 600; border-color: var(--gold2); }
+.ctx-body { padding: 8px 10px 10px; font-size: 11px; color: var(--ink); max-height: 280px; overflow-y: auto; line-height: 1.6; background: var(--parch2); border-radius: 0 0 8px 8px; }
+.ctx-body::-webkit-scrollbar { width: 3px; } .ctx-body::-webkit-scrollbar-thumb { background: rgba(138,109,32,.2); }
+.ctx-lbl { font: 600 9px var(--sans); color: var(--gold); margin: 6px 0 2px; letter-spacing: .08em; border-bottom: .5px solid rgba(138,109,32,.08); }
+.ctx-lbl:first-child { margin: 0; }
+.ctx-sum { display: flex; flex-wrap: wrap; gap: 3px; }
+.ctx-sum-chip { display: inline-flex; gap: 2px; font: 10px var(--sans); padding: 1px 5px; border-radius: 3px; background: white; border: 1px solid rgba(138,109,32,.1); }
+.ctx-sum-chip .k { font-size: 9px; color: var(--ink3); }
+.ctx-sum-chip .v { color: var(--ink2); font-weight: 600; }
+.ctx-hpbar { height: 12px; border-radius: 6px; background: rgba(0,0,0,.03); border: 1px solid rgba(138,109,32,.1); overflow: hidden; position: relative; margin: 4px 0 3px; }
+.ctx-hpbar .fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #b03030, #e05040, #ff7a6a); transition: width .5s; display: block; }
+.ctx-hpbar span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 9px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.ctx-slots { display: flex; gap: 5px; flex-wrap: wrap; margin: 2px 0; }
+.ctx-slots .slot { display: flex; gap: 2px; align-items: center; }
+.ctx-slots .n { font: 600 8px var(--sans); color: var(--ink3); }
+.ctx-slots .pip { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--azur); background: rgba(74,144,219,.1); }
+.ctx-slots .pip.used { background: transparent; border-color: rgba(138,109,32,.1); }
+.ctx-attr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px 5px; font: 10px var(--sans); }
+.ctx-attr .s { display: flex; justify-content: space-between; }
+.ctx-attr .s .nm { color: var(--ink3); }
+.ctx-attr .s .vl { color: var(--ink2); font-weight: 600; }
+.ctx-attr .s .mod { color: var(--gold); font-size: 8px; margin-left: 1px; }
+.ctx-item { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+.ctx-item .mc { color: var(--ink); }
+.ctx-item .dv { color: var(--ink3); font: 9px var(--sans); }
+.ctx-skill { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+.ctx-skill .nm .expert { color: var(--gold2); }
+.ctx-skill .mod { color: var(--ink2); font-weight: 600; }
+.ctx-skill .attr { color: var(--ink3); font-size: 8px; margin-right: 2px; }
+.ctx-st { display: flex; gap: 3px; flex-wrap: wrap; margin: 2px 0; }
+.ctx-note { font: 10px/1.5 var(--sans); color: var(--ink3); margin-top: 3px; }
+
+/* ═══ 书弹窗 ═══ */
+.rb-ov { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.3); }
+.rb-ov.open { display: flex; }
+.rb-box { width: 700px; max-width: 90vw; height: 460px; max-height: 80vh; background: var(--parch); border: 2px solid var(--gold2); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.15); }
+.rb-h { padding: 6px 12px; background: linear-gradient(180deg, #fff, var(--parch)); border-radius: 8px 8px 0 0; border-bottom: 1px solid rgba(138,109,32,.12); display: flex; align-items: center; }
+.rb-nm { font-size: 14px; color: var(--gold); font-weight: 700; letter-spacing: .2em; }
+.rb-s { font: 12px var(--sans); color: var(--ink); background: white; border: 1px solid rgba(138,109,32,.12); border-radius: 4px; padding: 3px 8px; outline: none; width: 120px; margin-left: auto; margin-right: 6px; }
+.rb-s:focus { border-color: var(--gold2); }
+.rb-x { background: none; border: none; color: rgba(106,90,64,.3); font-size: 13px; cursor: pointer; }
+.rb-b { flex: 1; display: flex; overflow: hidden; border-radius: 0 0 8px 8px; }
+.rb-n { width: 148px; flex-shrink: 0; border-right: 1px solid rgba(138,109,32,.08); overflow-y: auto; padding: 4px 0; background: var(--parch2); }
+.rb-ng { font: 600 9px var(--sans); color: var(--gold); padding: 4px 10px 2px; text-transform: uppercase; letter-spacing: .1em; }
+.rb-ni { font: inherit; font-size: 11px; color: var(--ink); padding: 2px 10px 2px 14px; background: none; border: none; cursor: pointer; width: 100%; text-align: left; }
+.rb-ni:hover { background: rgba(138,109,32,.04); }
+.rb-c { flex: 1; overflow-y: auto; padding: 10px 16px 14px; font-size: 13px; line-height: 1.8; color: var(--ink); }
+.rb-c h3 { font-size: 14px; color: var(--ink2); margin: 0 0 4px; }
+.rb-c p { margin: 0 0 6px; }
+
+/* Composer */
+.composer-h { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 20px 12px; z-index: 50; display: flex; justify-content: center; }
+.composer-i { width: 100%; max-width: 640px; background: rgba(0,0,0,.4); border: 1px solid rgba(200,169,110,.2); border-radius: 6px; padding: 10px 16px; color: #f5f0e0; font: 14px var(--serif); outline: none; }
+.composer-i::placeholder { color: rgba(200,169,110,.3); }
+
+/* demo(原型演示专用,非正式页面) */
+.demo { position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); display: flex; gap: 3px; z-index: 1000; opacity: .35; }
+.demo:hover { opacity: 1; }
+.demo button { font: 9px var(--sans); color: var(--ink3); background: white; border: 1px solid rgba(138,109,32,.1); padding: 1px 6px; border-radius: 3px; cursor: pointer; }
+
+::-webkit-scrollbar { width: 3px; } ::-webkit-scrollbar-thumb { background: rgba(138,109,32,.12); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 4c4-2 8-2 8 0v16c0-2-4-2-8 0V4zM12 4c4-2 8-2 8 0v16c0-2-4-2-8 0V4z" fill="#8a6d20" opacity=".4" stroke="#8a6d20" stroke-width="1.2" fill-rule="evenodd"/></symbol>
+  <symbol id="ic-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="1.5" fill="none" stroke="#8a6d20" stroke-width="1.4"/><rect x="13" y="4" width="8" height="16" rx="1.5" fill="none" stroke="#8a6d20" stroke-width="1.4"/><path d="M7 9v6M17 9v6" stroke="#8a6d20" stroke-width="1" fill="none"/></symbol>
+</svg>
+
+<!-- 叙事 -->
+<div class="stage"><div class="stage-prose">
+  <p>薄雾散去，石板路的尽头浮现出猎猎作响的旗幡——<strong>边境小镇</strong>。你踏着暮色迈过门槛，身后山林的窸窣声似仍在追索……</p>
+  <p style="margin-top:10px">你注意到，入口石墙刻有数道新鲜爪痕，向镇北延伸。草丛半掩铜币——酸性腐蚀痕迹……</p>
+  <p style="margin-top:10px">阴影中窜出矮小身影——<em>哥布林</em>！短剑划出弧线，薄皮甲上鲜血涌出。嘶吼之后还有两双绿油油的眼眸……</p>
+</div></div>
+
+<!-- ═══ 主角(华丽版,同构成) ═══ -->
+<div class="pcard hero" id="hero" data-ctx="ctx-pc">
+  <div class="av">洛<span class="lv">LV3</span></div>
+  <div class="body">
+    <div class="id"><span class="nm">洛克</span><span class="cl">盗贼</span></div>
+    <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" id="hp-fl" style="width:77%"></div><span class="n" id="hp-n">17/22</span></div></div>
+    <div class="bh mp"><span class="lbl">位</span><div class="tk"><div class="fl" style="width:50%"></div><span class="n">1/2</span></div></div>
+    <div class="meta"><span class="m">AC <b>15</b></span><span class="m">暗视<b>60</b></span><span class="stc b">狂·2</span><span class="stc d">盲·1</span><span class="stc i">💡</span></div>
+  </div>
+</div>
+
+<!-- ═══ 同伴/敌怪 栈(同构成缩小版) ═══ -->
+<div class="hud-left" id="hud-left">
+  <div class="zone-tag">同伴</div>
+
+  <div class="pcard mate" data-ctx="ctx-tina">
+    <div class="av">缇<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">缇娜</span><span class="cl">牧师</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:62%"></div><span class="n">5/8</span></div></div>
+      <div class="bh mp"><span class="lbl">位</span><div class="tk"><div class="fl" style="width:67%"></div><span class="n">4/6</span></div></div>
+      <div class="meta"><span class="m">AC <b>12</b></span><span class="stc d">惧·1</span></div>
+    </div>
+  </div>
+
+  <div class="pcard mate" data-ctx="ctx-iron">
+    <div class="av">铁<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">老铁</span><span class="cl">战士</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:100%"></div><span class="n">12/12</span></div></div>
+      <div class="bh rage"><span class="lbl">怒</span><div class="tk"><div class="fl" style="width:60%"></div><span class="n" style="color:#a08020;text-shadow:none">3/5</span></div></div>
+      <div class="meta"><span class="m">AC <b>18</b></span><span class="stc b">狂暴·3</span></div>
+    </div>
+  </div>
+
+  <div class="pcard mate dying">
+    <div class="av">伊<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">伊娃</span><span class="cl">盗贼</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl crit" style="width:0%"></div><span class="n">0/10</span></div></div>
+      <div class="meta"><span class="m">AC <b>14</b></span><span class="stc dying">✗2 ✚0</span></div>
+    </div>
+  </div>
+
+  <div class="zone-tag" id="enemy-tag">敌人</div>
+
+  <div class="pcard mate enemy">
+    <div class="av">甲</div>
+    <div class="body">
+      <div class="id"><span class="nm">哥布林甲</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:100%"></div><span class="n">7/7</span></div></div>
+      <div class="meta"><span class="m">AC <b>15</b></span><span class="stc i">⏱9</span></div>
+    </div>
+  </div>
+
+  <div class="pcard mate enemy">
+    <div class="av">乙</div>
+    <div class="body">
+      <div class="id"><span class="nm">哥布林乙</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:29%"></div><span class="n">2/7</span></div></div>
+      <div class="meta"><span class="m">AC <b>15</b></span><span class="stc i">⏱7</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 右侧 ═══ -->
+<div class="hud-right" id="hud-right">
+  <div class="map-disc"><span class="compass">N</span></div>
+  <div class="map-info">
+    <div class="place">边境小镇</div>
+    <div class="when">第3日 · 黄昏</div>
+    <span class="terr">温带丘陵</span>
+  </div>
+  <div class="q-zone">
+    <div class="q-tag">任务</div>
+    <div class="q-item main open">
+      <div class="q-title">◆ 山中异动</div>
+      <div class="q-deet">
+        <div class="q-step done">✓ 到达小镇</div>
+        <div class="q-step cur">◆ 调查爪痕</div>
+        <div class="q-step todo">○ 追踪巢穴</div>
+      </div>
+    </div>
+    <div class="q-item"><div class="q-title">◇ 失踪商队</div>
+      <div class="q-deet"><div class="q-step todo">○ 前往勘察</div></div>
+    </div>
+    <div class="q-item done"><div class="q-title">✓ 酒馆情报</div></div>
+  </div>
+</div>
+
+<!-- ═══ 主角详情卡 ═══ -->
+<div class="ctx-card" id="ctx-pc">
+  <div class="ch">
+    <div class="ctx-av" data-lv="LV3">洛</div>
+    <div class="ctx-ti"><div class="ctx-nm">洛克</div><div class="ctx-sub">LV3 盗贼 · 半精灵</div></div>
+    <button class="ctx-x" data-close="ctx-pc">✕</button>
+  </div>
+  <div class="ctx-tabs">
+    <button class="ctx-tab on" data-t="ov">总览</button>
+    <button class="ctx-tab" data-t="eq">装备</button>
+    <button class="ctx-tab" data-t="sk">技能</button>
+  </div>
+  <div class="ctx-body">
+    <div class="ctx-pane" data-p="ov">
+      <div class="ctx-sum">
+        <span class="ctx-sum-chip"><span class="k">HP</span><span class="v">17/22</span></span>
+        <span class="ctx-sum-chip"><span class="k">AC</span><span class="v">15</span></span>
+        <span class="ctx-sum-chip"><span class="k">HD</span><span class="v">1/3</span></span>
+        <span class="ctx-sum-chip"><span class="k">速度</span><span class="v">30尺</span></span>
+      </div>
+      <div class="ctx-hpbar"><div class="fill" style="width:77%"></div><span>HP 17 / 22</span></div>
+      <div class="ctx-lbl">施法位</div>
+      <div class="ctx-slots">
+        <div class="slot"><span class="n">1环</span><span class="pip"></span><span class="pip used"></span></div>
+        <div class="slot"><span class="n">2环</span><span class="pip"></span><span class="pip"></span></div>
+      </div>
+      <div class="ctx-lbl">属性</div>
+      <div class="ctx-attr">
+        <div class="s"><span class="nm">力</span><span><span class="vl">14</span><span class="mod">+2</span></span></div>
+        <div class="s"><span class="nm">敏</span><span><span class="vl">12</span><span class="mod">+1</span></span></div>
+        <div class="s"><span class="nm">体</span><span><span class="vl">13</span><span class="mod">+1</span></span></div>
+        <div class="s"><span class="nm">智</span><span><span class="vl">10</span><span class="mod">+0</span></span></div>
+        <div class="s"><span class="nm">感</span><span><span class="vl">11</span><span class="mod">+0</span></span></div>
+        <div class="s"><span class="nm">魅</span><span><span class="vl">8</span><span class="mod">−1</span></span></div>
+      </div>
+      <div class="ctx-lbl">状态</div>
+      <div class="ctx-st"><span class="stc b">🛡 狂暴 ·2轮</span><span class="stc d">👁 目盲 ·1轮</span></div>
+      <div class="ctx-note">狂暴：近战+2<br>目盲：攻击劣势；对它的近战有优势。专注：（无）</div>
+    </div>
+    <div class="ctx-pane" data-p="eq" style="display:none">
+      <div class="ctx-lbl">武器</div>
+      <div class="ctx-item"><span class="mc">短剑 ×2</span><span class="dv">1d6 灵巧</span></div>
+      <div class="ctx-item"><span class="mc">短弓</span><span class="dv">1d6 · 80/320</span></div>
+      <div class="ctx-lbl">护甲</div>
+      <div class="ctx-item"><span class="mc">镶钉皮+盾</span><span class="dv">AC 15</span></div>
+      <div class="ctx-lbl">杂物</div>
+      <div class="ctx-item"><span class="mc">火把×5 · 绳(50尺) · 干粮×3日</span></div>
+      <div class="ctx-lbl">钱袋</div>
+      <div class="ctx-item"><span class="mc">15 gp · 3 sp</span></div>
+    </div>
+    <div class="ctx-pane" data-p="sk" style="display:none">
+      <div class="ctx-lbl">技能</div>
+      <div class="ctx-skill"><span class="nm">隐匿<span class="expert">★</span></span><span><span class="attr">DEX</span><span class="mod">+7</span></span></div>
+      <div class="ctx-skill"><span class="nm">巧手</span><span><span class="attr">DEX</span><span class="mod">+4</span></span></div>
+      <div class="ctx-lbl">豁免</div>
+      <div class="ctx-skill"><span class="nm">DEX / INT</span><span class="mod">+4 / +2</span></div>
+      <div class="ctx-lbl">特征</div>
+      <div class="ctx-item"><span class="mc">偷袭 2d6</span><span class="dv">优势时追加</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 缇娜详情(同构成) -->
+<div class="ctx-card" id="ctx-tina">
+  <div class="ch">
+    <div class="ctx-av" data-lv="LV3">缇</div>
+    <div class="ctx-ti"><div class="ctx-nm">缇娜</div><div class="ctx-sub">LV3 牧师 · 半精灵</div></div>
+    <button class="ctx-x" data-close="ctx-tina">✕</button>
+  </div>
+  <div class="ctx-tabs">
+    <button class="ctx-tab on" data-t="ov">总览</button>
+    <button class="ctx-tab" data-t="eq">装备</button>
+    <button class="ctx-tab" data-t="sk">技能</button>
+  </div>
+  <div class="ctx-body">
+    <div class="ctx-pane" data-p="ov">
+      <div class="ctx-sum"><span class="ctx-sum-chip"><span class="k">HP</span><span class="v">5/8</span></span><span class="ctx-sum-chip"><span class="k">AC</span><span class="v">12</span></span><span class="ctx-sum-chip"><span class="k">HD</span><span class="v">3/3</span></span></div>
+      <div class="ctx-hpbar"><div class="fill" style="width:62%"></div><span>HP 5 / 8</span></div>
+      <div class="ctx-slots"><div class="slot"><span class="n">1环</span><span class="pip"></span><span class="pip"></span></div><div class="slot"><span class="n">2环</span><span class="pip"></span></div></div>
+      <div class="ctx-attr"><div class="s"><span class="nm">力</span><span><span class="vl">10</span><span class="mod">+0</span></span></div><div class="s"><span class="nm">体</span><span><span class="vl">14</span><span class="mod">+2</span></span></div><div class="s"><span class="nm">感</span><span><span class="vl">16</span><span class="mod">+3</span></span></div></div>
+      <div class="ctx-lbl">状态</div>
+      <div class="ctx-st"><span class="stc d">恐惧 ·1轮</span></div>
+      <div class="ctx-note">恐惧：恐惧源在视野内时攻击与检定劣势</div>
+    </div>
+    <div class="ctx-pane" data-p="eq" style="display:none">
+      <div class="ctx-item"><span class="mc">硬头锤</span><span class="dv">1d8 钝击</span></div>
+      <div class="ctx-item"><span class="mc">鳞甲</span><span class="dv">AC 14</span></div>
+      <div class="ctx-item"><span class="mc">圣徽</span><span class="dv">日神法器</span></div>
+      <div class="ctx-item"><span class="mc">治愈药水×2</span><span class="dv">2d4+2</span></div>
+    </div>
+    <div class="ctx-pane" data-p="sk" style="display:none">
+      <div class="ctx-skill"><span class="nm">医药</span><span><span class="attr">WIS</span><span class="mod">+5</span></span></div>
+      <div class="ctx-skill"><span class="nm">宗教</span><span><span class="attr">INT</span><span class="mod">+2</span></span></div>
+      <div class="ctx-item"><span class="mc">神圣渠道</span><span class="dv">短休回充</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 书弹 -->
+<div class="rb-ov" id="rb">
+  <div class="rb-box">
+    <div class="rb-h"><span class="rb-nm">规则之书</span><input class="rb-s" placeholder="搜索…"><button class="rb-x">✕</button></div>
+    <div class="rb-b">
+      <div class="rb-n">
+        <div class="rb-ng">规则</div>
+        <button class="rb-ni">战斗秩序</button>
+        <button class="rb-ni">执行动作</button>
+        <div class="rb-ng">状态</div>
+        <button class="rb-ni">目盲</button>
+        <div class="rb-ng">装备</div>
+        <button class="rb-ni">长剑</button>
+      </div>
+      <div class="rb-c">
+        <h3>Order of Combat</h3>
+        <p>Combat unfolds in rounds. Each participant takes turns in initiative order, and the round ends when every participant has acted.</p>
+        <p><em>d20 + DEX modifier</em>. Ties are simultaneous.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="hud-btns">
+  <button class="hud-btn" id="btn-rb" title="规则之书"><svg><use xlink:href="#ic-book"/></svg></button>
+  <button class="hud-btn" id="btn-pn" title="隐藏/开启面板"><svg><use xlink:href="#ic-panel"/></svg></button>
+</div>
+
+<div class="composer-h"><input class="composer-i" placeholder="[ 输入你的行动…… ]"></div>
+
+<div class="demo"><button onclick="tE()">敌</button><button onclick="tH()">血</button></div>
+
+<script>
+const hL = document.getElementById('hud-left'), hR = document.getElementById('hud-right'), hero = document.getElementById('hero')
+document.getElementById('btn-pn').onclick = () => {
+  const v = !hL.classList.contains('hidden')
+  hL.classList.toggle('hidden', v)
+  hR.classList.toggle('hidden', v)
+  hero.classList.toggle('hidden', v)
+}
+function cCtx() { for (const c of document.querySelectorAll('.ctx-card')) c.classList.remove('open') }
+for (const el of document.querySelectorAll('[data-ctx]')) {
+  el.addEventListener('click', e => {
+    e.stopPropagation()
+    const ctx = document.getElementById(el.dataset.ctx)
+    const w = ctx.classList.contains('open')
+    cCtx()
+    if (!w) { const r = el.getBoundingClientRect(); ctx.style.top = Math.min(r.bottom + 4, 240) + 'px'; ctx.classList.add('open') }
+  })
+}
+for (const x of document.querySelectorAll('.ctx-x')) { x.onclick = e => { e.stopPropagation(); document.getElementById(x.dataset.close).classList.remove('open') } }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ctx-card')) cCtx()
+  if (!e.target.closest('.rb-ov, .hud-btn')) document.getElementById('rb').classList.remove('open')
+})
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { cCtx(); document.getElementById('rb').classList.remove('open') } })
+for (const card of document.querySelectorAll('.ctx-card')) {
+  for (const tab of card.querySelectorAll('.ctx-tab')) {
+    tab.onclick = e => {
+      e.stopPropagation()
+      for (const t of card.querySelectorAll('.ctx-tab')) t.classList.remove('on')
+      tab.classList.add('on')
+      for (const p of card.querySelectorAll('.ctx-pane')) p.style.display = p.dataset.p === tab.dataset.t ? '' : 'none'
+    }
+  }
+}
+for (const q of document.querySelectorAll('.q-item')) q.onclick = e => { e.stopPropagation(); q.classList.toggle('open') }
+document.getElementById('btn-rb').onclick = e => { e.stopPropagation(); document.getElementById('rb').classList.add('open') }
+document.querySelector('.rb-x').onclick = () => document.getElementById('rb').classList.remove('open')
+
+function tE() {
+  for (const e of document.querySelectorAll('.mate.enemy')) e.style.display = e.style.display === 'none' ? '' : 'none'
+  const tag = document.getElementById('enemy-tag')
+  tag.style.display = tag.style.display === 'none' ? '' : 'none'
+}
+let pulsing = false, t = 0
+function tH() { pulsing = !pulsing }
+setInterval(() => {
+  if (!pulsing) return
+  t = (t + 1) % 16
+  if (t === 6) { document.getElementById('hp-fl').style.width = '36%'; document.getElementById('hp-n').textContent = '8/22' }
+  if (t === 0) { document.getElementById('hp-fl').style.width = '77%'; document.getElementById('hp-n').textContent = '17/22' }
+}, 2000)
+</script>
+</body>
+</html>

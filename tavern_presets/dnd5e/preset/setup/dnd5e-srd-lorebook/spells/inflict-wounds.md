@@ -1,0 +1,25 @@
+---
+name: Inflict Wounds
+description: 1st-level Necromancy
+level: 1
+school: necromancy
+casting_time: 1 action
+range: Touch
+duration: Instantaneous
+components:
+  - V
+  - S
+attack_type: melee
+classes:
+  - Cleric
+---
+**1st-level Necromancy**
+- **Casting Time:** 1 action
+- **Range:** Touch
+- **Components:** V, S
+- **Duration:** Instantaneous
+- **Spell Lists:** Cleric
+
+Make a melee spell attack against a creature you can reach. On a hit, the target takes 3d10 necrotic damage.
+
+**At Higher Levels.** When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d10 for each slot level above 1st.

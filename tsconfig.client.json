@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/vendor-ui-renderer"
+    },
+    {
+      "path": "./packages/vendor-ui-session"
+    },
+    {
+      "path": "./packages/api/tsconfig.client.json"
+    },
+    {
+      "path": "./packages/ui"
+    }
+  ]
+}

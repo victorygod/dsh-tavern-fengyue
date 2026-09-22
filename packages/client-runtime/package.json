@@ -1,0 +1,40 @@
+{
+  "name": "dsh-tavern-fengyue-client-runtime",
+  "description": "jsdom slot test runtime: real Cordis Context + SlotRegistry + UI renderer with test-owned session/workspace doubles (vendored from @deepseek-ai/dsh-client-test-runtime; its sibling /src/ imports are re-pointed to the published /client export)",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@deepseek-ai/dsh-attachment": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-client-store": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.1.5-rc.1 <0.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-session": ">=0.1.5-rc.1 <0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-session": ">=0.1.5-rc.1 <0.2",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "immer": "^10.1.1",
+    "zustand": "~4.4.7"
+  }
+}

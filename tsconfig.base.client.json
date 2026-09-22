@@ -1,0 +1,12 @@
+{
+  // Client-side compiler shape shared by tsconfig.client.json and the ui/api
+  // client faces: browser library API, React JSX, ambient DSH_CLIENT_* build
+  // types (scripts/types/client-build-environment).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "typeRoots": ["./scripts/types", "./node_modules/@types"],
+    "types": ["client-build-environment"]
+  }
+}

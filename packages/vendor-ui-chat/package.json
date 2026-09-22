@@ -1,0 +1,8 @@
+{
+  "name": "dsh-tavern-fengyue-vendor-ui-chat",
+  "description": "Contract snapshot of client/ui-chat for the jsdom testkit only (provenance = deepseek-harness tavern-extraction-2026-09-17 / 078257c). Not built, not published.",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "type": "module",
+  "license": "MIT"
+}

@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "main.after": [],
+    "tail.after": []
+  }
+}

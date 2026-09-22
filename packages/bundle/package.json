@@ -1,0 +1,59 @@
+{
+  "name": "dsh-tavern-fengyue",
+  "description": "The tavern fengyue bundle: the RPG world-card engine patch layer over the DeepSeek Harness web surface (host engine + Remote owner + browser takeover)",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*"
+  },
+  "files": [
+    "lib/index.js",
+    "bin/**",
+    "dsh-compatibility.json",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/victorygod/dsh-tavern-fengyue.git",
+    "directory": "packages/bundle"
+  },
+  "homepage": "https://github.com/victorygod/dsh-tavern-fengyue#readme",
+  "bugs": {
+    "url": "https://github.com/victorygod/dsh-tavern-fengyue/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "sillytavern",
+    "rpg"
+  ],
+  "dependencies": {
+    "dsh-tavern-fengyue-engine": "workspace:*",
+    "dsh-tavern-fengyue-api": "workspace:*",
+    "dsh-tavern-fengyue-ui": "workspace:*"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  },
+  "bin": {
+    "dsh-tavern-fengyue": "bin/setup.mjs"
+  }
+}

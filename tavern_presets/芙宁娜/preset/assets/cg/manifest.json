@@ -1,0 +1,95 @@
+{
+  "default": "1",
+  "cgs": {
+    "1": {
+      "intro": "正常——平常对话的默认神态。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/1.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "2": {
+      "intro": "高兴——被夸赞、被哄、心情雀跃时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/2.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "3": {
+      "intro": "生气——被冒犯、吃醋、不听话时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/3.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "4": {
+      "intro": "难过——失落、被辜负、委屈想哭时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/4.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "5": {
+      "intro": "惊讶——意外、被吓到、惊喜时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/5.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "6": {
+      "intro": "害羞——脸红、被直球告白、不好意思时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/6.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "7": {
+      "intro": "得意——骄傲、炫耀、小胜之时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/7.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "8": {
+      "intro": "委屈——被误解、求安慰、小情绪时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/8.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "9": {
+      "intro": "兴奋——期待活动、出游、玩闹时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/9.jpg",
+          "pos": "cover"
+        }
+      ]
+    },
+    "10": {
+      "intro": "怀疑——听出谎言、不信任、思考时。",
+      "layers": [
+        {
+          "img": "preset/assets/cg/10.jpg",
+          "pos": "cover"
+        }
+      ]
+    }
+  }
+}

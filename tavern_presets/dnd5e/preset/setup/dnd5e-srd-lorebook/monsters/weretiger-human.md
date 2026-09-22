@@ -1,0 +1,52 @@
+---
+name: "Weretiger, Human Form"
+description: "Medium humanoid, CR 4 (1100 XP)"
+cr: 4
+xp: 1100
+pb: 2
+skill_prof:
+  - perception
+  - stealth
+ac: 12
+hp: 120
+hp_roll: 16d8+48
+size: Medium
+type: humanoid
+alignment: neutral
+speed: 30 ft.
+languages: Common
+str: 17
+dex: 15
+con: 16
+int: 10
+wis: 13
+cha: 11
+---
+*Medium humanoid (human), neutral*
+- **Armor Class** 12
+- **Hit Points** 120 (16d8+48)
+- **Speed** 30 ft.
+
+| STR | DEX | CON | INT | WIS | CHA |
+| 17 (3) | 15 (2) | 16 (3) | 10 (0) | 13 (1) | 11 (0) |
+
+- **Proficiencies** Skill: Perception: +5, Skill: Stealth: +4
+- **Damage Immunities** bludgeoning, piercing, and slashing from nonmagical weapons that aren't silvered
+- **Senses** darkvision 60 ft., passive Perception 15
+- **Languages** Common
+- **Challenge** 4 (1100 XP, PB +2)
+
+**Shapechanger.** The weretiger can use its action to polymorph into a tiger-humanoid hybrid or into a tiger, or back into its true form, which is humanoid. Its statistics, other than its size, are the same in each form. Any equipment it is wearing or carrying isn't transformed. It reverts to its true form if it dies.
+
+**Keen Hearing and Smell.** The weretiger has advantage on Wisdom (Perception) checks that rely on hearing or smell.
+
+***Multiattack.*** In humanoid form, the weretiger makes two scimitar attacks or two longbow attacks. In hybrid form, it can attack like a humanoid or make two claw attacks.
+***Scimitar.*** Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) slashing damage.
+***Longbow.*** Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage.
+
+## Forms
+
+| 形态 | CR | AC | HP |
+|---|---|---|---|
+| [Weretiger, Hybrid Form](weretiger-hybrid.md) | 4 | 12 | 120 |
+| [Weretiger, Tiger Form](weretiger-tiger.md) | 4 | 12 | 120 |

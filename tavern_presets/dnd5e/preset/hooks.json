@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "main.after": ["test_main_after.mjs"],
+    "tail.after": ["test_tail_after.mjs"]
+  }
+}

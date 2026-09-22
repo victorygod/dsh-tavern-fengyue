@@ -1,0 +1,30 @@
+# Agent Note: Tavern send-moment autosave, reply retry, and draft restore
+
+Status: implemented
+
+English | [中文](2026-09-16-tavern-send-moment-autosave-and-retry.zh.md)
+
+## Problem
+
+Autosave hung on turn end (the `turn/end` for tail-less cards, the fork settlement for tailed ones), so every save was a turn PRODUCT: the newest snapshot always contained the reply just generated, giving the player no path back to "before this message was sent". Retry (regenerate the latest reply) therefore had no reliable anchor — no pre-send world snapshot and no record of what the composer held. Loading a save also dropped the composer text.
+
+## Decision
+
+**The save point moves to the moment the player hits send; the stamp gains a `draft` field.** Engine `prompt()` calls `autosaveStamped` after the tail gate settles and before the pending-snapshot write and the wrap render, stamping `{sessionId, seq: lastTurnEndSeq, summary, draft}` — the snapshot is the pre-send world (the tail has finished maintaining `runtime/`), and `draft` is the raw text being submitted. Both turn-end stamping sites are deleted outright; the manual `save` signature gains `draft` (the on-screen composer text, possibly empty). The autosave summary is the submitted text truncated — at send time that IS the last player message; the `lastPlayerText` log walk would not find it yet.
+
+**Retry = `retryPoint` rebind + client re-send verbatim.** The new engine method takes the newest `autosave-*` stamp carrying a `draft` (mtime order, the existing `listSaves` sort); a non-null `seq` goes through the existing `load()` (fork, rebind, runtime restore, seed-ledger repair), a `null` one (first message) goes through `reset()` — fork throws without a completed turn, and there the runtime was seeded and untouched, so re-seeding equals the snapshot. It returns `{freshId, text}`; the client immediately runs the existing `rpc.prompt` pipeline against freshId (wrap re-render, fresh requestId, its own turn and tail agent), then `onSessionSwitch(freshId, 'retry')`. Correctness rests on two kernel facts (both verified against source): the durable `user/message` lands AFTER `turn/start` (the first step's firstAttempt branch in `agent.ts`), and the fork cut stops before the next `turn/start` — a send-moment stamp's seed excludes the message being retried, so the re-send is the only copy; severed ledger entries in the seed are stripped by the existing `repairSeedInbox` against `livePendingIds`.
+
+**Load restores the draft, sharing the stamp field with retry.** `load`/`reset` return values gain `draft`; `SavesPanel` → `onSessionSwitch(cause, draft)` → a `restoreDraftRef` one-shot handoff → the chat view's session effect consumes and applies it (each effect run clears the handoff unconditionally — no cross-visit resurrection); an in-place load (a boundary-less save returns the same session id) borrows a `resetSignal` bump to re-run the effect. Manual-save draft capture runs through an `onDraftChange` callback into a parent-side ref mirror (per-keystroke setState would drag the whole page), with all four composer mutation sites funneled through one `updateDraft`.
+
+**Three UI pieces: the actions row, the retry control, the Esc shortcuts.** Every user/narrative line carries a fixed-space actions row (copy with the 1s check swap via `writeClipboard` from client-ui-primitives — already on the client external list), revealed by opacity on hover behind `@media (hover: hover)` — the same mechanics as the stock `MessageIconActions` and the same idiom as the existing `.stamp`. The ↻ renders only on the last reply line (`narrative`/`stopped`/`error` — stopped and failed turns count as settled), gated by the send button's own state machine (`!running && !pending && !tailRunning`) plus `state().retryable`. Esc: a single press fires immediately (stop → close dialog → no-op, sharing the send button's stoppable state); a double press (within 400ms) counts ONLY when the first press was a no-op — clear the composer → open the load page — which kills both accidental paths (mashing Esc to stop, habitually double-pressing to close a dialog); `event.repeat` is not dropped (holding ≈ repeated stops); IME composition and modifier combos are ignored; modal-level Esc has one global owner — the key dialog's local handler is removed and the file-tree inline-rename Esc adds `stopPropagation`.
+
+## Alternatives considered
+
+- **Retry by resurrecting the seed's severed ledger entry** (riding the phantom-resend mechanism): rejected — it fights `repairSeedInbox`'s repair semantics head-on, and the seed already contains the message, so a replay would duplicate it.
+- **A single `retryPoint` RPC that also prompts**: rejected — on a partial failure (admission rejection) the workspace has already rebound and the client gets no coherent error surface; the two-step shape reuses the entire pending/stop/scriptFailures send path.
+- **Keeping the save at turn end and adding a separate "retry snapshot"**: rejected — two save chains inevitably drift; one send-moment stamp serves retry, crash recovery, and the save row at once.
+- **Absolutely positioned floating action rows**: rejected — the user explicitly required reserved space, and a floating layer would collide with the `.stamp` hover zone.
+
+## Consequences
+
+Four small wire additions: `state.retryable`, `save.draft`, the `draft` return of `load`/`reset`, and `retryPoint(request, signal)` — typert host and both client bundles were rebuilt in the same batch, and the wire-face conforms assertion pins the two-arg signature. The autosave ring (`keep 10`) semantics are unchanged — every send consumes one ring slot. `state()` gains one save-directory scan per poll (~10-20 stat/read calls, negligible on a local disk). Retry semantics are defined as "return to the moment of that send-click and redo the message": on the queued-race path the boundary is the click-time state — a self-consistent rule. The design narrative lives in `docs/tavern-prototype/send-moment-autosave-and-retry_zh.md` (settled design plus mechanism evidence); the「状态与存档」and「运行流程」sections of design_zh.md were reversed in the same batch.

@@ -1,0 +1,8 @@
+{
+  "transcript": { "window": "all" },
+  "panels": [
+    { "name": "hud-left", "slot": "overlay", "data": { "script": "ui_data.mjs" }, "view": "heroPanel", "hideDuringOpening": true },
+    { "name": "hud-right", "slot": "overlay", "data": { "script": "ui_data.mjs" }, "view": "rightPanel", "hideDuringOpening": true }
+  ],
+  "html": true
+}

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>galgame UI 原型 v2 · 对话框状态机 + composer 对齐 + CG 换场</title>
+<style>
+/* ═══ 原型=视觉正本(design_galgame-ui_zh.md)═══ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; background: #05070d; }
+body { display: flex; align-items: center; justify-content: center;
+  font-family: "Source Han Serif SC", "Noto Serif SC", Georgia, serif; }
+
+#stage { position: relative; width: min(1100px, 96vw); aspect-ratio: 16/9;
+  overflow: hidden; border-radius: 10px; cursor: pointer; user-select: none;
+  background: #0b0e1a; }
+
+/* CG 双缓冲层:换场交叉淡入;锚头身(截头修复) */
+.cg { position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: 50% 18%;
+  transition: filter .45s ease, transform .45s ease, opacity .6s ease; }
+.cg.front { opacity: 1; } .cg.behind { opacity: 0; }
+#stage.backlog .cg.front { filter: brightness(.55); transform: scale(.965); }
+
+/* ── 对话框(底贴边)── */
+#dialog { position: absolute; left: 3.5%; right: 3.5%; bottom: 4%;
+  min-height: 26%; max-height: 46%; padding: 26px 46px 30px 40px;
+  background: linear-gradient(180deg, rgba(9,12,24,.82), rgba(9,12,24,.93));
+  border: 1px solid rgba(201,162,75,.5); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  display: flex; flex-direction: column; z-index: 10; }
+#dialog::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(240,210,138,.65) 25%, rgba(240,210,138,.65) 75%, transparent); }
+
+/* 名字牌(上边缘骑线):reading/waiting=芙宁娜(金);input=你(青) */
+#who { position: absolute; top: -16px; left: 18px; padding: 3px 16px;
+  font: 700 15px/1.5 var(--t-serif, serif); letter-spacing: .18em;
+  background: linear-gradient(180deg, #f0d28a, #c9a24b); color: #221607;
+  border-radius: 99px; box-shadow: 0 3px 8px rgba(0,0,0,.45);
+  transition: background .3s ease; }
+#dialog.you #who { background: linear-gradient(180deg, #9fd8d2, #4d9a91); color: #06211f; }
+
+/* 历史/停止钮:骑对话框上边缘(右翼) */
+.edge-btn { position: absolute; top: -15px; padding: 3px 14px;
+  font: 600 12px/1.6 -apple-system, "PingFang SC", sans-serif;
+  background: rgba(16,21,38,.9); color: #d9c081;
+  border: 1px solid rgba(201,162,75,.45); border-radius: 99px; cursor: pointer; z-index: 2; }
+.edge-btn:hover { color: #f0d28a; }
+#expandBtn { right: 18px; display: inline-flex; align-items: center; justify-content: center; padding: 4px 11px; }
+#stopBtn { right: 108px; color: #e58c86; border-color: rgba(196,84,78,.5); display: none; }
+#stage.waiting #stopBtn { display: block; }
+
+/* 段落正文 */
+#text { flex: 1; min-height: 0; color: #f3ead6; font-size: 17px; line-height: 2.05;
+  white-space: pre-wrap; word-break: break-word; overflow-y: auto; }
+#text::-webkit-scrollbar { width: 6px; } #text::-webkit-scrollbar-thumb { background: rgba(201,162,75,.3); border-radius: 6px; }
+#text .cursor { display: inline-block; width: 9px; height: 1.05em; margin-left: 2px;
+  background: #f0d28a; vertical-align: text-bottom; animation: blink .8s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ▼ 慢悠悠浮动(仅存在下一段时) */
+#next { position: absolute; right: 18px; bottom: 18px;
+  color: #f0d28a; opacity: 0; transition: opacity .3s; }
+#next.on { opacity: 1; animation: bob 1.4s ease-in-out infinite alternate; }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(5px); } }
+
+/* token 统计:对话框外·正下方·灰色小字(常驻) */
+#usage { position: absolute; bottom: 1.2%; left: 0; right: 0; text-align: center;
+  font: 500 10.5px/1.4 -apple-system, "PingFang SC", sans-serif;
+  color: rgba(190,186,178,.5); letter-spacing: .03em; pointer-events: none; z-index: 9; }
+
+/* 输入态功能块:模型座(左)+环形(右),随 inputRow 仅 input 出现,右缘不越发送键 */
+#ring { position: relative; width: 30px; height: 30px; flex-shrink: 0; }
+#ring svg { transform: rotate(-90deg); }
+#ring .lbl { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font: 700 8.5px/1 sans-serif; color: #d9c081; }
+#modelSeat { flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border: 1px solid rgba(201,162,75,.4); border-radius: 8px;
+  background: rgba(0,0,0,.3); font: 600 12px/1.3 -apple-system, "PingFang SC", sans-serif;
+  color: #d9c081; cursor: pointer; max-width: 240px; }
+#modelSeat:hover { border-color: #f0d28a; }
+#modelSeat .sub { color: rgba(217,192,129,.6); font-weight: 500; font-size: 11px; }
+
+/* waiting 三点弹跳 */
+#dots { display: none; height: 100%; align-items: center; }
+#stage.waiting #dots { display: flex; }
+#dots i { width: 10px; height: 10px; margin: 0 7px; border-radius: 50%;
+  background: #f0d28a; opacity: .85; animation: dotjump 1.05s ease-in-out infinite; }
+#dots i:nth-child(2) { animation-delay: .18s; } #dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes dotjump { 0%,100% { transform: translateY(0); opacity: .55; } 50% { transform: translateY(-9px); opacity: 1; } }
+
+/* ── 输入态:行1=textarea(矮)+发送同排(发送键右),行2=模型座+环形(右缘对齐发送键) ── */
+#inputRow { display: none; flex-direction: column; gap: 10px; }
+#dialog.mode-input #inputRow { display: flex; }
+#dialog.mode-input { min-height: 0; padding-bottom: 12px; }
+#dialog.mode-input #text { display: none; }
+#taRow { display: flex; align-items: stretch; gap: 12px; }
+#ta { flex: 1; resize: none; height: 64px; background: rgba(0,0,0,.4); color: #f3ead6;
+  border: 1px solid rgba(201,162,75,.35); border-radius: 9px; padding: 11px 15px;
+  font: 15px/1.7 var(--t-serif, serif); outline: none; }
+#ta:focus { border-color: #f0d28a; }
+#send { padding: 0 24px; border-radius: 9px; cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center;
+  border: 1px solid #c9a24b; background: linear-gradient(180deg, #f0d28a, #b07d2b);
+  color: #221607; font: 700 14px/1 sans-serif; letter-spacing: .2em; }
+#metaRow { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+
+/* ── backlog(上拉历史,防剧透截止);折叠钮固定右上角(不随内容滚)── */
+#backlog { position: absolute; left: 3.5%; right: 3.5%; top: 6%; bottom: 4%;
+  background: rgba(7,10,20,.92); border: 1px solid rgba(201,162,75,.42);
+  border-radius: 14px; display: none; flex-direction: column; z-index: 20; }
+#stage.backlog #backlog { display: flex; }
+#stage.backlog #dialog { opacity: 0; pointer-events: none; }
+.bl-head { position: relative; flex: none; padding: 16px 46px 8px; }
+#collapseBtn { position: absolute; top: 12px; right: 18px; }
+#collapseBtn svg { transform: rotate(180deg); }
+#blBody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 26px 22px; }
+#blBody::-webkit-scrollbar { width: 9px; } #blBody::-webkit-scrollbar-thumb { background: rgba(201,162,75,.35); border-radius: 9px; }
+.bl-cap { text-align: center; color: #9b8a66; font: 600 12px/2 sans-serif; letter-spacing: .3em; margin-bottom: 10px; }
+.bl-row { margin: 13px 0; max-width: 76%; }
+.bl-row.u { margin-left: auto; }
+.bl-name { font: 800 12px/2 -apple-system, "PingFang SC", sans-serif; letter-spacing: .15em; color: #9fd8d2; }
+.bl-row.a .bl-name { color: #f0d28a; }
+.bl-text { white-space: pre-wrap; color: #e9e2d2; font-size: 14.5px; line-height: 1.95;
+  background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07);
+  padding: 9px 15px; border-radius: 11px; }
+
+/* 调试行(原型标注,施工前删) */
+#dbg { position: absolute; top: 8px; left: 12px; z-index: 5;
+  font: 600 11px/1.4 -apple-system, sans-serif; color: rgba(240,210,138,.75);
+  background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 6px; }
+#cgmood { position: absolute; top: 8px; left: 150px; z-index: 5;
+  font: 600 11px/1.4 -apple-system, sans-serif; color: rgba(240,210,138,.75);
+  background: rgba(0,0,0,.45); padding: 4px 10px; border-radius: 6px; }
+#hint { position: absolute; top: 36px; left: 12px; z-index: 5;
+  font: 500 11px/1.6 -apple-system, sans-serif; color: rgba(220,210,190,.7);
+  background: rgba(0,0,0,.5); padding: 6px 12px; border-radius: 8px; transition: opacity 1s; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <img class="cg front" id="cgA" src="../preset/assets/cg/1.jpg" alt="">
+  <img class="cg behind" id="cgB" alt="">
+  <div id="dbg"></div>
+  <div id="cgmood">CG:1 正常</div>
+  <div id="hint">点击=补全/下一段 · 全点完后点一次=输入 · 右上=历史(防剧透) · 发送后看 CG 情绪换场</div>
+
+  <div id="dialog">
+    <span id="who">芙宁娜</span>
+    <button class="edge-btn" id="stopBtn">停止</button>
+    <button class="edge-btn" id="expandBtn" title="展开历史"><svg width="12" height="9" viewBox="0 0 12 9"><path d="M6 1 11 8H1Z" fill="currentColor"/></svg></button>
+    <div id="text"></div>
+    <div id="dots"><i></i><i></i><i></i></div>
+    <div id="inputRow">
+      <div id="taRow">
+        <textarea id="ta" placeholder="说点什么…(Enter 发送)"></textarea>
+        <button id="send">发 送</button>
+      </div>
+      <div id="metaRow">
+        <div id="modelSeat" title="选择模型"><span>glm-4.7</span><span class="sub">思考·高</span></div>
+        <div id="ring" title="上下文占用 41%">
+          <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="rgba(201,162,75,.22)" stroke-width="3"/><circle cx="15" cy="15" r="12" fill="none" stroke="#c9a24b" stroke-width="3" stroke-linecap="round" stroke-dasharray="30.9 75.4"/></svg>
+          <span class="lbl">41</span>
+        </div>
+      </div>
+    </div>
+    <div id="next">▼</div>
+  </div>
+  <div id="usage">输入 6.1K tok ｜ 输出 652 tok ｜ 缓存命中 0% ｜ 26 tok/s</div>
+
+  <div id="backlog">
+    <div class="bl-head">
+      <button class="edge-btn" id="collapseBtn" title="折叠历史"><svg width="12" height="9" viewBox="0 0 12 9"><path d="M6 1 11 8H1Z" fill="currentColor"/></svg></button>
+      <div class="bl-cap">—— 聊 天 历 史 ——</div>
+    </div>
+    <div id="blBody"></div>
+  </div>
+</div>
+
+<script>
+'use strict'
+const $ = id => document.getElementById(id)
+const stage = $('stage'), dialog = $('dialog'), who = $('who'), text = $('text'), ta = $('ta')
+
+const MOODS = { 1:'正常', 2:'高兴', 3:'生气', 4:'难过', 5:'惊讶', 6:'害羞', 7:'得意', 8:'委屈', 9:'兴奋', 10:'怀疑' }
+
+const history = [
+  { role: 'u', text: '今天想听你聊聊枫丹的剧院。' },
+  { role: 'a', text: '哼,那可是本剧女主角的主场!水晶灯、幕布、还有为我欢呼的观众——不过在讲述之前,你先告诉我,你是为了看演出,还是为了看我?' },
+  { role: 'u', text: '当然是为了看你。' },
+  { role: 'a', text: '……哼哼,算你识相。',
+    as: ['你终于来了。让女主角久等,在枫丹可是重罪哦。',
+         '今晚的舞台已经布置好了——灯光、幕布、还有观众席上唯一的位置,你的位置。',
+         '在其他人为演出欢呼的时候,只有你知道,谢幕之后我会走向谁。',
+         '不过先说好:今晚你的眼睛只许看着我。台上的其他演员,一秒都不许多看。',
+         '要是敢走神……我可是会当场停演,然后在你耳边唱完剩下的咏叹调,让所有人都看着你脸红。',
+         '……怎、怎么了?这样看着我不说话。台词排练得再熟练,被你这样盯着也会忘词的。',
+         '好啦。深呼吸——幕布升起之前,牵好我的手。',
+         '演出结束后我们有整整一夜呢,今晚就慢慢来吧。',
+         '那么,阁下,第一幕,开始了。',
+         '——(第十段:只读五段时展开历史,应|截止在第四段|看不到我。)'] }
+]
+const paras = history[3].as.map(t => t.replace(/\|([^|]*)\|/g, '【$1】'))
+
+/* 情绪剧本:每轮假回复携带 CG(模型侧决策的替身) */
+const script = [
+  { cg: 6, reply: ['呀……!?你、你突然这么说……这、这也太犯规了吧!','咳咳。既然都到这一步了,本女主角就勉为其难地,允许你继续说下去。','……说吧,我在听。'] },
+  { cg: 3, reply: ['什么?!跟别的女生聊了十分钟?!','哼,今晚的演出你自己一个人看吧!','……骗你的。但是要罚你牵着我,一整晚不许松手。'] },
+  { cg: 2, reply: ['嘿嘿,你这样老实,本女主角很满意。','那就奖励你——今晚的谢幕吻,提前预定。','好啦,下一幕开始了。'] },
+]
+
+let mode = 'reading', r = 0, typing = null, turn = 0
+let inTok = 6100, outTok = 652
+
+const dbg = () => $('dbg').textContent = `mode=${mode} · 段 ${r + 1}/${paras.length}`
+const usageUpd = (dOut) => { outTok += dOut; inTok += 137;
+  $('usage').textContent = `输入 ${(inTok / 1000).toFixed(1)}K tok ｜ 输出 ${outTok} tok ｜ 缓存命中 ${Math.min(63, 8 + turn * 17)}% ｜ 26 tok/s` }
+
+/* CG 换场:双缓冲交叉淡入 */
+function setCG(id) {
+  const front = $('cgA').classList.contains('front') ? $('cgA') : $('cgB')
+  const back = front === $('cgA') ? $('cgB') : $('cgA')
+  if (front.src.endsWith(`/${id}.jpg`)) return
+  back.src = `../preset/assets/cg/${id}.jpg`
+  back.classList.remove('behind'); back.classList.add('wiping')
+  front.classList.remove('front'); front.classList.add('behind')
+  back.classList.add('front'); back.classList.remove('wiping')
+  $('cgmood').textContent = `CG:${id} ${MOODS[id]}`
+}
+setCG(1)
+
+function startParagraph(i) {
+  r = i; mode = 'reading'; stage.className = ''; dialog.className = ''
+  who.textContent = '芙宁娜'
+  clearInterval(typing); text.innerHTML = ''
+  const full = paras[r]
+  let n = 0
+  const cursor = document.createElement('span'); cursor.className = 'cursor'; text.appendChild(cursor)
+  typing = setInterval(() => {
+    n += 1; cursor.insertAdjacentText('beforebegin', full[n - 1] ?? '')
+    if (n >= full.length) { clearInterval(typing); typing = null; cursor.remove() }
+  }, 28)
+  $('next').classList.toggle('on', r < paras.length - 1)
+  renderBacklog(); dbg()
+}
+
+stage.addEventListener('click', e => {
+  if (e.target.closest('.edge-btn, #modelSeat, #ring, #ta, #send, #backlog')) return
+  if (stage.classList.contains('backlog')) { toggleBacklog(false); return }
+  if (mode === 'waiting' || mode === 'input') return
+  if (typing !== null) { clearInterval(typing); typing = null
+    text.textContent = paras[r]; $('next').classList.toggle('on', r < paras.length - 1); dbg(); return }
+  if (r < paras.length - 1) { startParagraph(r + 1); return }
+  mode = 'input'; dialog.className = 'mode-input you'; stage.className = ''
+  who.textContent = '你'; $('next').classList.remove('on')
+  setTimeout(() => ta.focus(), 60); dbg()
+})
+
+function toggleBacklog(open) {
+  const on = open ?? !stage.classList.contains('backlog')
+  stage.classList.toggle('backlog', on)
+  $('expandBtn').title = on ? '折叠历史' : '展开历史'
+}
+$('expandBtn').addEventListener('click', e => { e.stopPropagation(); toggleBacklog() })
+$('collapseBtn').addEventListener('click', e => { e.stopPropagation(); toggleBacklog(false) })
+$('stopBtn').addEventListener('click', e => { e.stopPropagation() })  /* 原型仅示意 */
+
+function renderBacklog() {
+  const body = $('blBody'); body.innerHTML = ''
+  for (const row of history) {
+    if (row.role === 'u') pushRow(body, 'u', '你', row.text)
+    else if (row === history[3]) { const upto = mode === 'reading' ? r - 1 : paras.length - 1
+      for (let i = 0; i <= upto; i++) pushRow(body, 'a', '芙宁娜', history[3].as[i].replace(/\|([^|]*)\|/g, '【$1】')) }
+    else pushRow(body, 'a', '芙宁娜', row.text)
+  }
+}
+function pushRow(body, role, name, txt) {
+  const div = document.createElement('div'); div.className = 'bl-row ' + role
+  div.innerHTML = `<div class="bl-name">${name}</div><div class="bl-text"></div>`
+  div.querySelector('.bl-text').textContent = txt; body.appendChild(div)
+}
+
+/* 发送 → waiting(期间 CG 预换场)→ 下一轮剧本(mood CG) */
+function send() {
+  if (mode !== 'input') return
+  const v = ta.value.trim(); if (v === '') return
+  history.push({ role: 'u', text: v }); ta.value = ''
+  mode = 'waiting'; dialog.className = ''; stage.className = 'waiting'
+  who.textContent = '芙宁娜'; text.innerHTML = ''
+  $('next').classList.remove('on'); usageUpd(0); dbg()
+  const next = script[turn % script.length]
+  setTimeout(() => { setCG(next.cg) }, 230)
+  setTimeout(() => {
+    history.push({ role: 'a', text: next.reply.join('\n\n'), as: next.reply })
+    paras.splice(0, paras.length, ...next.reply)
+    turn += 1; usageUpd(next.reply.join('').length * 7 + 120)
+    startParagraph(0)
+  }, 1700)
+}
+$('send').addEventListener('click', e => { e.stopPropagation(); send() })
+ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.stopPropagation(); send() } })
+
+startParagraph(0); usageUpd(0)
+setTimeout(() => { $('hint').style.opacity = 0 }, 9000)
+</script>
+</body>
+</html>

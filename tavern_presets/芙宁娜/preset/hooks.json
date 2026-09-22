@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "main.after": ["apply_directives.mjs"]
+  }
+}

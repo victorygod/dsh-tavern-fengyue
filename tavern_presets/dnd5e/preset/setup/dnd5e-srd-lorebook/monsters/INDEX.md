@@ -1,0 +1,336 @@
+# monsters — 334 entries
+
+- [Aboleth](aboleth.md) — CR 10 · 135 HP · AC 17
+- [Acolyte](acolyte.md) — CR 0.25 · 9 HP · AC 10
+- [Adult Black Dragon](adult-black-dragon.md) — CR 14 · 195 HP · AC 19
+- [Adult Blue Dragon](adult-blue-dragon.md) — CR 16 · 225 HP · AC 19
+- [Adult Brass Dragon](adult-brass-dragon.md) — CR 13 · 172 HP · AC 18
+- [Adult Bronze Dragon](adult-bronze-dragon.md) — CR 15 · 212 HP · AC 19
+- [Adult Copper Dragon](adult-copper-dragon.md) — CR 14 · 184 HP · AC 18
+- [Adult Gold Dragon](adult-gold-dragon.md) — CR 17 · 256 HP · AC 19
+- [Adult Green Dragon](adult-green-dragon.md) — CR 15 · 207 HP · AC 19
+- [Adult Red Dragon](adult-red-dragon.md) — CR 17 · 256 HP · AC 19
+- [Adult Silver Dragon](adult-silver-dragon.md) — CR 16 · 243 HP · AC 19
+- [Adult White Dragon](adult-white-dragon.md) — CR 13 · 200 HP · AC 18
+- [Air Elemental](air-elemental.md) — CR 5 · 90 HP · AC 15
+- [Ancient Black Dragon](ancient-black-dragon.md) — CR 21 · 367 HP · AC 22
+- [Ancient Blue Dragon](ancient-blue-dragon.md) — CR 23 · 481 HP · AC 22
+- [Ancient Brass Dragon](ancient-brass-dragon.md) — CR 20 · 297 HP · AC 20
+- [Ancient Bronze Dragon](ancient-bronze-dragon.md) — CR 22 · 444 HP · AC 22
+- [Ancient Copper Dragon](ancient-copper-dragon.md) — CR 21 · 350 HP · AC 21
+- [Ancient Gold Dragon](ancient-gold-dragon.md) — CR 24 · 546 HP · AC 22
+- [Ancient Green Dragon](ancient-green-dragon.md) — CR 22 · 385 HP · AC 21
+- [Ancient Red Dragon](ancient-red-dragon.md) — CR 24 · 546 HP · AC 22
+- [Ancient Silver Dragon](ancient-silver-dragon.md) — CR 23 · 487 HP · AC 22
+- [Ancient White Dragon](ancient-white-dragon.md) — CR 20 · 333 HP · AC 20
+- [Androsphinx](androsphinx.md) — CR 17 · 199 HP · AC 17
+- [Animated Armor](animated-armor.md) — CR 1 · 33 HP · AC 18
+- [Ankheg](ankheg.md) — CR 2 · 39 HP · AC 14
+- [Ape](ape.md) — CR 0.5 · 19 HP · AC 12
+- [Archmage](archmage.md) — CR 12 · 99 HP · AC 12
+- [Assassin](assassin.md) — CR 8 · 78 HP · AC 15
+- [Awakened Shrub](awakened-shrub.md) — CR 0 · 10 HP · AC 9
+- [Awakened Tree](awakened-tree.md) — CR 2 · 59 HP · AC 13
+- [Axe Beak](axe-beak.md) — CR 0.25 · 19 HP · AC 11
+- [Azer](azer.md) — CR 2 · 39 HP · AC 15
+- [Baboon](baboon.md) — CR 0 · 3 HP · AC 12
+- [Badger](badger.md) — CR 0 · 3 HP · AC 10
+- [Balor](balor.md) — CR 19 · 262 HP · AC 19
+- [Bandit](bandit.md) — CR 0.125 · 11 HP · AC 12
+- [Bandit Captain](bandit-captain.md) — CR 2 · 65 HP · AC 15
+- [Barbed Devil](barbed-devil.md) — CR 5 · 110 HP · AC 15
+- [Basilisk](basilisk.md) — CR 3 · 52 HP · AC 12
+- [Bat](bat.md) — CR 0 · 1 HP · AC 12
+- [Bearded Devil](bearded-devil.md) — CR 3 · 52 HP · AC 13
+- [Behir](behir.md) — CR 11 · 168 HP · AC 17
+- [Berserker](berserker.md) — CR 2 · 67 HP · AC 13
+- [Black Bear](black-bear.md) — CR 0.5 · 19 HP · AC 11
+- [Black Dragon Wyrmling](black-dragon-wyrmling.md) — CR 2 · 33 HP · AC 17
+- [Black Pudding](black-pudding.md) — CR 4 · 85 HP · AC 7
+- [Blink Dog](blink-dog.md) — CR 0.25 · 22 HP · AC 13
+- [Blood Hawk](blood-hawk.md) — CR 0.125 · 7 HP · AC 12
+- [Blue Dragon Wyrmling](blue-dragon-wyrmling.md) — CR 3 · 52 HP · AC 17
+- [Boar](boar.md) — CR 0.25 · 11 HP · AC 11
+- [Bone Devil](bone-devil.md) — CR 9 · 142 HP · AC 19
+- [Brass Dragon Wyrmling](brass-dragon-wyrmling.md) — CR 1 · 16 HP · AC 16
+- [Bronze Dragon Wyrmling](bronze-dragon-wyrmling.md) — CR 2 · 32 HP · AC 17
+- [Brown Bear](brown-bear.md) — CR 1 · 34 HP · AC 11
+- [Bugbear](bugbear.md) — CR 1 · 27 HP · AC 16
+- [Bulette](bulette.md) — CR 5 · 94 HP · AC 17
+- [Camel](camel.md) — CR 0.125 · 15 HP · AC 9
+- [Cat](cat.md) — CR 0 · 2 HP · AC 12
+- [Centaur](centaur.md) — CR 2 · 45 HP · AC 12
+- [Chain Devil](chain-devil.md) — CR 8 · 85 HP · AC 16
+- [Chimera](chimera.md) — CR 6 · 114 HP · AC 14
+- [Chuul](chuul.md) — CR 4 · 93 HP · AC 16
+- [Clay Golem](clay-golem.md) — CR 9 · 133 HP · AC 14
+- [Cloaker](cloaker.md) — CR 8 · 78 HP · AC 14
+- [Cloud Giant](cloud-giant.md) — CR 9 · 200 HP · AC 14
+- [Cockatrice](cockatrice.md) — CR 0.5 · 27 HP · AC 11
+- [Commoner](commoner.md) — CR 0 · 4 HP · AC 10
+- [Constrictor Snake](constrictor-snake.md) — CR 0.25 · 13 HP · AC 12
+- [Copper Dragon Wyrmling](copper-dragon-wyrmling.md) — CR 1 · 22 HP · AC 16
+- [Couatl](couatl.md) — CR 4 · 97 HP · AC 19
+- [Crab](crab.md) — CR 0 · 2 HP · AC 11
+- [Crocodile](crocodile.md) — CR 0.5 · 19 HP · AC 12
+- [Cult Fanatic](cult-fanatic.md) — CR 2 · 22 HP · AC 13
+- [Cultist](cultist.md) — CR 0.125 · 9 HP · AC 12
+- [Darkmantle](darkmantle.md) — CR 0.5 · 22 HP · AC 11
+- [Death Dog](death-dog.md) — CR 1 · 39 HP · AC 12
+- [Deep Gnome (Svirfneblin)](deep-gnome-svirfneblin.md) — CR 0.5 · 16 HP · AC 15
+- [Deer](deer.md) — CR 0 · 4 HP · AC 13
+- [Deva](deva.md) — CR 10 · 136 HP · AC 17
+- [Dire Wolf](dire-wolf.md) — CR 1 · 37 HP · AC 14
+- [Djinni](djinni.md) — CR 11 · 161 HP · AC 17
+- [Doppelganger](doppelganger.md) — CR 3 · 52 HP · AC 14
+- [Draft Horse](draft-horse.md) — CR 0.25 · 19 HP · AC 10
+- [Dragon Turtle](dragon-turtle.md) — CR 17 · 341 HP · AC 20
+- [Dretch](dretch.md) — CR 0.25 · 18 HP · AC 11
+- [Drider](drider.md) — CR 6 · 123 HP · AC 19
+- [Drow](drow.md) — CR 0.25 · 13 HP · AC 15
+- [Druid](druid.md) — CR 2 · 27 HP · AC 11
+- [Dryad](dryad.md) — CR 1 · 22 HP · AC 11
+- [Duergar](duergar.md) — CR 1 · 26 HP · AC 16
+- [Dust Mephit](dust-mephit.md) — CR 0.5 · 17 HP · AC 12
+- [Eagle](eagle.md) — CR 0 · 3 HP · AC 12
+- [Earth Elemental](earth-elemental.md) — CR 5 · 126 HP · AC 17
+- [Efreeti](efreeti.md) — CR 11 · 200 HP · AC 17
+- [Elephant](elephant.md) — CR 4 · 76 HP · AC 12
+- [Elk](elk.md) — CR 0.25 · 13 HP · AC 10
+- [Erinyes](erinyes.md) — CR 12 · 153 HP · AC 18
+- [Ettercap](ettercap.md) — CR 2 · 44 HP · AC 13
+- [Ettin](ettin.md) — CR 4 · 85 HP · AC 12
+- [Fire Elemental](fire-elemental.md) — CR 5 · 102 HP · AC 13
+- [Fire Giant](fire-giant.md) — CR 9 · 162 HP · AC 18
+- [Flesh Golem](flesh-golem.md) — CR 5 · 93 HP · AC 9
+- [Flying Snake](flying-snake.md) — CR 0.125 · 5 HP · AC 14
+- [Flying Sword](flying-sword.md) — CR 0.25 · 17 HP · AC 17
+- [Frog](frog.md) — CR 0 · 1 HP · AC 11
+- [Frost Giant](frost-giant.md) — CR 8 · 138 HP · AC 15
+- [Gargoyle](gargoyle.md) — CR 2 · 52 HP · AC 15
+- [Gelatinous Cube](gelatinous-cube.md) — CR 2 · 84 HP · AC 6
+- [Ghast](ghast.md) — CR 2 · 36 HP · AC 13
+- [Ghost](ghost.md) — CR 4 · 45 HP · AC 11
+- [Ghoul](ghoul.md) — CR 1 · 22 HP · AC 12
+- [Giant Ape](giant-ape.md) — CR 7 · 157 HP · AC 12
+- [Giant Badger](giant-badger.md) — CR 0.25 · 13 HP · AC 10
+- [Giant Bat](giant-bat.md) — CR 0.25 · 22 HP · AC 13
+- [Giant Boar](giant-boar.md) — CR 2 · 42 HP · AC 12
+- [Giant Centipede](giant-centipede.md) — CR 0.25 · 4 HP · AC 13
+- [Giant Constrictor Snake](giant-constrictor-snake.md) — CR 2 · 60 HP · AC 12
+- [Giant Crab](giant-crab.md) — CR 0.125 · 13 HP · AC 15
+- [Giant Crocodile](giant-crocodile.md) — CR 5 · 85 HP · AC 14
+- [Giant Eagle](giant-eagle.md) — CR 1 · 26 HP · AC 13
+- [Giant Elk](giant-elk.md) — CR 2 · 42 HP · AC 14
+- [Giant Fire Beetle](giant-fire-beetle.md) — CR 0 · 4 HP · AC 13
+- [Giant Frog](giant-frog.md) — CR 0.25 · 18 HP · AC 11
+- [Giant Goat](giant-goat.md) — CR 0.5 · 19 HP · AC 11
+- [Giant Hyena](giant-hyena.md) — CR 1 · 45 HP · AC 12
+- [Giant Lizard](giant-lizard.md) — CR 0.25 · 19 HP · AC 12
+- [Giant Octopus](giant-octopus.md) — CR 1 · 52 HP · AC 11
+- [Giant Owl](giant-owl.md) — CR 0.25 · 19 HP · AC 12
+- [Giant Poisonous Snake](giant-poisonous-snake.md) — CR 0.25 · 11 HP · AC 14
+- [Giant Rat](giant-rat.md) — CR 0.125 · 7 HP · AC 12
+- [Giant Rat (Diseased)](giant-rat-diseased.md) — CR 0.125 · 7 HP · AC 12
+- [Giant Scorpion](giant-scorpion.md) — CR 3 · 52 HP · AC 15
+- [Giant Sea Horse](giant-sea-horse.md) — CR 0.5 · 16 HP · AC 13
+- [Giant Shark](giant-shark.md) — CR 5 · 126 HP · AC 13
+- [Giant Spider](giant-spider.md) — CR 1 · 26 HP · AC 14
+- [Giant Toad](giant-toad.md) — CR 1 · 39 HP · AC 11
+- [Giant Vulture](giant-vulture.md) — CR 1 · 22 HP · AC 10
+- [Giant Wasp](giant-wasp.md) — CR 0.5 · 13 HP · AC 12
+- [Giant Weasel](giant-weasel.md) — CR 0.125 · 9 HP · AC 13
+- [Giant Wolf Spider](giant-wolf-spider.md) — CR 0.25 · 11 HP · AC 13
+- [Gibbering Mouther](gibbering-mouther.md) — CR 2 · 67 HP · AC 9
+- [Glabrezu](glabrezu.md) — CR 9 · 157 HP · AC 17
+- [Gladiator](gladiator.md) — CR 5 · 112 HP · AC 16
+- [Gnoll](gnoll.md) — CR 0.5 · 22 HP · AC 15
+- [Goat](goat.md) — CR 0 · 4 HP · AC 10
+- [Goblin](goblin.md) — CR 0.25 · 7 HP · AC 15
+- [Gold Dragon Wyrmling](gold-dragon-wyrmling.md) — CR 3 · 60 HP · AC 17
+- [Gorgon](gorgon.md) — CR 5 · 114 HP · AC 19
+- [Gray Ooze](gray-ooze.md) — CR 0.5 · 22 HP · AC 8
+- [Green Dragon Wyrmling](green-dragon-wyrmling.md) — CR 2 · 38 HP · AC 17
+- [Green Hag](green-hag.md) — CR 3 · 82 HP · AC 17
+- [Grick](grick.md) — CR 2 · 27 HP · AC 14
+- [Griffon](griffon.md) — CR 2 · 59 HP · AC 12
+- [Grimlock](grimlock.md) — CR 0.25 · 11 HP · AC 11
+- [Guard](guard.md) — CR 0.125 · 11 HP · AC 16
+- [Guardian Naga](guardian-naga.md) — CR 10 · 127 HP · AC 18
+- [Gynosphinx](gynosphinx.md) — CR 11 · 136 HP · AC 17
+- [Half-Red Dragon Veteran](half-red-dragon-veteran.md) — CR 5 · 65 HP · AC 18
+- [Harpy](harpy.md) — CR 1 · 38 HP · AC 11
+- [Hawk](hawk.md) — CR 0 · 1 HP · AC 13
+- [Hell Hound](hell-hound.md) — CR 3 · 45 HP · AC 15
+- [Hezrou](hezrou.md) — CR 8 · 136 HP · AC 16
+- [Hill Giant](hill-giant.md) — CR 5 · 105 HP · AC 13
+- [Hippogriff](hippogriff.md) — CR 1 · 19 HP · AC 11
+- [Hobgoblin](hobgoblin.md) — CR 0.5 · 11 HP · AC 18
+- [Homunculus](homunculus.md) — CR 0 · 5 HP · AC 13
+- [Horned Devil](horned-devil.md) — CR 11 · 178 HP · AC 18
+- [Hunter Shark](hunter-shark.md) — CR 2 · 45 HP · AC 12
+- [Hydra](hydra.md) — CR 8 · 172 HP · AC 15
+- [Hyena](hyena.md) — CR 0 · 5 HP · AC 11
+- [Ice Devil](ice-devil.md) — CR 14 · 180 HP · AC 18
+- [Ice Mephit](ice-mephit.md) — CR 0.5 · 21 HP · AC 11
+- [Imp](imp.md) — CR 1 · 10 HP · AC 13
+- [Invisible Stalker](invisible-stalker.md) — CR 6 · 104 HP · AC 14
+- [Iron Golem](iron-golem.md) — CR 16 · 210 HP · AC 20
+- [Jackal](jackal.md) — CR 0 · 3 HP · AC 12
+- [Killer Whale](killer-whale.md) — CR 3 · 90 HP · AC 12
+- [Knight](knight.md) — CR 3 · 52 HP · AC 18
+- [Kobold](kobold.md) — CR 0.125 · 5 HP · AC 12
+- [Kraken](kraken.md) — CR 23 · 472 HP · AC 18
+- [Lamia](lamia.md) — CR 4 · 97 HP · AC 13
+- [Lemure](lemure.md) — CR 0 · 13 HP · AC 7
+- [Lich](lich.md) — CR 21 · 135 HP · AC 17
+- [Lion](lion.md) — CR 1 · 26 HP · AC 12
+- [Lizard](lizard.md) — CR 0 · 2 HP · AC 10
+- [Lizardfolk](lizardfolk.md) — CR 0.5 · 22 HP · AC 13
+- [Mage](mage.md) — CR 6 · 40 HP · AC 12
+- [Magma Mephit](magma-mephit.md) — CR 0.5 · 22 HP · AC 11
+- [Magmin](magmin.md) — CR 0.5 · 9 HP · AC 14
+- [Mammoth](mammoth.md) — CR 6 · 126 HP · AC 13
+- [Manticore](manticore.md) — CR 3 · 68 HP · AC 14
+- [Marilith](marilith.md) — CR 16 · 189 HP · AC 18
+- [Mastiff](mastiff.md) — CR 0.125 · 5 HP · AC 12
+- [Medusa](medusa.md) — CR 6 · 127 HP · AC 15
+- [Merfolk](merfolk.md) — CR 0.125 · 11 HP · AC 11
+- [Merrow](merrow.md) — CR 2 · 45 HP · AC 13
+- [Mimic](mimic.md) — CR 2 · 58 HP · AC 12
+- [Minotaur](minotaur.md) — CR 3 · 76 HP · AC 14
+- [Minotaur Skeleton](minotaur-skeleton.md) — CR 2 · 67 HP · AC 12
+- [Mule](mule.md) — CR 0.125 · 11 HP · AC 10
+- [Mummy](mummy.md) — CR 3 · 58 HP · AC 11
+- [Mummy Lord](mummy-lord.md) — CR 15 · 97 HP · AC 17
+- [Nalfeshnee](nalfeshnee.md) — CR 13 · 184 HP · AC 18
+- [Night Hag](night-hag.md) — CR 5 · 112 HP · AC 17
+- [Nightmare](nightmare.md) — CR 3 · 68 HP · AC 13
+- [Noble](noble.md) — CR 0.125 · 9 HP · AC 15
+- [Ochre Jelly](ochre-jelly.md) — CR 2 · 45 HP · AC 8
+- [Octopus](octopus.md) — CR 0 · 3 HP · AC 12
+- [Ogre](ogre.md) — CR 2 · 59 HP · AC 11
+- [Ogre Zombie](ogre-zombie.md) — CR 2 · 85 HP · AC 8
+- [Oni](oni.md) — CR 7 · 110 HP · AC 16
+- [Orc](orc.md) — CR 0.5 · 15 HP · AC 13
+- [Otyugh](otyugh.md) — CR 5 · 114 HP · AC 14
+- [Owl](owl.md) — CR 0 · 1 HP · AC 11
+- [Owlbear](owlbear.md) — CR 3 · 59 HP · AC 13
+- [Panther](panther.md) — CR 0.25 · 13 HP · AC 12
+- [Pegasus](pegasus.md) — CR 2 · 59 HP · AC 12
+- [Phase Spider](phase-spider.md) — CR 3 · 32 HP · AC 13
+- [Pit Fiend](pit-fiend.md) — CR 20 · 300 HP · AC 19
+- [Planetar](planetar.md) — CR 16 · 200 HP · AC 19
+- [Plesiosaurus](plesiosaurus.md) — CR 2 · 68 HP · AC 13
+- [Poisonous Snake](poisonous-snake.md) — CR 0.125 · 2 HP · AC 13
+- [Polar Bear](polar-bear.md) — CR 2 · 42 HP · AC 12
+- [Pony](pony.md) — CR 0.125 · 11 HP · AC 10
+- [Priest](priest.md) — CR 2 · 27 HP · AC 13
+- [Pseudodragon](pseudodragon.md) — CR 0.25 · 7 HP · AC 13
+- [Purple Worm](purple-worm.md) — CR 15 · 247 HP · AC 18
+- [Quasit](quasit.md) — CR 1 · 7 HP · AC 13
+- [Quipper](quipper.md) — CR 0 · 1 HP · AC 13
+- [Rakshasa](rakshasa.md) — CR 13 · 110 HP · AC 16
+- [Rat](rat.md) — CR 0 · 1 HP · AC 10
+- [Raven](raven.md) — CR 0 · 1 HP · AC 12
+- [Red Dragon Wyrmling](red-dragon-wyrmling.md) — CR 4 · 75 HP · AC 17
+- [Reef Shark](reef-shark.md) — CR 0.5 · 22 HP · AC 12
+- [Remorhaz](remorhaz.md) — CR 11 · 195 HP · AC 17
+- [Rhinoceros](rhinoceros.md) — CR 2 · 45 HP · AC 11
+- [Riding Horse](riding-horse.md) — CR 0.25 · 13 HP · AC 10
+- [Roc](roc.md) — CR 11 · 248 HP · AC 15
+- [Roper](roper.md) — CR 5 · 93 HP · AC 20
+- [Rug of Smothering](rug-of-smothering.md) — CR 2 · 33 HP · AC 12
+- [Rust Monster](rust-monster.md) — CR 0.5 · 27 HP · AC 14
+- [Saber-Toothed Tiger](saber-toothed-tiger.md) — CR 2 · 52 HP · AC 12
+- [Sahuagin](sahuagin.md) — CR 0.5 · 22 HP · AC 12
+- [Salamander](salamander.md) — CR 5 · 90 HP · AC 15
+- [Satyr](satyr.md) — CR 0.5 · 31 HP · AC 14
+- [Scorpion](scorpion.md) — CR 0 · 1 HP · AC 11
+- [Scout](scout.md) — CR 0.5 · 16 HP · AC 13
+- [Sea Hag](sea-hag.md) — CR 2 · 52 HP · AC 14
+- [Sea Horse](sea-horse.md) — CR 0 · 1 HP · AC 11
+- [Shadow](shadow.md) — CR 0.5 · 16 HP · AC 12
+- [Shambling Mound](shambling-mound.md) — CR 5 · 136 HP · AC 15
+- [Shield Guardian](shield-guardian.md) — CR 7 · 142 HP · AC 17
+- [Shrieker](shrieker.md) — CR 0 · 13 HP · AC 5
+- [Silver Dragon Wyrmling](silver-dragon-wyrmling.md) — CR 2 · 45 HP · AC 17
+- [Skeleton](skeleton.md) — CR 0.25 · 13 HP · AC 13
+- [Solar](solar.md) — CR 21 · 243 HP · AC 21
+- [Specter](specter.md) — CR 1 · 22 HP · AC 12
+- [Spider](spider.md) — CR 0 · 1 HP · AC 12
+- [Spirit Naga](spirit-naga.md) — CR 8 · 75 HP · AC 15
+- [Sprite](sprite.md) — CR 0.25 · 2 HP · AC 15
+- [Spy](spy.md) — CR 1 · 27 HP · AC 12
+- [Steam Mephit](steam-mephit.md) — CR 0.25 · 21 HP · AC 10
+- [Stirge](stirge.md) — CR 0.125 · 2 HP · AC 14
+- [Stone Giant](stone-giant.md) — CR 7 · 126 HP · AC 17
+- [Stone Golem](stone-golem.md) — CR 10 · 178 HP · AC 17
+- [Storm Giant](storm-giant.md) — CR 13 · 230 HP · AC 16
+- [Succubus/Incubus](succubus-incubus.md) — CR 4 · 66 HP · AC 15
+- [Swarm of Bats](swarm-of-bats.md) — CR 0.25 · 22 HP · AC 12
+- [Swarm of Beetles](swarm-of-beetles.md) — CR 0.5 · 22 HP · AC 12
+- [Swarm of Centipedes](swarm-of-centipedes.md) — CR 0.5 · 22 HP · AC 12
+- [Swarm of Insects](swarm-of-insects.md) — CR 0.5 · 22 HP · AC 12
+- [Swarm of Poisonous Snakes](swarm-of-poisonous-snakes.md) — CR 2 · 36 HP · AC 14
+- [Swarm of Quippers](swarm-of-quippers.md) — CR 1 · 28 HP · AC 13
+- [Swarm of Rats](swarm-of-rats.md) — CR 0.25 · 24 HP · AC 10
+- [Swarm of Ravens](swarm-of-ravens.md) — CR 0.25 · 24 HP · AC 12
+- [Swarm of Spiders](swarm-of-spiders.md) — CR 0.5 · 22 HP · AC 12
+- [Swarm of Wasps](swarm-of-wasps.md) — CR 0.5 · 22 HP · AC 12
+- [Tarrasque](tarrasque.md) — CR 30 · 676 HP · AC 25
+- [Thug](thug.md) — CR 0.5 · 32 HP · AC 11
+- [Tiger](tiger.md) — CR 1 · 37 HP · AC 12
+- [Treant](treant.md) — CR 9 · 138 HP · AC 16
+- [Tribal Warrior](tribal-warrior.md) — CR 0.125 · 11 HP · AC 12
+- [Triceratops](triceratops.md) — CR 5 · 95 HP · AC 13
+- [Troll](troll.md) — CR 5 · 84 HP · AC 15
+- [Tyrannosaurus Rex](tyrannosaurus-rex.md) — CR 8 · 136 HP · AC 13
+- [Unicorn](unicorn.md) — CR 5 · 67 HP · AC 12
+- [Vampire, Vampire Form](vampire-vampire.md) — CR 13 · 144 HP · AC 16
+- [Vampire, Bat Form](vampire-bat.md) — CR 13 · 144 HP · AC 16
+- [Vampire, Mist Form](vampire-mist.md) — CR 13 · 144 HP · AC 16
+- [Vampire Spawn](vampire-spawn.md) — CR 5 · 82 HP · AC 15
+- [Veteran](veteran.md) — CR 3 · 58 HP · AC 17
+- [Violet Fungus](violet-fungus.md) — CR 0.25 · 18 HP · AC 5
+- [Vrock](vrock.md) — CR 6 · 104 HP · AC 15
+- [Vulture](vulture.md) — CR 0 · 5 HP · AC 10
+- [Warhorse](warhorse.md) — CR 0.5 · 19 HP · AC 11
+- [Warhorse Skeleton](warhorse-skeleton.md) — CR 0.5 · 22 HP · AC 13
+- [Water Elemental](water-elemental.md) — CR 5 · 114 HP · AC 14
+- [Weasel](weasel.md) — CR 0 · 1 HP · AC 13
+- [Werebear, Bear Form](werebear-bear.md) — CR 5 · 135 HP · AC 11
+- [Werebear, Human Form](werebear-human.md) — CR 5 · 135 HP · AC 10
+- [Werebear, Hybrid Form](werebear-hybrid.md) — CR 5 · 135 HP · AC 11
+- [Wereboar, Boar Form](wereboar-boar.md) — CR 4 · 78 HP · AC 11
+- [Wereboar, Human Form](wereboar-human.md) — CR 4 · 78 HP · AC 10
+- [Wereboar, Hybrid Form](wereboar-hybrid.md) — CR 4 · 78 HP · AC 11
+- [Wererat, Human Form](wererat-human.md) — CR 2 · 33 HP · AC 12
+- [Wererat, Hybrid Form](wererat-hybrid.md) — CR 2 · 33 HP · AC 12
+- [Wererat, Rat Form](wererat-rat.md) — CR 2 · 33 HP · AC 12
+- [Weretiger, Human Form](weretiger-human.md) — CR 4 · 120 HP · AC 12
+- [Weretiger, Hybrid Form](weretiger-hybrid.md) — CR 4 · 120 HP · AC 12
+- [Weretiger, Tiger Form](weretiger-tiger.md) — CR 4 · 120 HP · AC 12
+- [Werewolf, Human Form](werewolf-human.md) — CR 3 · 58 HP · AC 11
+- [Werewolf, Hybrid Form](werewolf-hybrid.md) — CR 3 · 58 HP · AC 12
+- [Werewolf, Wolf Form](werewolf-wolf.md) — CR 3 · 58 HP · AC 12
+- [White Dragon Wyrmling](white-dragon-wyrmling.md) — CR 2 · 32 HP · AC 16
+- [Wight](wight.md) — CR 3 · 45 HP · AC 14
+- [Will-o'-Wisp](will-o-wisp.md) — CR 2 · 22 HP · AC 19
+- [Winter Wolf](winter-wolf.md) — CR 3 · 75 HP · AC 13
+- [Wolf](wolf.md) — CR 0.25 · 11 HP · AC 13
+- [Worg](worg.md) — CR 0.5 · 26 HP · AC 13
+- [Wraith](wraith.md) — CR 5 · 67 HP · AC 13
+- [Wyvern](wyvern.md) — CR 6 · 110 HP · AC 13
+- [Xorn](xorn.md) — CR 5 · 73 HP · AC 19
+- [Young Black Dragon](young-black-dragon.md) — CR 7 · 127 HP · AC 18
+- [Young Blue Dragon](young-blue-dragon.md) — CR 9 · 152 HP · AC 18
+- [Young Brass Dragon](young-brass-dragon.md) — CR 6 · 110 HP · AC 17
+- [Young Bronze Dragon](young-bronze-dragon.md) — CR 8 · 142 HP · AC 18
+- [Young Copper Dragon](young-copper-dragon.md) — CR 7 · 119 HP · AC 17
+- [Young Gold Dragon](young-gold-dragon.md) — CR 10 · 178 HP · AC 18
+- [Young Green Dragon](young-green-dragon.md) — CR 8 · 136 HP · AC 18
+- [Young Red Dragon](young-red-dragon.md) — CR 10 · 178 HP · AC 18
+- [Young Silver Dragon](young-silver-dragon.md) — CR 9 · 168 HP · AC 18
+- [Young White Dragon](young-white-dragon.md) — CR 6 · 133 HP · AC 17
+- [Zombie](zombie.md) — CR 0.25 · 22 HP · AC 8

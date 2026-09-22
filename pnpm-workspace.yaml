@@ -1,0 +1,13 @@
+packages:
+  - packages/*
+allowBuilds:
+  # Real bash for engine REAL-composition tests (workspace/project sandboxing).
+  '@deepseek-ai/dsh-subprocess-local': true
+  # tsdown/rolldown bundler underpinning the client bundles.
+  esbuild: true
+  # Web-search provider native bits and terminal deps: not part of the tavern surface.
+  '@google/genai': false
+  koffi: false
+  node-pty: false
+  protobufjs: false
+nodeLinker: hoisted

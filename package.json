@@ -1,0 +1,57 @@
+{
+  "name": "dsh-profile-tavern-fengyue",
+  "description": "Tavern fengyue: an independent DeepSeek Harness profile project — the RPG world-card engine (SillyTavern-style card imports, workspace editor, turn-tail maintenance agent) shipped as an out-of-tree DSH plugin",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run build:lib:host && pnpm run build:lib:client",
+    "build:lib:host": "tsc -b tsconfig.host.json && tsdown --config-loader tsx --env.DSH_BUILD_FACE host",
+    "build:lib:client": "tsc -b tsconfig.client.json && tsdown --config-loader tsx --env.DSH_BUILD_FACE client",
+    "typecheck": "tsc -b tsconfig.host.json && tsdown --config-loader tsx --env.DSH_BUILD_FACE host && tsc -b tsconfig.client.json",
+    "lint": "oxlint",
+    "test": "vitest run",
+    "bootstrap": "node bin/dev.mjs bootstrap",
+    "start": "node bin/dev.mjs start",
+    "stop": "node bin/dev.mjs stop",
+    "restart": "node bin/dev.mjs restart",
+    "status": "node bin/dev.mjs status",
+    "tavern": "node bin/dev.mjs start",
+    "dsh": "node node_modules/@deepseek-ai/dsh/lib/bin.js",
+    "cleanup": "node scripts/cleanup.mjs"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-tavern-fengyue"
+      ],
+      "patchReload": "live"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "devDependencies": {
+    "@deepseek-ai/dsh": "0.1.5-rc.2",
+    "@shikijs/langs": "^4.4.3",
+    "@types/node": "^22.20.0",
+    "anser": "^2.3.5",
+    "clsx": "^2.1.1",
+    "jsdom": "29.1.1",
+    "lightningcss": "^1.32.0",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-math": "^3.0.0",
+    "oxlint": "^1.83.0",
+    "shiki": "^4.4.3",
+    "tsdown": "0.22.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.8"
+  }
+}

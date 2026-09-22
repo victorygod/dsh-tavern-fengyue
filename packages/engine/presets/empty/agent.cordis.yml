@@ -1,0 +1,5 @@
+# The `empty` agent preset: deliberately carries NO rows. Tavern's main/tail
+# agents select it so nothing shadows the card's own system prompt or tool
+# face — the preset plane exists only so the card-writing agent can select
+# `standard` beside it. See packages/extensions/tavern (bundle + composition).
+[]

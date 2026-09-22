@@ -1,0 +1,7 @@
+{
+  "transcript": { "window": "all" },
+  "html": true,
+  "panels": [
+    { "name": "galgame", "slot": "overlay" }
+  ]
+}

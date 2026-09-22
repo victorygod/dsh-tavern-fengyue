@@ -1,0 +1,16 @@
+{{get_player_ops()}}
+
+【玩家面板】
+{{get_player_state()}}
+
+【附近 NPC 面板】
+{{get_npc_state()}}
+
+【人际关系】（只有简述）
+{{get_roster()}}
+
+【世界状态】
+{{get_world_state()}}
+
+【上回合变化】
+{{get_changes()}}

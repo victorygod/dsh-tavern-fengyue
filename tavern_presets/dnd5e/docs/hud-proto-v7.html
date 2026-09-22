@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>dnd5e HUD v7 · 精修版</title>
+<style>
+/* ═══ 设计 token：亮色羊皮纸·精修（v7）═══
+   五条修法：①字号≥10px ②底深卡浅+柔和投影取代1px边 ③金色收敛一支
+   ④血条内凹+实心填充去珊瑚渐变 ⑤SVG线性图标去emoji */
+:root {
+  --bg0: #e9dfc9;        /* 背景·外圈 */
+  --bg1: #dfd3ba;        /* 背景·内圈（vignette 晕影） */
+  --card: #fdf9ef;       /* 卡面·亮羊皮纸 */
+  --card2: #f7f0e0;      /* 卡面·次级（详情卡底/书正文） */
+  --ink: #2b2118;        /* 墨·名/主 */
+  --ink2: #4a3b26;       /* 墨·次 */
+  --ink3: #8a7552;       /* 墨·弱（标签/提示） */
+  --gold: #b07d2b;       /* 金·唯一强调色（LV章/主线边/关键标签） */
+  --gold2: #c9953a;      /* 金·hover/焦点 */
+  --hp: #a62b2b;         /* 血·实心 */
+  --hp-hi: #c13b32;      /* 血·高亮端 */
+  --arc: #3d6fa8;        /* 奥术·实心 */
+  --pool: #b07d2b;       /* 职业池·金 */
+  --buff: #5b7f3c;       /* 状态·增益 */
+  --debuff: #b0493f;     /* 状态·减益 */
+  --serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --sans: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  --sh: 0 2px 10px rgba(60,40,10,.10), 0 8px 28px rgba(60,40,10,.08);
+  --sh-lg: 0 6px 24px rgba(60,40,10,.18), 0 16px 48px rgba(60,40,10,.12);
+  --spring: cubic-bezier(.4, 0, .2, 1);
+}
+* { margin: 0; box-sizing: border-box; }
+html { color-scheme: light; }
+body {
+  min-height: 100vh; overflow: hidden;
+  font-family: var(--serif); color: var(--ink);
+  background:
+    radial-gradient(120% 90% at 50% 40%, var(--bg0) 0%, var(--bg1) 62%, #d6c8a8 100%);
+}
+
+.stage { position: fixed; inset: 0; overflow-y: auto; padding: 64px 22px 96px; }
+.stage-prose { font-size: 16px; line-height: 2; text-align: justify; color: var(--ink); max-width: 600px; margin: 0 auto; }
+.stage-prose strong { color: var(--ink); }
+.stage-prose em { font-style: normal; text-decoration: underline dotted; color: var(--ink2); }
+
+/* ═══ 统一角色卡解剖：头像突出 + 身体(名/条×2/元信息) ═══ */
+.pcard {
+  display: flex; align-items: center;
+  cursor: pointer; user-select: none;
+  transition: transform .25s var(--spring), opacity .25s, box-shadow .25s var(--spring);
+}
+.pcard .av {
+  border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-weight: 800; color: var(--ink);
+  background: radial-gradient(circle at 38% 30%, #fff, var(--card2) 78%);
+  border: 1.5px solid var(--gold);
+  box-shadow: 0 3px 10px rgba(60,40,10,.20);
+  position: relative; z-index: 2;
+}
+.pcard .av .lv {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  font: 700 9px var(--sans); color: #fdf9ef; background: var(--gold);
+  border-radius: 99px; padding: 1px 7px; letter-spacing: .04em; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(60,40,10,.3);
+}
+.pcard .body {
+  display: flex; flex-direction: column; gap: 5px;
+  margin-left: -14px; padding: 10px 12px 9px 22px;
+  background: var(--card); border-radius: 10px;
+  box-shadow: var(--sh);
+}
+.pcard .id { display: flex; align-items: baseline; gap: 6px; line-height: 1.1; }
+.pcard .nm { font-weight: 800; color: var(--ink); white-space: nowrap; letter-spacing: .01em; }
+.pcard .cl { font: 600 10px var(--sans); color: var(--gold); white-space: nowrap; }
+
+/* 双行条：label 左 · 槽中 · 数字右（数字移出条，永可读） */
+.pcard .bh { display: flex; align-items: center; gap: 6px; }
+.pcard .bh .lbl { font: 700 10px var(--sans); flex-shrink: 0; color: var(--ink3); letter-spacing: .06em; }
+.pcard .bh .tk {
+  flex: 1; height: 8px; border-radius: 99px; overflow: hidden;
+  background: rgba(0,0,0,.07);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.10);
+}
+.pcard .bh .fl { display: block; height: 100%; border-radius: 99px; transition: width .6s var(--spring);
+  box-shadow: inset 0 -1px 1px rgba(0,0,0,.18); }
+.pcard .bh .n { font: 700 11px var(--sans); color: var(--ink2); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.pcard .bh.hp .fl { background: linear-gradient(90deg, var(--hp), var(--hp-hi)); }
+.pcard .bh.mp .fl { background: linear-gradient(90deg, var(--arc), #5a8fd0); }
+.pcard .bh.rage .fl { background: linear-gradient(90deg, var(--pool), var(--gold2)); }
+.pcard .bh.hp .fl.crit { background: var(--hp); animation: dc 1.2s infinite; }
+@keyframes dc { 0%,100%{opacity:1} 50%{opacity:.28} }
+
+/* 元信息行：AC/感官/状态chips */
+.pcard .meta { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow: hidden; }
+.pcard .m { font: 500 10px var(--sans); color: var(--ink3); white-space: nowrap; }
+.pcard .m b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
+.stc {
+  font: 600 10px/1 var(--sans); padding: 3px 8px; border-radius: 99px;
+  white-space: nowrap; flex-shrink: 0; letter-spacing: .02em;
+}
+.stc.b { background: rgba(91,127,60,.12); color: var(--buff); }
+.stc.d { background: rgba(176,73,63,.12); color: var(--debuff); }
+.stc.i { background: rgba(138,117,82,.12); color: var(--ink3); }
+.stc.dying { background: rgba(166,43,43,.18); color: var(--hp); animation: dc 1.2s infinite; }
+.stc .k { font-weight: 800; margin-right: 2px; }
+
+/* ── hero：主角面板（统一面板，BG3 风格，贴左上角）── */
+.hero { position: fixed; top: 0; left: 0; z-index: 101; cursor: pointer; user-select: none; }
+.hero .panel {
+  width: 264px;
+  padding: 10px 12px 11px 12px;
+  color: #f2e3c2;
+  background:
+    radial-gradient(130% 70% at 18% -8%, rgba(201,162,75,.18), transparent 55%),
+    linear-gradient(180deg, #3a2b1b 0%, #2a1e12 45%, #1d140a 100%);
+  border: 1px solid rgba(201,162,75,.55);
+  border-left: 3px solid var(--gold);
+  border-radius: 0 0 14px 0;
+  box-shadow: 0 8px 26px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,236,190,.10);
+  position: relative;
+  overflow: hidden;
+}
+.hero .panel::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--gold), #f0d28a 45%, rgba(240,210,138,0));
+}
+.hero .panel::after {
+  content: ""; position: absolute; inset: 4px; border: 1px solid rgba(201,162,75,.16);
+  border-radius: 0 0 10px 0; pointer-events: none;
+}
+.hero .wm {
+  position: absolute; right: -38px; bottom: -40px; width: 140px; height: 140px;
+  color: var(--gold); opacity: .1; pointer-events: none; transform: rotate(-16deg);
+}
+.hero .hd { display: flex; align-items: center; gap: 10px; position: relative; }
+.hero .av {
+  width: 44px; height: 44px; flex-shrink: 0; position: relative;
+  border-radius: 50%; border: 1.5px solid var(--gold);
+  background: radial-gradient(circle at 38% 30%, #4b3520, #241a10);
+  box-shadow: 0 0 0 2px rgba(201,162,75,.15), 0 0 14px rgba(201,162,75,.25), 0 3px 8px rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+  font: 800 20px var(--serif); color: #f5e7c8; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+}
+.hero .av .lv {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  font: 700 8px var(--sans); color: #1a130c; background: linear-gradient(180deg, #f0d28a, #c9a24b);
+  border-radius: 99px; padding: 0 6px; letter-spacing: .04em; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+.hero .ti { display: flex; flex-direction: column; gap: 2px; }
+.hero .nm { font-size: 16px; font-weight: 800; letter-spacing: .02em; color: #f5e7c8; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.hero .cl { font: 600 10px var(--sans); color: var(--gold); }
+.hero .divider { color: var(--gold); opacity: .7; margin: 8px 0 7px; }
+.hero .divider svg { width: 100%; height: 8px; display: block; }
+.hero .bars { display: flex; flex-direction: column; gap: 3px; }
+.hero .bar { position: relative; height: 13px; border-radius: 3px; overflow: hidden; background: rgba(0,0,0,.52); box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 1px rgba(201,162,75,.12); }
+.hero .bar .fl { display: block; height: 100%; border-radius: 2px; transition: width .6s; box-shadow: inset 0 1px 1px rgba(255,255,255,.22); }
+.hero .bar .n { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 9px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.75); font-variant-numeric: tabular-nums; }
+.hero .bar .lbl { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font: 700 8px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.75); opacity: .92; }
+.hero .bar.hp .fl { background: linear-gradient(180deg, #d8483a, #a62b2b); }
+.hero .bar.mp .fl { background: linear-gradient(180deg, #5a90d9, #3a6aa8); }
+/* 2026-09-20 用户定案：六维格 → 头区右侧六角雷达（数值悬停 title/详情卡;刻度 3~20 线性归一） */
+.hero .radar { width: 48px; height: 48px; flex-shrink: 0; margin-left: auto; }
+.hero .radar .rl { font: 700 6px var(--sans); fill: #b09a70; text-anchor: middle; dominant-baseline: central; }
+.hero .meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(201,162,75,.18); }
+.hero .m { font: 500 9px var(--sans); color: #b09a70; }
+.hero .m b { color: #f2e3c2; }
+.hero .stc { border: 1px solid rgba(201,162,75,.25); background: rgba(0,0,0,.25); }
+.hero .stc.b { color: #86cf6c; background: rgba(80,150,70,.18); }
+.hero .stc.d { color: #e88377; background: rgba(190,70,60,.18); }
+.hero .stc.i { color: #c9a24b; background: rgba(201,162,75,.12); }
+
+/* ── mate/enemy：同构成缩小 ── */
+.hud-left {
+  position: fixed; top: 226px; left: 14px; z-index: 100;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: transform .3s var(--spring), opacity .3s;
+}
+.hud-left.hidden { transform: translateX(-230px); opacity: 0; pointer-events: none; }
+.hero.hidden { transform: translateX(-250px); opacity: 0; pointer-events: none; }
+
+.mate .av {
+  width: 44px; height: 44px; font-size: 18px;
+  background: radial-gradient(circle at 38% 30%, #4b3520, #241a10);
+  border-color: rgba(201,162,75,.55);
+  color: #f5e7c8;
+  box-shadow: 0 0 0 2px rgba(201,162,75,.14), 0 2px 8px rgba(0,0,0,.4);
+}
+.mate .body {
+  padding: 7px 10px 6px 20px; gap: 4px; min-width: 176px;
+  background: linear-gradient(180deg, #3a2b1b, #241a10);
+  border: 1px solid rgba(201,162,75,.45);
+  box-shadow: 0 3px 12px rgba(0,0,0,.35);
+}
+.mate .nm { font-size: 13px; color: #f5e7c8; }
+.mate .cl { font-size: 9px; }
+.mate .bh { gap: 5px; }
+.mate .bh .lbl { color: #b09a70; }
+.mate .bh .tk { height: 6px; background: rgba(0,0,0,.42); box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.mate .bh .n { font-size: 10px; color: #f2e3c2; }
+.mate .meta { gap: 5px; }
+.mate .m { font-size: 9px; color: #b09a70; }
+.mate .m b { color: #f2e3c2; }
+.mate .stc { border-color: rgba(201,162,75,.25); background: rgba(0,0,0,.25); }
+.mate .stc.b { color: #86cf6c; background: rgba(80,150,70,.18); }
+.mate .stc.d { color: #e88377; background: rgba(190,70,60,.18); }
+.mate .stc.i { color: #c9a24b; background: rgba(201,162,75,.12); }
+.mate .stc.dying { color: #e88377; background: rgba(190,70,60,.18); }
+
+.mate.enemy .av { border-color: #a05040; background: radial-gradient(circle at 38% 30%, #4a2f20, #2a1a10); color: #e8b89a; }
+.mate.enemy .nm { color: #e0a080; }
+.mate.enemy .bh.hp .fl { background: linear-gradient(90deg, #a05030, #c06040); }
+.mate.dying .av { border-color: var(--hp); color: #ff7a6a; }
+.mate.dying .nm { color: #e88377; }
+
+.zone-tag {
+  font: 700 9px var(--sans); letter-spacing: .32em; text-indent: .32em;
+  color: var(--ink3); padding: 4px 0 0 4px; text-transform: uppercase; opacity: .6;
+}
+
+/* ═══ 右侧 ═══ */
+.hud-right {
+  position: fixed; top: 14px; right: 14px; z-index: 100;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 212px;
+  transition: transform .3s var(--spring), opacity .3s;
+}
+.hud-right.hidden { transform: translateX(220px); opacity: 0; pointer-events: none; }
+.map-info {
+  width: 100%; text-align: right;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #3a2b1b, #241a10);
+  border: 1px solid rgba(201,162,75,.5);
+  border-right: 3px solid var(--gold);
+  border-radius: 10px 0 0 10px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.4);
+}
+.map-info .place { font-size: 14px; font-weight: 800; color: #f5e7c8; line-height: 1.1; }
+.map-info .when { font: 600 10px var(--sans); color: #b09a70; margin-top: 3px; }
+.map-info .terr { display: inline-block; font: 600 9px var(--sans); color: var(--gold); background: rgba(201,162,75,.14); border: 1px solid rgba(201,162,75,.25); padding: 2px 8px; border-radius: 99px; margin-top: 4px; }
+.q-zone { width: 100%; display: flex; flex-direction: column; gap: 3px; }
+.enemy-zone { width: 100%; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.q-tag { font: 700 9px var(--sans); letter-spacing: .28em; text-align: right; color: var(--ink3); opacity: .6; }
+.q-item { cursor: pointer; background: var(--card); border-left: 2px solid rgba(176,125,43,.35); border-radius: 6px; padding: 5px 9px; box-shadow: var(--sh); }
+.q-item.main { border-left: 3px solid var(--gold); }
+.q-item.done { opacity: .45; }
+.q-title { font-size: 11px; color: var(--ink); font-weight: 700; white-space: nowrap; overflow: hidden; }
+.q-item.done .q-title { text-decoration: line-through; font-weight: 500; }
+.q-deet { display: none; padding: 3px 1px 1px 4px; }
+.q-item.open .q-deet { display: block; }
+.q-step { font-size: 10px; color: var(--ink3); }
+.q-step.done { text-decoration: line-through; opacity: .3; }
+.q-step.cur { color: var(--gold); font-weight: 700; }
+
+/* ═══ 底部按钮 ═══ */
+.hud-btns { position: fixed; bottom: 88px; right: 14px; z-index: 100; display: flex; flex-direction: column; gap: 6px; }
+.hud-btn { width: 32px; height: 32px; background: var(--card); border: 1.5px solid rgba(176,125,43,.5); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold); box-shadow: var(--sh);
+  transition: border-color .2s, transform .2s var(--spring); }
+.hud-btn:hover { border-color: var(--gold2); transform: translateY(-1px); }
+.hud-btn svg { width: 15px; height: 15px; }
+
+/* ═══ 详情卡（tab；头像突出）═══ */
+.ctx-card { position: fixed; left: 14px; z-index: 200; display: none; width: 264px;
+  background: var(--card); border: 1.5px solid rgba(176,125,43,.5); border-radius: 12px; box-shadow: var(--sh-lg); }
+.ctx-card.open { display: flex; flex-direction: column; }
+.ctx-card .ch { display: flex; align-items: center; padding: 10px 10px 2px 6px; background: linear-gradient(180deg, #fff, var(--card)); border-radius: 12px 12px 0 0; border-bottom: 1px solid rgba(176,125,43,.14); position: relative; }
+.ctx-av { width: 46px; height: 46px; flex-shrink: 0; border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #fff, var(--card2) 80%); border: 1.5px solid var(--gold);
+  box-shadow: 0 2px 8px rgba(60,40,10,.18), 0 0 0 3px var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font: 800 20px var(--serif); color: var(--ink); margin: -4px 0 0 -14px; position: relative; z-index: 1; }
+.ctx-av::after { content: attr(data-lv); position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+  font: 700 8px var(--sans); color: #fdf9ef; background: var(--gold); border-radius: 99px; padding: 0 5px; }
+.ctx-ti { flex: 1; display: flex; flex-direction: column; padding-left: 12px; }
+.ctx-nm { font-size: 15px; font-weight: 800; color: var(--ink); }
+.ctx-sub { font: 600 10px var(--sans); color: var(--gold); margin-top: 2px; }
+.ctx-x { position: absolute; top: 8px; right: 9px; background: none; border: none; color: var(--ink3); font-size: 13px; cursor: pointer; }
+.ctx-x:hover { color: var(--hp); }
+.ctx-tabs { display: flex; gap: 2px; padding: 0 9px; border-bottom: 1px solid rgba(176,125,43,.2); }
+.ctx-tab { font: 600 10px var(--sans); cursor: pointer; color: var(--ink3); background: transparent; border: 1px solid rgba(176,125,43,.12); border-bottom: none; border-radius: 6px 6px 0 0; padding: 4px 9px 3px; flex: 1; text-align: center; }
+.ctx-tab.on { background: var(--card); color: var(--ink); font-weight: 700; border-color: var(--gold); }
+.ctx-body { padding: 10px 11px 12px; font-size: 11px; color: var(--ink); max-height: 300px; overflow-y: auto; line-height: 1.6; background: var(--card2); border-radius: 0 0 12px 12px; }
+.ctx-body::-webkit-scrollbar { width: 4px; } .ctx-body::-webkit-scrollbar-thumb { background: rgba(176,125,43,.22); border-radius: 99px; }
+.ctx-lbl { font: 700 9px var(--sans); color: var(--gold); margin: 8px 0 3px; letter-spacing: .1em; border-bottom: 1px solid rgba(176,125,43,.12); padding-bottom: 2px; }
+.ctx-lbl:first-child { margin: 0; }
+.ctx-sum { display: flex; flex-wrap: wrap; gap: 4px; }
+.ctx-sum-chip { display: inline-flex; gap: 3px; font: 600 10px var(--sans); padding: 2px 7px; border-radius: 99px; background: #fff; border: 1px solid rgba(176,125,43,.12); }
+.ctx-sum-chip .k { font-size: 9px; color: var(--ink3); }
+.ctx-sum-chip .v { color: var(--ink); font-weight: 700; }
+.ctx-hpbar { height: 12px; border-radius: 99px; background: rgba(0,0,0,.07); box-shadow: inset 0 1px 2px rgba(0,0,0,.1); overflow: hidden; position: relative; margin: 6px 0 4px; }
+.ctx-hpbar .fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--hp), var(--hp-hi)); transition: width .5s; display: block; }
+.ctx-hpbar span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 10px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.ctx-slots { display: flex; gap: 7px; flex-wrap: wrap; margin: 3px 0; }
+.ctx-slots .slot { display: flex; gap: 3px; align-items: center; }
+.ctx-slots .n { font: 600 9px var(--sans); color: var(--ink3); }
+.ctx-slots .pip { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--arc); background: rgba(61,111,168,.14); }
+.ctx-slots .pip.used { background: transparent; border-color: rgba(138,117,82,.2); }
+.ctx-attr { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px 6px; font: 600 10px var(--sans); }
+.ctx-attr .s { display: flex; justify-content: space-between; }
+.ctx-attr .s .nm { color: var(--ink3); }
+.ctx-attr .s .vl { color: var(--ink); font-weight: 700; }
+.ctx-attr .s .mod { color: var(--gold); font-size: 9px; margin-left: 1px; }
+.ctx-item { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+.ctx-item .mc { color: var(--ink); }
+.ctx-item .dv { color: var(--ink3); font: 600 9px var(--sans); }
+.ctx-skill { display: flex; justify-content: space-between; font-size: 11px; padding: 1px 0; }
+.ctx-skill .nm .expert { color: var(--gold2); }
+.ctx-skill .mod { color: var(--ink); font-weight: 700; }
+.ctx-skill .attr { color: var(--ink3); font-size: 8px; margin-right: 2px; }
+.ctx-st { display: flex; gap: 4px; flex-wrap: wrap; margin: 3px 0; }
+.ctx-note { font: 500 10px/1.5 var(--sans); color: var(--ink3); margin-top: 4px; }
+
+/* ═══ 书弹窗 ═══ */
+.rb-ov { position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center; background: rgba(40,28,12,.35); backdrop-filter: blur(3px); }
+.rb-ov.open { display: flex; }
+.rb-box { width: 720px; max-width: 90vw; height: 470px; max-height: 82vh; background: var(--card); border: 1.5px solid rgba(176,125,43,.55); border-radius: 12px; display: flex; flex-direction: column; box-shadow: var(--sh-lg); }
+.rb-h { padding: 8px 13px; background: linear-gradient(180deg, #fff, var(--card)); border-radius: 12px 12px 0 0; border-bottom: 1px solid rgba(176,125,43,.15); display: flex; align-items: center; }
+.rb-nm { font-size: 14px; color: var(--gold); font-weight: 800; letter-spacing: .2em; }
+.rb-s { font: 600 12px var(--sans); color: var(--ink); background: #fff; border: 1px solid rgba(176,125,43,.18); border-radius: 6px; padding: 4px 9px; outline: none; width: 130px; margin-left: auto; margin-right: 8px; }
+.rb-s:focus { border-color: var(--gold2); }
+.rb-x { background: none; border: none; color: var(--ink3); font-size: 14px; cursor: pointer; }
+.rb-x:hover { color: var(--hp); }
+.rb-b { flex: 1; display: flex; overflow: hidden; border-radius: 0 0 12px 12px; }
+.rb-n { width: 156px; flex-shrink: 0; border-right: 1px solid rgba(176,125,43,.12); overflow-y: auto; padding: 5px 0; background: var(--card2); }
+.rb-ng { font: 700 9px var(--sans); color: var(--gold); padding: 5px 11px 2px; text-transform: uppercase; letter-spacing: .12em; }
+.rb-ni { font: inherit; font-size: 11px; color: var(--ink); padding: 3px 11px 3px 15px; background: none; border: none; cursor: pointer; width: 100%; text-align: left; }
+.rb-ni:hover { background: rgba(176,125,43,.06); }
+.rb-c { flex: 1; overflow-y: auto; padding: 12px 18px 16px; font-size: 13px; line-height: 1.8; color: var(--ink); }
+.rb-c h3 { font-size: 14px; color: var(--ink); margin: 0 0 5px; }
+.rb-c p { margin: 0 0 7px; }
+
+/* Composer */
+.composer-h { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 20px 12px; z-index: 50; display: flex; justify-content: center; }
+.composer-i { width: 100%; max-width: 620px; background: rgba(43,33,24,.55); border: 1px solid rgba(200,169,110,.25); border-radius: 8px; padding: 11px 17px; color: #f5f0e0; font: 14px var(--serif); outline: none; backdrop-filter: blur(4px); }
+.composer-i::placeholder { color: rgba(200,169,110,.35); }
+
+/* demo（原型演示专用） */
+.demo { position: fixed; bottom: 54px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; z-index: 1000; opacity: .3; }
+.demo:hover { opacity: 1; }
+.demo button { font: 600 9px var(--sans); color: var(--ink3); background: var(--card); border: 1px solid rgba(176,125,43,.15); padding: 2px 7px; border-radius: 99px; cursor: pointer; }
+
+::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: rgba(176,125,43,.16); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="ic-book" viewBox="0 0 24 24"><path d="M4 4c4-2 8-2 8 0v16c0-2-4-2-8 0V4zM12 4c4-2 8-2 8 0v16c0-2-4-2-8 0V4z" fill="none" stroke="currentColor" stroke-width="1.6" fill-rule="evenodd" stroke-linejoin="round"/></symbol>
+  <symbol id="ic-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 9v6M17 9v6" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></symbol>
+  <!-- 龙头纹章（Lorc / game-icons.net，CC BY 3.0） -->
+  <symbol id="dragon-head" viewBox="0 0 512 512">
+    <path fill="currentColor" d="M200.947 18.686c-6.98.087-14.64.774-22.85 1.9 27.57 20.468 51.098 45.25 67.594 70.527 1.66 0 3.312.012 4.958.047 18.066.39 35.487 2.906 53.217 7.2-15.695-28.457-29.935-50.19-47.45-63.22-13.817-10.278-30.063-16.168-52.52-16.454-.967-.013-1.95-.013-2.948 0zm-91.66 22.96c-.73-.002-1.46.006-2.195.022-14.045.31-29.36 3.92-46.86 11.13 56.18 18.807 106.985 50.468 133.907 83.585 18.377-5.13 29.44-14.72 36.454-28.817C195.84 78.18 168.118 56.19 140.65 46.96c-10.168-3.418-20.433-5.306-31.363-5.315zm-.203 52.786c-39.42 6.758-74.73 31.854-87.822 74.19v322.345h212.73C100.352 442.58 61.19 206.49 187.115 230.104c5.838-14.164 9.92-28.027 11.018-41.465l18.627 1.522c-1.684 20.592-8.828 40.49-18.033 59.943-.732 2.035-1.472 4.12-2.186 6.063 32.842 85.24 113.77 160.69 169.495 168.197.915.033 1.905-.002 2.953-.09 17.016 1.035 35.86-4.222 52.21-22.304l7.984-8.83-10.473-5.658c-6.507-3.515-14.29-7.094-18.167-10.925-1.938-1.916-2.793-3.47-3.074-5.194-.282-1.725-.13-4.227 2.23-8.578l10.673-19.656-21.484 6.222c-6.304 1.825-17.305-3.032-23.224-10.71-2.96-3.84-4.408-7.907-4.387-10.843.02-2.938.72-5.125 4.747-8.05l19.453-14.125-23.884-2.72c-9.974-1.137-16.37-6.658-19.17-12.294-2.802-5.634-2.312-10.084 1.375-13.31l12.204-10.677-15.358-5.205c-6.717-2.276-10.296-7.555-10.357-10.633-.028-1.373.238-2.666 1.843-4.476 10.93-2.39 21.258-.45 28.088 6.374 6.154 6.146 8.35 15.128 6.977 24.832 8.55-2.254 16.985-1.616 24.112 2.494 9.34 5.387 14.647 15.692 15.67 27.965 15.212-10.132 32.152-12.725 45.262-5.164 15.467 8.92 21.36 29.513 16.805 51.75 23.992-33.355 34.588-75.717 5.617-120.43-46.726-4.442-81.693-30.676-93.293-67.64-5.026-16.016-21.284-28.67-42-37.904l-.08.217c-29.74-10.823-55.575-17.35-82.604-18.733l.08.155c-2.294-.093-4.56-.16-6.762-.172-9.537 22.874-28.662 39.9-57.436 46.054l-5.906 1.262-3.576-4.864c-14.216-19.33-41.23-40.452-74.002-58.074zm156.215 65.26c27.927-.073 44.874 11.617 42.09 44.45-35.844 3.39-51.933-16.683-63.074-42.632 7.507-1.155 14.538-1.8 20.983-1.817zm48.407 66.363c3.708.07 7.14.994 10.014 2.812a35.171 35.171 0 0 0-4.16 3.543c-5.246 5.24-8.087 12.122-7.956 18.742.183 9.322 5.27 17.184 12.68 22.56-3.14 8.103-2.452 17.455 1.407 25.22 3.813 7.668 10.54 14.273 19.302 18.398-1.445 3.366-2.375 6.862-2.4 10.33-.062 8.407 3.38 16.042 8.273 22.39 6.792 8.81 16.862 15.936 28.026 17.91-.183 2.18-.204 4.333.133 6.407 1.05 6.444 4.515 11.66 8.38 15.48 3.41 3.37 7.19 5.892 10.798 7.993-6.345 4.792-12.414 7.056-18.618 7.79-6.515-7.937-9.71-19.084-9.41-31.454-11.767 6.177-24.21 7.156-34.12 1.44-14.668-8.46-19.393-29.036-13.187-50.33-11.336 2.77-22.13.92-29.187-6.132-8.875-8.865-9.535-23.626-3.094-37.95-3.676-.615-6.963-2.166-9.525-4.725-8.808-8.798-5.773-26.09 6.776-38.626 7.843-7.835 17.546-11.957 25.87-11.8z"/>
+  </symbol>
+  <!-- 翼龙（Lorc / game-icons.net，CC BY 3.0） -->
+  <symbol id="wyvern" viewBox="0 0 512 512">
+    <path fill="currentColor" d="M324.97 17.54c.03.034.057.07.087.106l-34.924 32.428 36.904-3.752-15.396 30.12 38.048-16.075c26.147 69.965.623 154.277-52.555 166.262-6.554-25.37-34.13-37.945-36.055-57.382.303.093.604.187.912.27a27.113 27.113 0 0 0 14.274-.07l25.138 22.89 20.653-16.377c-7.363 2.836-28.588-1.402-33.25-13.923a27.114 27.114 0 0 0 6.793-11.922c.485-1.813.757-3.635.86-5.445l11.524 22.777 5.22-16.94c7.625 5.575 12.474 13.605 11.49 21.136l16.673-29.4-72.14-29.56-58.057-48.03 17.1 31.25-48.206-19.753 35.14 31.237c-40.602 28.158-22.085 85.04-1.796 119.29-57.5-9.685-103.128-77.435-95.763-145.03l49.21-21.366-31.08-5.14 29.207-33.417-32.015 11.54c.037-.067.07-.135.107-.202-168.36 66.33-116.413 367-63.728 417.99-.19-1.317-.364-2.58-.54-3.855-14.922-56.244-20.375-125.624-17.5-190.53 3.02-68.237 14.834-131.16 36.794-169.522l16.22 9.283c-18.894 33.008-31.4 94.563-34.345 161.064-1.942 43.86.106 90.022 6.275 132.082 6.124 1.892 15.046 9.615 27.295 23.24-4.818-13.35-6.78-26.5-6.482-38.28 20.286 41.665 67.34 69.234 104.633 62.308 22.444-4.17 41.803-12.73 57.81-24.475l7.31 15.418c-20.068 5.036-22.807 32.635-14.737 55.112 1.748-19.882 11.36-29.794 21.73-32.303-6.598 15.867-4.698 30.623-3.117 44.158 10.15-12.147 21.47-23.793 23.628-39.354 8.738 7.332 12.317 21.49 1.194 39.057 26.32-15.473 31.565-41.994 7.978-57.685l-32.07-34.297c5.918-5.55 11.24-11.6 15.947-18.066l39.28 15.776c-3.942 13.69 5.833 31.512 19.77 43.31-8.055-17.288-4.826-30.08 2.562-37.103 1.63 17.39 10.64 29.193 18.733 40.064 2.73-15.665 6.79-31.493-.213-45.987 11.016 1.56 21.2 11.568 20.338 31.877 14.362-25.313 6.11-49.702-20.742-51.52l-71.135-9.892c12.757-22.982 18.676-49.823 17.015-77.475 14.188-34.708 50.058-11.816 54.523 49.16C394.924 262.27 434.58 304 426.324 367.13c11.808-23.38 21.835-35.013 29.862-36.247-10.772-91.925-40.458-191.57-77.637-250.748l15.823-9.942c50.328 80.106 85.112 220.65 84.88 331.547 42.403-115.912-2.347-356.61-154.282-384.2zm-29.458 476.913-.026.016-.015.05c.015-.02.027-.044.042-.067zm26.543-318.492h.01v-.007l-.01.008zm-53.348-41.716a9.127 9.127 0 0 1 2.652.313c4.774 1.28 7.467 5.945 6.187 10.72-1.28 4.776-5.943 7.47-10.72 6.19-4.775-1.28-7.468-5.943-6.188-10.72.96-3.584 3.823-5.993 7.21-6.435a8.66 8.66 0 0 1 .857-.068zM204.904 297.13c11.878-.2 22.637 6.756 26.172 22.487-.008 35.88-9.557 68.823-42.137 77.412-27.624 7.283-69.725-11.398-84.12-53.663 12.28-21.078 37.362-21.986 62.838 22.592-12.583-41.596 14.386-68.444 37.246-68.83z"/>
+  </symbol>
+  <!-- 金色分隔纹：两侧线 + 中央菱形 -->
+  <symbol id="divider" viewBox="0 0 200 14">
+    <path d="M0 7 H74 M126 7 H200" stroke="currentColor" stroke-width="1" opacity=".55"/>
+    <path d="M100 7 l-9 -7 l9 7 l-9 7 z" fill="currentColor"/>
+    <path d="M100 7 l9 -7 l-9 7 l9 7 z" fill="none" stroke="currentColor" stroke-width="1" opacity=".7"/>
+    <circle cx="100" cy="7" r="1.6" fill="#f5e7c8"/>
+  </symbol>
+</svg>
+
+<!-- 叙事 -->
+<div class="stage"><div class="stage-prose">
+  <p>薄雾散去，石板路的尽头浮现出猎猎作响的旗幡——<strong>边境小镇</strong>。你踏着暮色迈过门槛，身后山林的窸窣声似仍在追索……</p>
+  <p style="margin-top:10px">你注意到，入口石墙刻有数道新鲜爪痕，向镇北延伸。草丛半掩铜币——酸性腐蚀痕迹……</p>
+  <p style="margin-top:10px">阴影中窜出矮小身影——<em>哥布林</em>！短剑划出弧线，薄皮甲上鲜血涌出。嘶吼之后还有两双绿油油的眼眸……</p>
+</div></div>
+
+<!-- ═══ 主角（华丽版） ═══ -->
+<div class="hero" id="hero" data-ctx="ctx-pc">
+  <div class="panel">
+    <svg class="wm"><use xlink:href="#wyvern"/></svg>
+    <div class="hd">
+      <div class="av">洛<span class="lv">LV3</span></div>
+      <div class="ti">
+        <div class="nm">洛克</div>
+        <div class="cl">盗贼 · 半精灵</div>
+      </div>
+      <svg class="radar" viewBox="0 0 48 48" role="img" aria-label="六维属性 力14 敏12 体13 智10 感11 魅8"><title>力14 敏12 体13 智10 感11 魅8</title>
+        <polygon points="24,19.3 27.6,21.4 27.6,25.6 24,27.7 20.4,25.6 20.4,21.4" fill="none" stroke="rgba(201,162,75,.18)" stroke-width=".5"/>
+        <polygon points="24,14.6 31.4,18.8 31.4,27.2 24,31.4 16.6,27.2 16.6,18.8" fill="none" stroke="rgba(201,162,75,.18)" stroke-width=".5"/>
+        <polygon points="24,9.5 36.6,16.8 36.6,31.3 24,38.5 11.4,31.3 11.4,16.8" fill="none" stroke="rgba(201,162,75,.18)" stroke-width=".5"/>
+        <g stroke="rgba(201,162,75,.14)" stroke-width=".5"><line x1="24" y1="24" x2="24" y2="9.5"/><line x1="24" y1="24" x2="36.6" y2="16.8"/><line x1="24" y1="24" x2="36.6" y2="31.3"/><line x1="24" y1="24" x2="24" y2="38.5"/><line x1="24" y1="24" x2="11.4" y2="31.3"/><line x1="24" y1="24" x2="11.4" y2="16.8"/></g>
+        <polygon points="24,14.6 30.6,20.2 31.4,28.3 24,30 18.1,27.4 20.3,21.9" fill="rgba(201,162,75,.28)" stroke="#f0d28a" stroke-width="1.2" stroke-linejoin="round"/>
+        <text class="rl" x="24" y="3.5">力</text><text class="rl" x="41.8" y="13.8">敏</text><text class="rl" x="41.8" y="34.3">体</text><text class="rl" x="24" y="44.5">智</text><text class="rl" x="6.2" y="34.3">感</text><text class="rl" x="6.2" y="13.8">魅</text>
+      </svg>
+    </div>
+    <div class="divider"><svg><use xlink:href="#divider"/></svg></div>
+    <div class="bars">
+      <div class="bar hp"><div class="fl" id="hp-fl" style="width:77%"></div><span class="n" id="hp-n">17/22</span><span class="lbl">HP</span></div>
+      <div class="bar mp"><div class="fl" style="width:50%"></div><span class="n">1/2</span><span class="lbl">位</span></div>
+    </div>
+    <div class="meta">
+      <span class="m">AC <b>15</b></span><span class="m">暗视<b>60</b></span>
+      <span class="stc b"><span class="k">狂</span>2轮</span><span class="stc d"><span class="k">盲</span>1轮</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 同伴/敌怪 栈 ═══ -->
+<div class="hud-left" id="hud-left">
+  <div class="zone-tag">同伴</div>
+
+  <div class="pcard mate" data-ctx="ctx-tina">
+    <div class="av">缇<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">缇娜</span><span class="cl">牧师</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:62%"></div></div><span class="n">5/8</span></div>
+      <div class="bh mp"><span class="lbl">位</span><div class="tk"><div class="fl" style="width:67%"></div></div><span class="n">4/6</span></div>
+      <div class="meta"><span class="m">AC <b>12</b></span><span class="stc d"><span class="k">惧</span>1轮</span></div>
+    </div>
+  </div>
+
+  <div class="pcard mate" data-ctx="ctx-iron">
+    <div class="av">铁<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">老铁</span><span class="cl">战士</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="n">12/12</span></div>
+      <div class="bh rage"><span class="lbl">怒</span><div class="tk"><div class="fl" style="width:60%"></div></div><span class="n">3/5</span></div>
+      <div class="meta"><span class="m">AC <b>18</b></span><span class="stc b"><span class="k">狂</span>3轮</span></div>
+    </div>
+  </div>
+
+  <div class="pcard mate dying">
+    <div class="av">伊<span class="lv">LV3</span></div>
+    <div class="body">
+      <div class="id"><span class="nm">伊娃</span><span class="cl">盗贼</span></div>
+      <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl crit" style="width:0%"></div></div><span class="n">0/10</span></div>
+      <div class="meta"><span class="m">AC <b>14</b></span><span class="stc dying">✗2 · ✚0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ 右侧 ═══ -->
+<div class="hud-right" id="hud-right">
+  <div class="map-info">
+    <div class="place">边境小镇</div>
+    <div class="when">第3日 · 黄昏</div>
+    <span class="terr">温带丘陵</span>
+  </div>
+  <div class="q-zone">
+    <div class="q-tag">任务</div>
+    <div class="q-item main open">
+      <div class="q-title">◆ 山中异动</div>
+      <div class="q-deet">
+        <div class="q-step done">✓ 到达小镇</div>
+        <div class="q-step cur">◆ 调查爪痕</div>
+        <div class="q-step todo">○ 追踪巢穴</div>
+      </div>
+    </div>
+    <div class="q-item"><div class="q-title">◇ 失踪商队</div>
+      <div class="q-deet"><div class="q-step todo">○ 前往勘察</div></div>
+    </div>
+    <div class="q-item done"><div class="q-title">✓ 酒馆情报</div></div>
+  </div>
+  <div class="enemy-zone" id="enemy-panel">
+    <div class="zone-tag">敌人</div>
+    <div class="pcard mate enemy">
+      <div class="av">甲</div>
+      <div class="body">
+        <div class="id"><span class="nm">哥布林甲</span></div>
+        <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:100%"></div></div><span class="n">7/7</span></div>
+        <div class="meta"><span class="m">AC <b>15</b></span><span class="stc i"><span class="k">先攻</span>9</span></div>
+      </div>
+    </div>
+    <div class="pcard mate enemy">
+      <div class="av">乙</div>
+      <div class="body">
+        <div class="id"><span class="nm">哥布林乙</span></div>
+        <div class="bh hp"><span class="lbl">HP</span><div class="tk"><div class="fl" style="width:29%"></div></div><span class="n">2/7</span></div>
+        <div class="meta"><span class="m">AC <b>15</b></span><span class="stc i"><span class="k">先攻</span>7</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 主角详情卡 ═══ -->
+<div class="ctx-card" id="ctx-pc">
+  <div class="ch">
+    <div class="ctx-av" data-lv="LV3">洛</div>
+    <div class="ctx-ti"><div class="ctx-nm">洛克</div><div class="ctx-sub">LV3 盗贼 · 半精灵</div></div>
+    <button class="ctx-x" data-close="ctx-pc">✕</button>
+  </div>
+  <div class="ctx-tabs">
+    <button class="ctx-tab on" data-t="ov">总览</button>
+    <button class="ctx-tab" data-t="eq">装备</button>
+    <button class="ctx-tab" data-t="sk">技能</button>
+  </div>
+  <div class="ctx-body">
+    <div class="ctx-pane" data-p="ov">
+      <div class="ctx-sum">
+        <span class="ctx-sum-chip"><span class="k">HP</span><span class="v">17/22</span></span>
+        <span class="ctx-sum-chip"><span class="k">AC</span><span class="v">15</span></span>
+        <span class="ctx-sum-chip"><span class="k">HD</span><span class="v">1/3</span></span>
+        <span class="ctx-sum-chip"><span class="k">速度</span><span class="v">30尺</span></span>
+      </div>
+      <div class="ctx-hpbar"><div class="fill" style="width:77%"></div><span>HP 17 / 22</span></div>
+      <div class="ctx-lbl">施法位</div>
+      <div class="ctx-slots">
+        <div class="slot"><span class="n">1环</span><span class="pip"></span><span class="pip used"></span></div>
+        <div class="slot"><span class="n">2环</span><span class="pip"></span><span class="pip"></span></div>
+      </div>
+      <div class="ctx-lbl">属性</div>
+      <div class="ctx-attr">
+        <div class="s"><span class="nm">力</span><span><span class="vl">14</span><span class="mod">+2</span></span></div>
+        <div class="s"><span class="nm">敏</span><span><span class="vl">12</span><span class="mod">+1</span></span></div>
+        <div class="s"><span class="nm">体</span><span><span class="vl">13</span><span class="mod">+1</span></span></div>
+        <div class="s"><span class="nm">智</span><span><span class="vl">10</span><span class="mod">+0</span></span></div>
+        <div class="s"><span class="nm">感</span><span><span class="vl">11</span><span class="mod">+0</span></span></div>
+        <div class="s"><span class="nm">魅</span><span><span class="vl">8</span><span class="mod">−1</span></span></div>
+      </div>
+      <div class="ctx-lbl">状态</div>
+      <div class="ctx-st"><span class="stc b"><span class="k">狂</span>2轮</span><span class="stc d"><span class="k">盲</span>1轮</span></div>
+      <div class="ctx-note">狂暴：近战+2　目盲：攻击劣势，被近战攻击优势。专注：无</div>
+    </div>
+    <div class="ctx-pane" data-p="eq" style="display:none">
+      <div class="ctx-lbl">武器</div>
+      <div class="ctx-item"><span class="mc">短剑 ×2</span><span class="dv">1d6 灵巧</span></div>
+      <div class="ctx-item"><span class="mc">短弓</span><span class="dv">1d6 · 80/320</span></div>
+      <div class="ctx-lbl">护甲</div>
+      <div class="ctx-item"><span class="mc">镶钉皮+盾</span><span class="dv">AC 15</span></div>
+      <div class="ctx-lbl">杂物</div>
+      <div class="ctx-item"><span class="mc">火把×5 · 绳(50尺) · 干粮×3日</span></div>
+      <div class="ctx-lbl">钱袋</div>
+      <div class="ctx-item"><span class="mc">15 gp · 3 sp</span></div>
+    </div>
+    <div class="ctx-pane" data-p="sk" style="display:none">
+      <div class="ctx-lbl">技能</div>
+      <div class="ctx-skill"><span class="nm">隐匿<span class="expert">★</span></span><span><span class="attr">DEX</span><span class="mod">+7</span></span></div>
+      <div class="ctx-skill"><span class="nm">巧手</span><span><span class="attr">DEX</span><span class="mod">+4</span></span></div>
+      <div class="ctx-lbl">豁免</div>
+      <div class="ctx-skill"><span class="nm">DEX / INT</span><span class="mod">+4 / +2</span></div>
+      <div class="ctx-lbl">特征</div>
+      <div class="ctx-item"><span class="mc">偷袭 2d6</span><span class="dv">优势时追加</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 缇娜详情（同构成） -->
+<div class="ctx-card" id="ctx-tina">
+  <div class="ch">
+    <div class="ctx-av" data-lv="LV3">缇</div>
+    <div class="ctx-ti"><div class="ctx-nm">缇娜</div><div class="ctx-sub">LV3 牧师 · 半精灵</div></div>
+    <button class="ctx-x" data-close="ctx-tina">✕</button>
+  </div>
+  <div class="ctx-tabs">
+    <button class="ctx-tab on" data-t="ov">总览</button>
+    <button class="ctx-tab" data-t="eq">装备</button>
+    <button class="ctx-tab" data-t="sk">技能</button>
+  </div>
+  <div class="ctx-body">
+    <div class="ctx-pane" data-p="ov">
+      <div class="ctx-sum"><span class="ctx-sum-chip"><span class="k">HP</span><span class="v">5/8</span></span><span class="ctx-sum-chip"><span class="k">AC</span><span class="v">12</span></span><span class="ctx-sum-chip"><span class="k">HD</span><span class="v">3/3</span></span></div>
+      <div class="ctx-hpbar"><div class="fill" style="width:62%"></div><span>HP 5 / 8</span></div>
+      <div class="ctx-slots"><div class="slot"><span class="n">1环</span><span class="pip"></span><span class="pip"></span></div><div class="slot"><span class="n">2环</span><span class="pip"></span></div></div>
+      <div class="ctx-attr"><div class="s"><span class="nm">力</span><span><span class="vl">10</span><span class="mod">+0</span></span></div><div class="s"><span class="nm">体</span><span><span class="vl">14</span><span class="mod">+2</span></span></div><div class="s"><span class="nm">感</span><span><span class="vl">16</span><span class="mod">+3</span></span></div></div>
+      <div class="ctx-lbl">状态</div>
+      <div class="ctx-st"><span class="stc d"><span class="k">惧</span>1轮</span></div>
+      <div class="ctx-note">恐惧：恐惧源在视野内时攻击与检定劣势</div>
+    </div>
+    <div class="ctx-pane" data-p="eq" style="display:none">
+      <div class="ctx-item"><span class="mc">硬头锤</span><span class="dv">1d8 钝击</span></div>
+      <div class="ctx-item"><span class="mc">鳞甲</span><span class="dv">AC 14</span></div>
+      <div class="ctx-item"><span class="mc">圣徽</span><span class="dv">日神法器</span></div>
+      <div class="ctx-item"><span class="mc">治愈药水×2</span><span class="dv">2d4+2</span></div>
+    </div>
+    <div class="ctx-pane" data-p="sk" style="display:none">
+      <div class="ctx-skill"><span class="nm">医药</span><span><span class="attr">WIS</span><span class="mod">+5</span></span></div>
+      <div class="ctx-skill"><span class="nm">宗教</span><span><span class="attr">INT</span><span class="mod">+2</span></span></div>
+      <div class="ctx-item"><span class="mc">神圣渠道</span><span class="dv">短休回充</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 书弹 -->
+<div class="rb-ov" id="rb">
+  <div class="rb-box">
+    <div class="rb-h"><span class="rb-nm">规则之书</span><input class="rb-s" placeholder="搜索…"><button class="rb-x">✕</button></div>
+    <div class="rb-b">
+      <div class="rb-n">
+        <div class="rb-ng">规则</div>
+        <button class="rb-ni">战斗秩序</button>
+        <button class="rb-ni">执行动作</button>
+        <div class="rb-ng">状态</div>
+        <button class="rb-ni">目盲</button>
+        <div class="rb-ng">装备</div>
+        <button class="rb-ni">长剑</button>
+      </div>
+      <div class="rb-c">
+        <h3>Order of Combat</h3>
+        <p>Combat unfolds in rounds. Each participant takes turns in initiative order, and the round ends when every participant has acted.</p>
+        <p><em>d20 + DEX modifier</em>. Ties are simultaneous.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="hud-btns">
+  <button class="hud-btn" id="btn-rb" title="规则之书"><svg><use xlink:href="#ic-book"/></svg></button>
+  <button class="hud-btn" id="btn-pn" title="隐藏/开启面板"><svg><use xlink:href="#ic-panel"/></svg></button>
+</div>
+
+<div class="composer-h"><input class="composer-i" placeholder="[ 输入你的行动…… ]"></div>
+
+<div class="demo"><button onclick="tE()">敌</button><button onclick="tH()">血</button></div>
+
+<script>
+const hL = document.getElementById('hud-left'), hR = document.getElementById('hud-right'), hero = document.getElementById('hero')
+document.getElementById('btn-pn').onclick = () => {
+  const v = !hL.classList.contains('hidden')
+  hL.classList.toggle('hidden', v)
+  hR.classList.toggle('hidden', v)
+  hero.classList.toggle('hidden', v)
+}
+function cCtx() { for (const c of document.querySelectorAll('.ctx-card')) c.classList.remove('open') }
+for (const el of document.querySelectorAll('[data-ctx]')) {
+  el.addEventListener('click', e => {
+    e.stopPropagation()
+    const ctx = document.getElementById(el.dataset.ctx)
+    const w = ctx.classList.contains('open')
+    cCtx()
+    if (!w) { const r = el.getBoundingClientRect(); ctx.style.top = Math.min(r.bottom + 6, 220) + 'px'; ctx.classList.add('open') }
+  })
+}
+for (const x of document.querySelectorAll('.ctx-x')) { x.onclick = e => { e.stopPropagation(); document.getElementById(x.dataset.close).classList.remove('open') } }
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ctx-card')) cCtx()
+  if (!e.target.closest('.rb-ov, .hud-btn')) document.getElementById('rb').classList.remove('open')
+})
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { cCtx(); document.getElementById('rb').classList.remove('open') } })
+for (const card of document.querySelectorAll('.ctx-card')) {
+  for (const tab of card.querySelectorAll('.ctx-tab')) {
+    tab.onclick = e => {
+      e.stopPropagation()
+      for (const t of card.querySelectorAll('.ctx-tab')) t.classList.remove('on')
+      tab.classList.add('on')
+      for (const p of card.querySelectorAll('.ctx-pane')) p.style.display = p.dataset.p === tab.dataset.t ? '' : 'none'
+    }
+  }
+}
+for (const q of document.querySelectorAll('.q-item')) q.onclick = e => { e.stopPropagation(); q.classList.toggle('open') }
+document.getElementById('btn-rb').onclick = e => { e.stopPropagation(); document.getElementById('rb').classList.add('open') }
+document.querySelector('.rb-x').onclick = () => document.getElementById('rb').classList.remove('open')
+
+function tE() {
+  const p = document.getElementById('enemy-panel')
+  p.style.display = p.style.display === 'none' ? '' : 'none'
+}
+let pulsing = false, t = 0
+function tH() { pulsing = !pulsing }
+setInterval(() => {
+  if (!pulsing) return
+  t = (t + 1) % 16
+  if (t === 6) { document.getElementById('hp-fl').style.width = '36%'; document.getElementById('hp-n').textContent = '8/22' }
+  if (t === 0) { document.getElementById('hp-fl').style.width = '77%'; document.getElementById('hp-n').textContent = '17/22' }
+}, 2000)
+</script>
+</body>
+</html>

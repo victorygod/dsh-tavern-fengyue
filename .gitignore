@@ -1,0 +1,15 @@
+node_modules/
+lib/
+!tavern_presets/*/preset/lib/
+*.tsbuildinfo
+.dsh-build/
+.DS_Store
+tavern_workspace/
+.tmp-fixture/
+# Claude Code local overrides — never commit (shared settings/commands stay committable)
+.claude/settings.local.json
+# Local credentials — never commit (bin/dev.mjs loads repo-root .env on start)
+.env
+.env.*
+!.env.example
+.dsh-tavern-fengyue

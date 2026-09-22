@@ -1,0 +1,321 @@
+# spells — 319 entries
+
+- [Acid Arrow](acid-arrow.md) — 2nd-level Evocation
+- [Acid Splash](acid-splash.md) — cantrip Conjuration
+- [Aid](aid.md) — 2nd-level Abjuration
+- [Alarm](alarm.md) — 1st-level Abjuration
+- [Alter Self](alter-self.md) — 2nd-level Transmutation · conc
+- [Animal Friendship](animal-friendship.md) — 1st-level Enchantment
+- [Animal Messenger](animal-messenger.md) — 2nd-level Enchantment
+- [Animal Shapes](animal-shapes.md) — 8th-level Transmutation · conc
+- [Animate Dead](animate-dead.md) — 3rd-level Necromancy
+- [Animate Objects](animate-objects.md) — 5th-level Transmutation · conc
+- [Antilife Shell](antilife-shell.md) — 5th-level Abjuration · conc
+- [Antimagic Field](antimagic-field.md) — 8th-level Abjuration · conc
+- [Antipathy/Sympathy](antipathy-sympathy.md) — 8th-level Enchantment
+- [Arcane Eye](arcane-eye.md) — 4th-level Divination · conc
+- [Arcane Hand](arcane-hand.md) — 5th-level Evocation · conc
+- [Arcane Lock](arcane-lock.md) — 2nd-level Abjuration
+- [Arcane Sword](arcane-sword.md) — 7th-level Evocation · conc
+- [Arcanist's Magic Aura](arcanists-magic-aura.md) — 2nd-level Illusion
+- [Astral Projection](astral-projection.md) — 9th-level Necromancy
+- [Augury](augury.md) — 2nd-level Divination
+- [Awaken](awaken.md) — 5th-level Transmutation
+- [Bane](bane.md) — 1st-level Enchantment · conc
+- [Banishment](banishment.md) — 4th-level Abjuration · conc
+- [Barkskin](barkskin.md) — 2nd-level Transmutation · conc
+- [Beacon of Hope](beacon-of-hope.md) — 3rd-level Abjuration · conc
+- [Bestow Curse](bestow-curse.md) — 3rd-level Necromancy · conc
+- [Black Tentacles](black-tentacles.md) — 4th-level Conjuration · conc
+- [Blade Barrier](blade-barrier.md) — 6th-level Evocation · conc
+- [Bless](bless.md) — 1st-level Enchantment · conc
+- [Blight](blight.md) — 4th-level Necromancy
+- [Blindness/Deafness](blindness-deafness.md) — 2nd-level Necromancy
+- [Blink](blink.md) — 3rd-level Transmutation
+- [Blur](blur.md) — 2nd-level Illusion · conc
+- [Branding Smite](branding-smite.md) — 2nd-level Evocation · conc
+- [Burning Hands](burning-hands.md) — 1st-level Evocation
+- [Call Lightning](call-lightning.md) — 3rd-level Conjuration · conc
+- [Calm Emotions](calm-emotions.md) — 2nd-level Enchantment · conc
+- [Chain Lightning](chain-lightning.md) — 6th-level Evocation
+- [Charm Person](charm-person.md) — 1st-level Enchantment
+- [Chill Touch](chill-touch.md) — cantrip Necromancy
+- [Circle of Death](circle-of-death.md) — 6th-level Necromancy
+- [Clairvoyance](clairvoyance.md) — 3rd-level Divination · conc
+- [Clone](clone.md) — 8th-level Necromancy
+- [Cloudkill](cloudkill.md) — 5th-level Conjuration · conc
+- [Color Spray](color-spray.md) — 1st-level Illusion
+- [Command](command.md) — 1st-level Enchantment
+- [Commune](commune.md) — 5th-level Divination
+- [Commune With Nature](commune-with-nature.md) — 5th-level Divination
+- [Comprehend Languages](comprehend-languages.md) — 1st-level Divination
+- [Compulsion](compulsion.md) — 4th-level Enchantment · conc
+- [Cone of Cold](cone-of-cold.md) — 5th-level Evocation
+- [Confusion](confusion.md) — 4th-level Enchantment · conc
+- [Conjure Animals](conjure-animals.md) — 3rd-level Conjuration · conc
+- [Conjure Celestial](conjure-celestial.md) — 7th-level Conjuration · conc
+- [Conjure Elemental](conjure-elemental.md) — 5th-level Conjuration · conc
+- [Conjure Fey](conjure-fey.md) — 6th-level Conjuration · conc
+- [Conjure Minor Elementals](conjure-minor-elementals.md) — 4th-level Conjuration · conc
+- [Conjure Woodland Beings](conjure-woodland-beings.md) — 4th-level Conjuration · conc
+- [Contact Other Plane](contact-other-plane.md) — 5th-level Divination
+- [Contagion](contagion.md) — 5th-level Necromancy
+- [Contingency](contingency.md) — 6th-level Evocation
+- [Continual Flame](continual-flame.md) — 2nd-level Evocation
+- [Control Water](control-water.md) — 4th-level Transmutation · conc
+- [Control Weather](control-weather.md) — 8th-level Transmutation · conc
+- [Counterspell](counterspell.md) — 3rd-level Abjuration
+- [Create Food and Water](create-food-and-water.md) — 3rd-level Conjuration
+- [Create Undead](create-undead.md) — 6th-level Necromancy
+- [Create or Destroy Water](create-or-destroy-water.md) — 1st-level Transmutation
+- [Creation](creation.md) — 5th-level Illusion
+- [Cure Wounds](cure-wounds.md) — 1st-level Evocation
+- [Dancing Lights](dancing-lights.md) — cantrip Evocation · conc
+- [Darkness](darkness.md) — 2nd-level Evocation · conc
+- [Darkvision](darkvision.md) — 2nd-level Transmutation
+- [Daylight](daylight.md) — 3rd-level Evocation
+- [Death Ward](death-ward.md) — 4th-level Abjuration
+- [Delayed Blast Fireball](delayed-blast-fireball.md) — 7th-level Evocation · conc
+- [Demiplane](demiplane.md) — 8th-level Conjuration
+- [Detect Evil and Good](detect-evil-and-good.md) — 1st-level Divination · conc
+- [Detect Magic](detect-magic.md) — 1st-level Divination · conc
+- [Detect Poison and Disease](detect-poison-and-disease.md) — 1st-level Divination · conc
+- [Detect Thoughts](detect-thoughts.md) — 2nd-level Divination · conc
+- [Dimension Door](dimension-door.md) — 4th-level Conjuration
+- [Disguise Self](disguise-self.md) — 1st-level Illusion
+- [Disintegrate](disintegrate.md) — 6th-level Transmutation
+- [Dispel Evil and Good](dispel-evil-and-good.md) — 5th-level Abjuration · conc
+- [Dispel Magic](dispel-magic.md) — 3rd-level Abjuration
+- [Divination](divination.md) — 4th-level Divination
+- [Divine Favor](divine-favor.md) — 1st-level Evocation · conc
+- [Divine Word](divine-word.md) — 7th-level Evocation
+- [Dominate Beast](dominate-beast.md) — 4th-level Enchantment · conc
+- [Dominate Monster](dominate-monster.md) — 8th-level Enchantment · conc
+- [Dominate Person](dominate-person.md) — 5th-level Enchantment · conc
+- [Dream](dream.md) — 5th-level Illusion
+- [Druidcraft](druidcraft.md) — cantrip Transmutation
+- [Earthquake](earthquake.md) — 8th-level Evocation · conc
+- [Eldritch Blast](eldritch-blast.md) — cantrip Evocation
+- [Enhance Ability](enhance-ability.md) — 2nd-level Transmutation · conc
+- [Enlarge/Reduce](enlarge-reduce.md) — 2nd-level Transmutation · conc
+- [Entangle](entangle.md) — 1st-level Conjuration · conc
+- [Enthrall](enthrall.md) — 2nd-level Enchantment
+- [Etherealness](etherealness.md) — 7th-level Transmutation
+- [Expeditious Retreat](expeditious-retreat.md) — 1st-level Transmutation · conc
+- [Eyebite](eyebite.md) — 6th-level Necromancy · conc
+- [Fabricate](fabricate.md) — 4th-level Transmutation
+- [Faerie Fire](faerie-fire.md) — 1st-level Evocation · conc
+- [Faithful Hound](faithful-hound.md) — 4th-level Conjuration
+- [False Life](false-life.md) — 1st-level Necromancy
+- [Fear](fear.md) — 3rd-level Illusion · conc
+- [Feather Fall](feather-fall.md) — 1st-level Transmutation
+- [Feeblemind](feeblemind.md) — 8th-level Enchantment
+- [Find Familiar](find-familiar.md) — 1st-level Conjuration
+- [Find Steed](find-steed.md) — 2nd-level Conjuration
+- [Find Traps](find-traps.md) — 2nd-level Divination
+- [Find the Path](find-the-path.md) — 6th-level Divination · conc
+- [Finger of Death](finger-of-death.md) — 7th-level Necromancy
+- [Fire Bolt](fire-bolt.md) — cantrip Evocation
+- [Fire Shield](fire-shield.md) — 4th-level Evocation
+- [Fire Storm](fire-storm.md) — 7th-level Evocation
+- [Fireball](fireball.md) — 3rd-level Evocation
+- [Flame Blade](flame-blade.md) — 2nd-level Evocation · conc
+- [Flame Strike](flame-strike.md) — 5th-level Evocation
+- [Flaming Sphere](flaming-sphere.md) — 2nd-level Conjuration · conc
+- [Flesh to Stone](flesh-to-stone.md) — 6th-level Transmutation · conc
+- [Floating Disk](floating-disk.md) — 1st-level Conjuration
+- [Fly](fly.md) — 3rd-level Transmutation · conc
+- [Fog Cloud](fog-cloud.md) — 1st-level Conjuration · conc
+- [Forbiddance](forbiddance.md) — 6th-level Abjuration
+- [Forcecage](forcecage.md) — 7th-level Evocation
+- [Foresight](foresight.md) — 9th-level Divination
+- [Freedom of Movement](freedom-of-movement.md) — 4th-level Abjuration
+- [Freezing Sphere](freezing-sphere.md) — 6th-level Evocation
+- [Gaseous Form](gaseous-form.md) — 3rd-level Transmutation · conc
+- [Gate](gate.md) — 9th-level Conjuration · conc
+- [Geas](geas.md) — 5th-level Enchantment
+- [Gentle Repose](gentle-repose.md) — 2nd-level Necromancy
+- [Giant Insect](giant-insect.md) — 4th-level Transmutation · conc
+- [Glibness](glibness.md) — 8th-level Transmutation
+- [Globe of Invulnerability](globe-of-invulnerability.md) — 6th-level Abjuration · conc
+- [Glyph of Warding](glyph-of-warding.md) — 3rd-level Abjuration
+- [Goodberry](goodberry.md) — 1st-level Transmutation
+- [Grease](grease.md) — 1st-level Conjuration
+- [Greater Invisibility](greater-invisibility.md) — 4th-level Illusion · conc
+- [Greater Restoration](greater-restoration.md) — 5th-level Abjuration
+- [Guardian of Faith](guardian-of-faith.md) — 4th-level Conjuration
+- [Guards and Wards](guards-and-wards.md) — 6th-level Abjuration
+- [Guidance](guidance.md) — cantrip Divination · conc
+- [Guiding Bolt](guiding-bolt.md) — 1st-level Evocation
+- [Gust of Wind](gust-of-wind.md) — 2nd-level Evocation · conc
+- [Hallow](hallow.md) — 5th-level Evocation
+- [Hallucinatory Terrain](hallucinatory-terrain.md) — 4th-level Illusion
+- [Harm](harm.md) — 6th-level Necromancy
+- [Haste](haste.md) — 3rd-level Transmutation · conc
+- [Heal](heal.md) — 6th-level Evocation
+- [Healing Word](healing-word.md) — 1st-level Evocation
+- [Heat Metal](heat-metal.md) — 2nd-level Transmutation · conc
+- [Hellish Rebuke](hellish-rebuke.md) — 1st-level Evocation
+- [Heroes' Feast](heroes-feast.md) — 6th-level Conjuration
+- [Heroism](heroism.md) — 1st-level Enchantment · conc
+- [Hideous Laughter](hideous-laughter.md) — 1st-level Enchantment · conc
+- [Hold Monster](hold-monster.md) — 5th-level Enchantment · conc
+- [Hold Person](hold-person.md) — 2nd-level Enchantment · conc
+- [Holy Aura](holy-aura.md) — 8th-level Abjuration · conc
+- [Hunter's Mark](hunters-mark.md) — 1st-level Divination · conc
+- [Hypnotic Pattern](hypnotic-pattern.md) — 3rd-level Illusion · conc
+- [Ice Storm](ice-storm.md) — 4th-level Evocation
+- [Identify](identify.md) — 1st-level Divination
+- [Illusory Script](illusory-script.md) — 1st-level Illusion
+- [Imprisonment](imprisonment.md) — 9th-level Abjuration
+- [Incendiary Cloud](incendiary-cloud.md) — 8th-level Conjuration · conc
+- [Inflict Wounds](inflict-wounds.md) — 1st-level Necromancy
+- [Insect Plague](insect-plague.md) — 5th-level Conjuration · conc
+- [Instant Summons](instant-summons.md) — 6th-level Conjuration
+- [Invisibility](invisibility.md) — 2nd-level Illusion · conc
+- [Irresistible Dance](irresistible-dance.md) — 6th-level Enchantment · conc
+- [Jump](jump.md) — 1st-level Transmutation
+- [Knock](knock.md) — 2nd-level Transmutation
+- [Legend Lore](legend-lore.md) — 5th-level Divination
+- [Lesser Restoration](lesser-restoration.md) — 2nd-level Abjuration
+- [Levitate](levitate.md) — 2nd-level Transmutation · conc
+- [Light](light.md) — cantrip Evocation
+- [Lightning Bolt](lightning-bolt.md) — 3rd-level Evocation
+- [Locate Animals or Plants](locate-animals-or-plants.md) — 2nd-level Divination
+- [Locate Creature](locate-creature.md) — 4th-level Divination · conc
+- [Locate Object](locate-object.md) — 2nd-level Divination · conc
+- [Longstrider](longstrider.md) — 1st-level Transmutation
+- [Mage Armor](mage-armor.md) — 1st-level Abjuration
+- [Mage Hand](mage-hand.md) — cantrip Conjuration
+- [Magic Circle](magic-circle.md) — 3rd-level Abjuration
+- [Magic Jar](magic-jar.md) — 6th-level Necromancy
+- [Magic Missile](magic-missile.md) — 1st-level Evocation
+- [Magic Mouth](magic-mouth.md) — 2nd-level Illusion
+- [Magic Weapon](magic-weapon.md) — 2nd-level Transmutation · conc
+- [Magnificent Mansion](magnificent-mansion.md) — 7th-level Conjuration
+- [Major Image](major-image.md) — 3rd-level Illusion · conc
+- [Mass Cure Wounds](mass-cure-wounds.md) — 5th-level Conjuration
+- [Mass Heal](mass-heal.md) — 9th-level Conjuration
+- [Mass Healing Word](mass-healing-word.md) — 3rd-level Evocation
+- [Mass Suggestion](mass-suggestion.md) — 6th-level Enchantment
+- [Maze](maze.md) — 8th-level Conjuration · conc
+- [Meld Into Stone](meld-into-stone.md) — 3rd-level Transmutation
+- [Mending](mending.md) — cantrip Transmutation
+- [Message](message.md) — cantrip Transmutation
+- [Meteor Swarm](meteor-swarm.md) — 9th-level Evocation
+- [Mind Blank](mind-blank.md) — 8th-level Abjuration
+- [Minor Illusion](minor-illusion.md) — cantrip Illusion
+- [Mirage Arcane](mirage-arcane.md) — 7th-level Illusion
+- [Mirror Image](mirror-image.md) — 2nd-level Illusion
+- [Mislead](mislead.md) — 5th-level Illusion · conc
+- [Misty Step](misty-step.md) — 2nd-level Conjuration
+- [Modify Memory](modify-memory.md) — 5th-level Enchantment · conc
+- [Moonbeam](moonbeam.md) — 2nd-level Evocation · conc
+- [Move Earth](move-earth.md) — 6th-level Transmutation · conc
+- [Nondetection](nondetection.md) — 3rd-level Abjuration
+- [Pass Without Trace](pass-without-trace.md) — 2nd-level Abjuration · conc
+- [Passwall](passwall.md) — 5th-level Transmutation
+- [Phantasmal Killer](phantasmal-killer.md) — 4th-level Illusion · conc
+- [Phantom Steed](phantom-steed.md) — 3rd-level Illusion
+- [Planar Ally](planar-ally.md) — 6th-level Conjuration
+- [Planar Binding](planar-binding.md) — 5th-level Abjuration
+- [Plane Shift](plane-shift.md) — 7th-level Conjuration
+- [Plant Growth](plant-growth.md) — 3rd-level Transmutation
+- [Poison Spray](poison-spray.md) — cantrip Conjuration
+- [Polymorph](polymorph.md) — 4th-level Transmutation · conc
+- [Power Word Kill](power-word-kill.md) — 9th-level Enchantment
+- [Power Word Stun](power-word-stun.md) — 8th-level Enchantment
+- [Prayer of Healing](prayer-of-healing.md) — 2nd-level Evocation
+- [Prestidigitation](prestidigitation.md) — cantrip Transmutation
+- [Prismatic Spray](prismatic-spray.md) — 7th-level Evocation
+- [Prismatic Wall](prismatic-wall.md) — 9th-level Abjuration
+- [Private Sanctum](private-sanctum.md) — 4th-level Abjuration
+- [Produce Flame](produce-flame.md) — cantrip Conjuration
+- [Programmed Illusion](programmed-illusion.md) — 6th-level Illusion
+- [Project Image](project-image.md) — 7th-level Illusion · conc
+- [Protection From Energy](protection-from-energy.md) — 3rd-level Abjuration · conc
+- [Protection from Evil and Good](protection-from-evil-and-good.md) — 1st-level Abjuration · conc
+- [Protection from Poison](protection-from-poison.md) — 2nd-level Abjuration
+- [Purify Food and Drink](purify-food-and-drink.md) — 1st-level Transmutation
+- [Raise Dead](raise-dead.md) — 5th-level Necromancy
+- [Ray of Enfeeblement](ray-of-enfeeblement.md) — 2nd-level Necromancy · conc
+- [Ray of Frost](ray-of-frost.md) — cantrip Evocation
+- [Regenerate](regenerate.md) — 7th-level Transmutation
+- [Reincarnate](reincarnate.md) — 5th-level Transmutation
+- [Remove Curse](remove-curse.md) — 3rd-level Abjuration
+- [Resilient Sphere](resilient-sphere.md) — 4th-level Evocation · conc
+- [Resistance](resistance.md) — cantrip Abjuration · conc
+- [Resurrection](resurrection.md) — 7th-level Necromancy
+- [Reverse Gravity](reverse-gravity.md) — 7th-level Transmutation · conc
+- [Revivify](revivify.md) — 3rd-level Conjuration
+- [Rope Trick](rope-trick.md) — 2nd-level Transmutation
+- [Sacred Flame](sacred-flame.md) — cantrip Evocation
+- [Sanctuary](sanctuary.md) — 1st-level Abjuration
+- [Scorching Ray](scorching-ray.md) — 2nd-level Evocation
+- [Scrying](scrying.md) — 5th-level Divination · conc
+- [Secret Chest](secret-chest.md) — 4th-level Conjuration
+- [See Invisibility](see-invisibility.md) — 2nd-level Divination
+- [Seeming](seeming.md) — 5th-level Illusion
+- [Sending](sending.md) — 3rd-level Evocation
+- [Sequester](sequester.md) — 7th-level Transmutation
+- [Shapechange](shapechange.md) — 9th-level Transmutation · conc
+- [Shatter](shatter.md) — 2nd-level Evocation
+- [Shield](shield.md) — 1st-level Abjuration
+- [Shield of Faith](shield-of-faith.md) — 1st-level Abjuration · conc
+- [Shillelagh](shillelagh.md) — cantrip Transmutation
+- [Shocking Grasp](shocking-grasp.md) — cantrip Evocation
+- [Silence](silence.md) — 2nd-level Illusion · conc
+- [Silent Image](silent-image.md) — 1st-level Illusion · conc
+- [Simulacrum](simulacrum.md) — 7th-level Illusion
+- [Sleep](sleep.md) — 1st-level Enchantment
+- [Sleet Storm](sleet-storm.md) — 3rd-level Conjuration · conc
+- [Slow](slow.md) — 3rd-level Transmutation · conc
+- [Spare the Dying](spare-the-dying.md) — cantrip Necromancy
+- [Speak with Animals](speak-with-animals.md) — 1st-level Divination
+- [Speak with Dead](speak-with-dead.md) — 3rd-level Necromancy
+- [Speak with Plants](speak-with-plants.md) — 3rd-level Transmutation
+- [Spider Climb](spider-climb.md) — 2nd-level Transmutation · conc
+- [Spike Growth](spike-growth.md) — 2nd-level Transmutation · conc
+- [Spirit Guardians](spirit-guardians.md) — 3rd-level Conjuration · conc
+- [Spiritual Weapon](spiritual-weapon.md) — 2nd-level Evocation
+- [Stinking Cloud](stinking-cloud.md) — 3rd-level Conjuration · conc
+- [Stone Shape](stone-shape.md) — 4th-level Transmutation
+- [Stoneskin](stoneskin.md) — 4th-level Abjuration · conc
+- [Storm of Vengeance](storm-of-vengeance.md) — 9th-level Conjuration · conc
+- [Suggestion](suggestion.md) — 2nd-level Enchantment · conc
+- [Sunbeam](sunbeam.md) — 6th-level Evocation · conc
+- [Sunburst](sunburst.md) — 8th-level Evocation
+- [Symbol](symbol.md) — 7th-level Abjuration
+- [Telekinesis](telekinesis.md) — 5th-level Transmutation · conc
+- [Telepathic Bond](telepathic-bond.md) — 5th-level Divination
+- [Teleport](teleport.md) — 7th-level Conjuration
+- [Teleportation Circle](teleportation-circle.md) — 5th-level Conjuration
+- [Thaumaturgy](thaumaturgy.md) — cantrip Transmutation
+- [Thunderwave](thunderwave.md) — 1st-level Evocation
+- [Time Stop](time-stop.md) — 9th-level Transmutation
+- [Tiny Hut](tiny-hut.md) — 3rd-level Evocation
+- [Tongues](tongues.md) — 3rd-level Divination
+- [Transport via Plants](transport-via-plants.md) — 6th-level Conjuration
+- [Tree Stride](tree-stride.md) — 5th-level Conjuration · conc
+- [True Polymorph](true-polymorph.md) — 9th-level Transmutation · conc
+- [True Resurrection](true-resurrection.md) — 9th-level Necromancy
+- [True Seeing](true-seeing.md) — 6th-level Divination
+- [True Strike](true-strike.md) — cantrip Divination · conc
+- [Unseen Servant](unseen-servant.md) — 1st-level Conjuration
+- [Vampiric Touch](vampiric-touch.md) — 3rd-level Necromancy · conc
+- [Vicious Mockery](vicious-mockery.md) — cantrip Enchantment
+- [Wall of Fire](wall-of-fire.md) — 4th-level Evocation · conc
+- [Wall of Force](wall-of-force.md) — 5th-level Evocation · conc
+- [Wall of Ice](wall-of-ice.md) — 6th-level Evocation · conc
+- [Wall of Stone](wall-of-stone.md) — 5th-level Evocation · conc
+- [Wall of Thorns](wall-of-thorns.md) — 6th-level Conjuration · conc
+- [Warding Bond](warding-bond.md) — 2nd-level Abjuration
+- [Water Breathing](water-breathing.md) — 3rd-level Transmutation
+- [Water Walk](water-walk.md) — 3rd-level Transmutation
+- [Web](web.md) — 2nd-level Conjuration · conc
+- [Weird](weird.md) — 9th-level Illusion · conc
+- [Wind Walk](wind-walk.md) — 6th-level Transmutation
+- [Wind Wall](wind-wall.md) — 3rd-level Evocation · conc
+- [Wish](wish.md) — 9th-level Conjuration
+- [Word of Recall](word-of-recall.md) — 6th-level Conjuration
+- [Zone of Truth](zone-of-truth.md) — 2nd-level Enchantment

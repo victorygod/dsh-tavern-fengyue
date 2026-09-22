@@ -1,0 +1,31 @@
+{
+  "name": "dsh-tavern-fengyue-vendor-ui-renderer",
+  "description": "Source snapshot of @deepseek-ai/dsh-client-ui-renderer for the test loop only: the published tarball ships no node-importable client plane, so ui tests resolve renderer sources through tsconfig paths into this copy (provenance = deepseek-harness tavern-extraction-2026-09-17 / 078257c). Not published, not loaded by any host composition.",
+  "version": "0.1.0-rc.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./invariant": "./src/invariant.ts",
+    "./client": "./src/client/index.tsx",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-invariants": ">=0.1.5-rc.1 <0.2",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "@types/use-sync-external-store": "^1.5.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "use-sync-external-store": "1.2.0"
+  }
+}

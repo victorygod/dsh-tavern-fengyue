@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-16-tavern-dynamic-post-injection.md
+2026-09-16-tavern-dynamic-post-injection.md: 86729ba01482d6742f90d98e89d4570ef20c8e67
+2026-09-16-tavern-dynamic-post-injection.zh.md: 4ec6067f835f81ec8814eded5cbca9afaa1813c4

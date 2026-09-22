@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>边境小镇·开局</title>
+<style>
+  :root { color-scheme: light; }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(1100px 520px at 78% -10%, rgba(214, 168, 106, 0.22), transparent 55%),
+      radial-gradient(800px 420px at 6% 110%, rgba(160, 112, 44, 0.12), transparent 60%),
+      linear-gradient(165deg, #f7f1e2 0%, #f2ebd8 55%, #ede3cc 100%);
+    color: #3f3628;
+    font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+    overflow-y: auto;
+    padding: 34px 24px 46px;
+  }
+  .page { max-width: 680px; margin: 0 auto; }
+  .title { font-size: 28px; letter-spacing: 0.35em; text-indent: 0.35em; color: #8a5f22; text-align: center; }
+  .sub { text-align: center; font-size: 12px; letter-spacing: 0.5em; text-indent: 0.5em; color: #9b8a68; margin-top: 4px; }
+  .rule { height: 1px; margin: 20px 0; background: linear-gradient(90deg, transparent, #c2a468, transparent); }
+  .prose { font-size: 16px; line-height: 2.0; text-align: justify; color: #433a28; }
+  .prose::first-letter { font-size: 180%; color: #8a5f22; }
+  .block { border: 1px solid #d9c9a4; border-radius: 8px; background: rgba(255, 253, 244, 0.65); padding: 16px 18px 14px; margin-top: 16px; }
+  .bt { font-size: 13px; letter-spacing: 0.3em; text-indent: 0.3em; color: #8a5f22; margin-bottom: 10px; }
+  .sec-label { font-size: 11px; letter-spacing: 0.18em; color: #9b8a68; margin: 10px 0 6px; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 12px; color: #7d6c4e; margin-bottom: 4px; letter-spacing: 0.12em; }
+  .field .req { color: #b05548; }
+  .field input, .field textarea {
+    width: 100%; font: inherit; font-size: 14.5px; color: #3f3628;
+    background: rgba(255, 255, 255, 0.75); border: 1px solid #d9c9a4; border-radius: 5px;
+    padding: 8px 10px; outline: none;
+  }
+  .field textarea { resize: vertical; line-height: 1.75; }
+  .field input:focus, .field textarea:focus { border-color: #8a5f22; box-shadow: 0 0 0 2px rgba(138, 95, 34, 0.12); }
+  .card { border: 1px solid #e2d5b4; border-radius: 6px; background: rgba(255, 253, 244, 0.55); padding: 10px 12px 8px; margin: 8px 0; }
+  .card.hero { background: rgba(255, 248, 230, 0.75); border-color: #c2a468; }
+  .card .del { float: right; }
+  .empty { font-size: 12px; color: #9b8a68; padding: 4px 0; }
+  .btnrow { margin-top: 10px; }
+  .ghost, .solid {
+    font: inherit; font-size: 14px; letter-spacing: 0.18em; text-indent: 0.18em;
+    border-radius: 4px; padding: 9px 22px; cursor: pointer;
+  }
+  .ghost { color: #6b5a38; background: rgba(255, 255, 255, 0.55); border: 1px solid #c2a468; }
+  .ghost:hover { color: #4a3a1e; border-color: #8a5f22; }
+  .solid { color: #4a3a1e; background: linear-gradient(180deg, #f2e5c4, #e8d7a8); border: 1px solid #c2a468; box-shadow: 0 2px 10px rgba(122, 94, 48, 0.18); }
+  .solid:hover { border-color: #8a5f22; color: #6b4a14; }
+  .del { font: inherit; font-size: 12px; letter-spacing: 0.12em; color: #b05548; background: transparent; border: 1px solid #e0b6ae; border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+  .del:hover { border-color: #b05548; background: rgba(176, 85, 72, 0.06); }
+  .note { font-size: 12.5px; color: #8d7c60; line-height: 1.9; border-left: 2px solid #c2a468; padding-left: 12px; margin-top: 12px; }
+  .hint { margin-top: 12px; text-align: center; font-size: 12px; color: #9b8a68; min-height: 1.3em; }
+  .hint.ok { color: #4d7c43; }
+  .hint.err { color: #b05548; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="title">边境小镇</div>
+    <div class="sub">D&amp;D 5e · 单人冒险</div>
+    <div class="rule"></div>
+    <p class="prose">黄昏薄雾漫过石板路,酒馆的灯火在前方摇晃。镇外山林静静起伏,近来猎户们不敢夜行,镇政厅的悬赏榜前总围着人。有人在低声议论山里的异动,也有人只想在炉火边买一份安静。这个小镇藏着它的故事——先告诉我们,你是谁。</p>
+
+    <div class="block">
+      <div class="bt">人 物</div>
+      <div class="sec-label">主角</div>
+      <div id="protagonist"></div>
+      <div class="sec-label">其他角色</div>
+      <div id="characters"></div>
+      <div class="btnrow"><button type="button" class="ghost" data-act="add-character">＋ 新建角色</button></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">地 点</div>
+      <div id="locations"></div>
+      <div class="btnrow"><button type="button" class="ghost" data-act="add-location">＋ 新建地点</button></div>
+    </div>
+
+    <div class="block">
+      <div class="bt">开 场 白</div>
+      <div id="openings"></div>
+      <div class="btnrow"><button type="button" class="ghost" data-act="add-opening">＋ 新建开场白</button></div>
+      <div class="note">
+        设定保存在世界档案里,状态摘要与人物册每回合都在地下城主眼前——<b>开场白不必复述它们</b>。
+        写几条不同的开场,挑一条「以此开场」;改动即自动保存,无需按钮。
+      </div>
+    </div>
+
+    <div class="hint" id="status"></div>
+  </div>
+
+  <script>
+    (function () {
+      var state = { player: { name: '', description: '', body: '' }, characters: [], locations: [], openings: [] }
+      var seq = 0
+      function nid() { return 'e' + (++seq) }
+      function post(m) { window.parent.postMessage(m, '*') }
+      function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] }) }
+      function setStatus(text, cls) { var el = document.getElementById('status'); el.textContent = text || ''; el.className = 'hint' + (cls ? ' ' + cls : '') }
+
+      function persist() {
+        post({
+          t: 'opening-persist',
+          state: {
+            player: { name: state.player.name, description: state.player.description, body: state.player.body },
+            characters: state.characters.map(function (c) { return { name: c.name, description: c.description, body: c.body } }),
+            locations: state.locations.map(function (l) { return { name: l.name, description: l.description, body: l.body } }),
+            openings: state.openings.map(function (o) { return o.text })
+          }
+        })
+      }
+
+      function fieldsHTML(p, kind) {
+        var detailPlaceholder = kind === 'hero' ? '选填（属性/技能/背包等数值）' : '选填（背景细节）'
+        return '<div class="field"><label>名字<span class="req">*</span></label><input data-field="name" maxlength="40" value="' + esc(p.name) + '" placeholder="姓名"></div>' +
+          '<div class="field"><label>描述<span class="req">*</span></label><input data-field="description" maxlength="120" value="' + esc(p.description) + '" placeholder="一句话身份/关系"></div>' +
+          '<div class="field"><label>详细设定</label><textarea data-field="body" rows="4" placeholder="' + detailPlaceholder + '">' + esc(p.body) + '</textarea></div>'
+      }
+      function heroHTML(p) {
+        return '<div class="card hero" data-id="hero">' + fieldsHTML(p, 'hero') + '</div>'
+      }
+      function charHTML(c) {
+        return '<div class="card" data-id="' + c._id + '">' +
+          '<button type="button" class="del" data-act="del" data-kind="character">删除</button>' + fieldsHTML(c, 'char') + '</div>'
+      }
+      function locHTML(l) {
+        return '<div class="card" data-id="' + l._id + '">' +
+          '<button type="button" class="del" data-act="del" data-kind="location">删除</button>' + fieldsHTML(l, 'loc') + '</div>'
+      }
+      function openingHTML(o) {
+        return '<div class="card" data-id="' + o._id + '">' +
+          '<div class="field"><textarea data-field="text" rows="3" placeholder="写一条开场白…">' + esc(o.text) + '</textarea></div>' +
+          '<div class="btnrow"><button type="button" class="solid" data-act="send" data-kind="opening">以此开场</button> <button type="button" class="ghost del" data-act="del" data-kind="opening">删除</button></div></div>'
+      }
+
+      function render() {
+        document.getElementById('protagonist').innerHTML = heroHTML(state.player)
+        document.getElementById('characters').innerHTML = state.characters.map(charHTML).join('') || '<div class="empty">（暂无其他角色）</div>'
+        document.getElementById('locations').innerHTML = state.locations.map(locHTML).join('') || '<div class="empty">（暂无地点）</div>'
+        document.getElementById('openings').innerHTML = state.openings.map(openingHTML).join('') || '<div class="empty">（暂无开场白，写一条吧）</div>'
+      }
+
+      function findEntity(id) {
+        if (id === 'hero') return state.player
+        var i
+        for (i = 0; i < state.characters.length; i++) if (state.characters[i]._id === id) return state.characters[i]
+        for (i = 0; i < state.locations.length; i++) if (state.locations[i]._id === id) return state.locations[i]
+        for (i = 0; i < state.openings.length; i++) if (state.openings[i]._id === id) return state.openings[i]
+        return null
+      }
+
+      document.addEventListener('input', function (e) {
+        var t = e.target
+        if (!t || !t.hasAttribute || !t.hasAttribute('data-field')) return
+        var card = t.closest ? t.closest('[data-id]') : null
+        if (!card) return
+        var ent = findEntity(card.getAttribute('data-id'))
+        if (!ent) return
+        ent[t.getAttribute('data-field')] = t.value
+      })
+
+      document.addEventListener('focusout', function (e) {
+        var t = e.target
+        if (!t || !t.hasAttribute || !t.hasAttribute('data-field')) return
+        persist()
+        setStatus('已自动保存', 'ok')
+      })
+
+      document.addEventListener('click', function (e) {
+        var t = e.target
+        if (!t || !t.hasAttribute || !t.hasAttribute('data-act')) return
+        var act = t.getAttribute('data-act')
+        if (act === 'add-character') { state.characters.push({ _id: nid(), name: '', description: '', body: '' }); render(); persist(); focusLast('#characters') }
+        else if (act === 'add-location') { state.locations.push({ _id: nid(), name: '', description: '', body: '' }); render(); persist(); focusLast('#locations') }
+        else if (act === 'add-opening') { state.openings.push({ _id: nid(), text: '' }); render(); persist(); focusLast('#openings') }
+        else if (act === 'del') {
+          var kind = t.getAttribute('data-kind')
+          var card = t.closest ? t.closest('[data-id]') : null
+          var id = card ? card.getAttribute('data-id') : null
+          if (id === null) return
+          if (kind === 'character') state.characters = state.characters.filter(function (c) { return c._id !== id })
+          else if (kind === 'location') state.locations = state.locations.filter(function (l) { return l._id !== id })
+          else if (kind === 'opening') state.openings = state.openings.filter(function (o) { return o._id !== id })
+          render(); persist(); setStatus('已删除', 'ok')
+        }
+        else if (act === 'send') {
+          var ocard = t.closest ? t.closest('[data-id]') : null
+          var oid = ocard ? ocard.getAttribute('data-id') : null
+          var ent = oid ? findEntity(oid) : null
+          var text = ent ? String(ent.text || '').trim() : ''
+          if (text === '') { setStatus('这条开场白是空的', 'err'); return }
+          post({ t: 'tavern-insert', text: text })
+          setStatus('开场白已写入输入框——确认口吻后，亲手发送', 'ok')
+        }
+      })
+
+      function focusLast(sel) {
+        var wrap = document.querySelector(sel)
+        if (!wrap) return
+        var inputs = wrap.querySelectorAll('.card:last-child input, .card:last-child textarea')
+        if (inputs.length > 0) inputs[0].focus()
+      }
+
+      // 加载后向父页请求预填数据;父页桥未就绪时重试几轮,拿不到就渲染空态。
+      function ask() { post({ t: 'opening-init' }) }
+      ask()
+      var tries = 0
+      var timer = setInterval(function () {
+        tries += 1
+        if (tries >= 6) clearInterval(timer)
+        else ask()
+      }, 400)
+
+      window.addEventListener('message', function (event) {
+        var d = event.data
+        if (d === undefined || d === null) return
+        if (d.t === 'opening-init-data') {
+          clearInterval(timer)
+          if (d.ok === true && d.data) {
+            state.player = d.data.player || { name: '', description: '', body: '' }
+            state.characters = (d.data.characters || []).map(function (c) { return { _id: nid(), name: c.name || '', description: c.description || '', body: c.body || '' } })
+            state.locations = (d.data.locations || []).map(function (l) { return { _id: nid(), name: l.name || '', description: l.description || '', body: l.body || '' } })
+            state.openings = (d.data.openings || []).map(function (text) { return { _id: nid(), text: text || '' } })
+          }
+          render()
+        } else if (d.t === 'opening-persist-ack') {
+          if (d.ok === true) setStatus('已保存' + (d.detail ? '：' + d.detail : ''), 'ok')
+          else setStatus('保存失败：' + (d.detail || ''), 'err')
+        }
+      })
+    })()
+  </script>
+</body>
+</html>

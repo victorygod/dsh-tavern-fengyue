@@ -1,0 +1,239 @@
+# equipment — 237 entries
+
+- [Club](club.md) — 1d4
+- [Dagger](dagger.md) — 1d4
+- [Greatclub](greatclub.md) — 1d8
+- [Handaxe](handaxe.md) — 1d6
+- [Javelin](javelin.md) — 1d6
+- [Light hammer](light-hammer.md) — 1d4
+- [Mace](mace.md) — 1d6
+- [Quarterstaff](quarterstaff.md) — 1d6
+- [Sickle](sickle.md) — 1d4
+- [Spear](spear.md) — 1d6
+- [Crossbow, light](crossbow-light.md) — 1d8
+- [Dart](dart.md) — 1d4
+- [Shortbow](shortbow.md) — 1d6
+- [Sling](sling.md) — 1d4
+- [Battleaxe](battleaxe.md) — 1d8
+- [Flail](flail.md) — 1d8
+- [Glaive](glaive.md) — 1d10
+- [Greataxe](greataxe.md) — 1d12
+- [Greatsword](greatsword.md) — 2d6
+- [Halberd](halberd.md) — 1d10
+- [Lance](lance.md) — 1d12
+- [Longsword](longsword.md) — 1d8
+- [Maul](maul.md) — 2d6
+- [Morningstar](morningstar.md) — 1d8
+- [Pike](pike.md) — 1d10
+- [Rapier](rapier.md) — 1d8
+- [Scimitar](scimitar.md) — 1d6
+- [Shortsword](shortsword.md) — 1d6
+- [Trident](trident.md) — 1d6
+- [War pick](war-pick.md) — 1d8
+- [Warhammer](warhammer.md) — 1d8
+- [Whip](whip.md) — 1d4
+- [Blowgun](blowgun.md) — 1
+- [Crossbow, hand](crossbow-hand.md) — 1d6
+- [Crossbow, heavy](crossbow-heavy.md) — 1d10
+- [Longbow](longbow.md) — 1d8
+- [Net](net.md) — Weapon
+- [Padded Armor](padded-armor.md) — AC 11
+- [Leather Armor](leather-armor.md) — AC 11
+- [Studded Leather Armor](studded-leather-armor.md) — AC 12
+- [Hide Armor](hide-armor.md) — AC 12
+- [Chain Shirt](chain-shirt.md) — AC 13
+- [Scale Mail](scale-mail.md) — AC 14
+- [Breastplate](breastplate.md) — AC 14
+- [Half Plate Armor](half-plate-armor.md) — AC 15
+- [Ring Mail](ring-mail.md) — AC 14
+- [Chain Mail](chain-mail.md) — AC 16
+- [Splint Armor](splint-armor.md) — AC 17
+- [Plate Armor](plate-armor.md) — AC 18
+- [Shield](shield.md) — AC 2
+- [Abacus](abacus.md) — Adventuring Gear
+- [Acid (vial)](acid-vial.md) — Adventuring Gear
+- [Alchemist's fire (flask)](alchemists-fire-flask.md) — Adventuring Gear
+- [Alms box](alms-box.md) — Adventuring Gear
+- [Arrow](arrow.md) — Adventuring Gear
+- [Block of incense](block-of-incense.md) — Adventuring Gear
+- [Blowgun needle](blowgun-needle.md) — Adventuring Gear
+- [Censer](censer.md) — Adventuring Gear
+- [Crossbow bolt](crossbow-bolt.md) — Adventuring Gear
+- [Sling bullet](sling-bullet.md) — Adventuring Gear
+- [Amulet](amulet.md) — Adventuring Gear
+- [Antitoxin (vial)](antitoxin-vial.md) — Adventuring Gear
+- [Crystal](crystal.md) — Adventuring Gear
+- [Orb](orb.md) — Adventuring Gear
+- [Rod](rod.md) — Adventuring Gear
+- [Staff](staff.md) — Adventuring Gear
+- [Wand](wand.md) — Adventuring Gear
+- [Backpack](backpack.md) — Adventuring Gear
+- [Ball bearings (bag of 1,000)](ball-bearings-bag-of-1000.md) — Adventuring Gear
+- [Barrel](barrel.md) — Adventuring Gear
+- [Basket](basket.md) — Adventuring Gear
+- [Bedroll](bedroll.md) — Adventuring Gear
+- [Bell](bell.md) — Adventuring Gear
+- [Blanket](blanket.md) — Adventuring Gear
+- [Block and tackle](block-and-tackle.md) — Adventuring Gear
+- [Book](book.md) — Adventuring Gear
+- [Bottle, glass](bottle-glass.md) — Adventuring Gear
+- [Bucket](bucket.md) — Adventuring Gear
+- [Caltrops](caltrops.md) — Adventuring Gear
+- [Candle](candle.md) — Adventuring Gear
+- [Case, crossbow bolt](case-crossbow-bolt.md) — Adventuring Gear
+- [Case, map or scroll](case-map-or-scroll.md) — Adventuring Gear
+- [Chain (10 feet)](chain-10-feet.md) — Adventuring Gear
+- [Chalk (1 piece)](chalk-1-piece.md) — Adventuring Gear
+- [Chest](chest.md) — Adventuring Gear
+- [Clothes, common](clothes-common.md) — Adventuring Gear
+- [Clothes, costume](clothes-costume.md) — Adventuring Gear
+- [Clothes, fine](clothes-fine.md) — Adventuring Gear
+- [Clothes, traveler's](clothes-travelers.md) — Adventuring Gear
+- [Component pouch](component-pouch.md) — Adventuring Gear
+- [Crowbar](crowbar.md) — Adventuring Gear
+- [Sprig of mistletoe](sprig-of-mistletoe.md) — Adventuring Gear
+- [Totem](totem.md) — Adventuring Gear
+- [Wooden staff](wooden-staff.md) — Adventuring Gear
+- [Yew wand](yew-wand.md) — Adventuring Gear
+- [Emblem](emblem.md) — Adventuring Gear
+- [Fishing tackle](fishing-tackle.md) — Adventuring Gear
+- [Flask or tankard](flask-or-tankard.md) — Adventuring Gear
+- [Grappling hook](grappling-hook.md) — Adventuring Gear
+- [Hammer](hammer.md) — Adventuring Gear
+- [Hammer, sledge](hammer-sledge.md) — Adventuring Gear
+- [Holy water (flask)](holy-water-flask.md) — Adventuring Gear
+- [Hourglass](hourglass.md) — Adventuring Gear
+- [Hunting trap](hunting-trap.md) — Adventuring Gear
+- [Ink (1 ounce bottle)](ink-1-ounce-bottle.md) — Adventuring Gear
+- [Ink pen](ink-pen.md) — Adventuring Gear
+- [Jug or pitcher](jug-or-pitcher.md) — Adventuring Gear
+- [Climber's Kit](climbers-kit.md) — Adventuring Gear
+- [Disguise Kit](disguise-kit.md) — Adventuring Gear
+- [Forgery Kit](forgery-kit.md) — Adventuring Gear
+- [Herbalism Kit](herbalism-kit.md) — Adventuring Gear
+- [Healer's Kit](healers-kit.md) — Adventuring Gear
+- [Mess Kit](mess-kit.md) — Adventuring Gear
+- [Poisoner's Kit](poisoners-kit.md) — Adventuring Gear
+- [Ladder (10-foot)](ladder-10-foot.md) — Adventuring Gear
+- [Lamp](lamp.md) — Adventuring Gear
+- [Lantern, bullseye](lantern-bullseye.md) — Adventuring Gear
+- [Lantern, hooded](lantern-hooded.md) — Adventuring Gear
+- [Little bag of sand](little-bag-of-sand.md) — Adventuring Gear
+- [Lock](lock.md) — Adventuring Gear
+- [Magnifying glass](magnifying-glass.md) — Adventuring Gear
+- [Manacles](manacles.md) — Adventuring Gear
+- [Mirror, steel](mirror-steel.md) — Adventuring Gear
+- [Oil (flask)](oil-flask.md) — Adventuring Gear
+- [Paper (one sheet)](paper-one-sheet.md) — Adventuring Gear
+- [Parchment (one sheet)](parchment-one-sheet.md) — Adventuring Gear
+- [Perfume (vial)](perfume-vial.md) — Adventuring Gear
+- [Pick, miner's](pick-miners.md) — Adventuring Gear
+- [Piton](piton.md) — Adventuring Gear
+- [Poison, basic (vial)](poison-basic-vial.md) — Adventuring Gear
+- [Pole (10-foot)](pole-10-foot.md) — Adventuring Gear
+- [Pot, iron](pot-iron.md) — Adventuring Gear
+- [Pouch](pouch.md) — Adventuring Gear
+- [Quiver](quiver.md) — Adventuring Gear
+- [Ram, portable](ram-portable.md) — Adventuring Gear
+- [Rations (1 day)](rations-1-day.md) — Adventuring Gear
+- [Reliquary](reliquary.md) — Adventuring Gear
+- [Robes](robes.md) — Adventuring Gear
+- [Rope, hempen (50 feet)](rope-hempen-50-feet.md) — Adventuring Gear
+- [Rope, silk (50 feet)](rope-silk-50-feet.md) — Adventuring Gear
+- [Sack](sack.md) — Adventuring Gear
+- [Scale, merchant's](scale-merchants.md) — Adventuring Gear
+- [Sealing wax](sealing-wax.md) — Adventuring Gear
+- [Shovel](shovel.md) — Adventuring Gear
+- [Signal whistle](signal-whistle.md) — Adventuring Gear
+- [Signet ring](signet-ring.md) — Adventuring Gear
+- [Small knife](small-knife.md) — Adventuring Gear
+- [Soap](soap.md) — Adventuring Gear
+- [Spellbook](spellbook.md) — Adventuring Gear
+- [Spike, iron](spike-iron.md) — Adventuring Gear
+- [Spyglass](spyglass.md) — Adventuring Gear
+- [String (10 feet)](string-10-feet.md) — Adventuring Gear
+- [Tent, two-person](tent-two-person.md) — Adventuring Gear
+- [Tinderbox](tinderbox.md) — Adventuring Gear
+- [Torch](torch.md) — Adventuring Gear
+- [Vestments](vestments.md) — Adventuring Gear
+- [Vial](vial.md) — Adventuring Gear
+- [Waterskin](waterskin.md) — Adventuring Gear
+- [Whetstone](whetstone.md) — Adventuring Gear
+- [Burglar's Pack](burglars-pack.md) — Adventuring Gear
+- [Diplomat's Pack](diplomats-pack.md) — Adventuring Gear
+- [Dungeoneer's Pack](dungeoneers-pack.md) — Adventuring Gear
+- [Entertainer's Pack](entertainers-pack.md) — Adventuring Gear
+- [Explorer's Pack](explorers-pack.md) — Adventuring Gear
+- [Priest's Pack](priests-pack.md) — Adventuring Gear
+- [Scholar's Pack](scholars-pack.md) — Adventuring Gear
+- [Alchemist's Supplies](alchemists-supplies.md) — Tools
+- [Brewer's Supplies](brewers-supplies.md) — Tools
+- [Calligrapher's Supplies](calligraphers-supplies.md) — Tools
+- [Carpenter's Tools](carpenters-tools.md) — Tools
+- [Cartographer's Tools](cartographers-tools.md) — Tools
+- [Cobbler's Tools](cobblers-tools.md) — Tools
+- [Cook's utensils](cooks-utensils.md) — Tools
+- [Glassblower's Tools](glassblowers-tools.md) — Tools
+- [Jeweler's Tools](jewelers-tools.md) — Tools
+- [Leatherworker's Tools](leatherworkers-tools.md) — Tools
+- [Mason's Tools](masons-tools.md) — Tools
+- [Painter's Supplies](painters-supplies.md) — Tools
+- [Potter's Tools](potters-tools.md) — Tools
+- [Smith's Tools](smiths-tools.md) — Tools
+- [Tinker's Tools](tinkers-tools.md) — Tools
+- [Weaver's Tools](weavers-tools.md) — Tools
+- [Woodcarver's Tools](woodcarvers-tools.md) — Tools
+- [Dice Set](dice-set.md) — Tools
+- [Playing Card Set](playing-card-set.md) — Tools
+- [Bagpipes](bagpipes.md) — Tools
+- [Drum](drum.md) — Tools
+- [Dulcimer](dulcimer.md) — Tools
+- [Flute](flute.md) — Tools
+- [Lute](lute.md) — Tools
+- [Lyre](lyre.md) — Tools
+- [Horn](horn.md) — Tools
+- [Pan flute](pan-flute.md) — Tools
+- [Shawm](shawm.md) — Tools
+- [Viol](viol.md) — Tools
+- [Navigator's Tools](navigators-tools.md) — Tools
+- [Thieves' Tools](thieves-tools.md) — Tools
+- [Camel](camel.md) — Mounts and Vehicles
+- [Donkey](donkey.md) — Mounts and Vehicles
+- [Mule](mule.md) — Mounts and Vehicles
+- [Elephant](elephant.md) — Mounts and Vehicles
+- [Horse, draft](horse-draft.md) — Mounts and Vehicles
+- [Horse, riding](horse-riding.md) — Mounts and Vehicles
+- [Mastiff](mastiff.md) — Mounts and Vehicles
+- [Pony](pony.md) — Mounts and Vehicles
+- [Warhorse](warhorse.md) — Mounts and Vehicles
+- [Barding: Padded](barding-padded.md) — Mounts and Vehicles
+- [Barding: Leather](barding-leather.md) — Mounts and Vehicles
+- [Barding: Studded Leather](barding-studded-leather.md) — Mounts and Vehicles
+- [Barding: Hide](barding-hide.md) — Mounts and Vehicles
+- [Barding: Chain shirt](barding-chain-shirt.md) — Mounts and Vehicles
+- [Barding: Scale mail](barding-scale-mail.md) — Mounts and Vehicles
+- [Barding: Breastplate](barding-breastplate.md) — Mounts and Vehicles
+- [Barding: Half plate](barding-half-plate.md) — Mounts and Vehicles
+- [Barding: Ring mail](barding-ring-mail.md) — Mounts and Vehicles
+- [Barding: Chain mail](barding-chain-mail.md) — Mounts and Vehicles
+- [Barding: Splint](barding-splint.md) — Mounts and Vehicles
+- [Barding: Plate](barding-plate.md) — Mounts and Vehicles
+- [Bit and bridle](bit-and-bridle.md) — Mounts and Vehicles
+- [Carriage](carriage.md) — Mounts and Vehicles
+- [Cart](cart.md) — Mounts and Vehicles
+- [Chariot](chariot.md) — Mounts and Vehicles
+- [Animal Feed (1 day)](animal-feed-1-day.md) — Mounts and Vehicles
+- [Saddle, Exotic](saddle-exotic.md) — Mounts and Vehicles
+- [Saddle, Military](saddle-military.md) — Mounts and Vehicles
+- [Saddle, Pack](saddle-pack.md) — Mounts and Vehicles
+- [Saddle, Riding](saddle-riding.md) — Mounts and Vehicles
+- [Saddlebags](saddlebags.md) — Mounts and Vehicles
+- [Sled](sled.md) — Mounts and Vehicles
+- [Stabling (1 day)](stabling-1-day.md) — Mounts and Vehicles
+- [Wagon](wagon.md) — Mounts and Vehicles
+- [Galley](galley.md) — Mounts and Vehicles
+- [Keelboat](keelboat.md) — Mounts and Vehicles
+- [Longship](longship.md) — Mounts and Vehicles
+- [Rowboat](rowboat.md) — Mounts and Vehicles
+- [Sailing ship](sailing-ship.md) — Mounts and Vehicles
+- [Warship](warship.md) — Mounts and Vehicles

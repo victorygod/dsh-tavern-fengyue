@@ -1,0 +1,5 @@
+---
+name: Tridents
+description: Weapons
+---
+

@@ -1,0 +1,35 @@
+# rules — 33 entries
+
+- [The Order of Combat](the-order-of-combat.md) — ## The Order of Combat A typical combat encounter is a clash between t
+- [Movement and Position](movement-and-position.md) — ## Movement and Position In combat, characters and monsters are in con
+- [Actions in Combat](actions-in-combat.md) — ## Actions in Combat When you take your action on your turn, you can t
+- [Making an Attack](making-an-attack.md) — ## Making an Attack Whether you're striking with a melee weapon, firin
+- [Cover](cover.md) — ## Cover Walls, trees, creatures, and other obstacles can provide cove
+- [Damage and Healing](damage-and-healing.md) — ## Damage and Healing Injury and the risk of death are constant compan
+- [Mounted Combat](mounted-combat.md) — ## Mounted Combat A knight charging into battle on a warhorse, a wizar
+- [Underwater Combat](underwater-combat.md) — ## Underwater Combat When adventurers pursue sahuagin back to their un
+- [Ability Scores and Modifiers](ability-scores-and-modifiers.md) — ## Ability Scores and Modifiers | Score | Modifier | |-------|--------
+- [Advantage and Disadvantage](advantage-and-disadvantage.md) — ## Advantage and Disadvantage Sometimes a special ability or spell tel
+- [Proficiency Bonus](proficiency-bonus.md) — ## Proficiency Bonus Characters have a proficiency bonus determined by
+- [Ability Checks](ability-checks.md) — ## Ability Checks An ability check tests a character's or monster's in
+- [Using Each Ability](using-each-ability.md) — ## Using Each Ability Every task that a character or monster might att
+- [Saving Throws](saving-throws.md) — ## Saving Throws A saving throw-also called a save-represents an attem
+- [Time](time.md) — ## Time In situations where keeping track of the passage of time is im
+- [Movement](movement.md) — ## Movement Swimming across a rushing river, sneaking down a dungeon c
+- [The Environment](the-environment.md) — ## The Environment By its nature, adventuring involves delving into pl
+- [Resting](resting.md) — ## Resting Heroic though they might be, adventurers can't spend every 
+- [Between Adventures](between-adventures.md) — ## Between Adventures Between trips to dungeons and battles against an
+- [What Is a Spell?](what-is-a-spell.md) — ## What Is a Spell? A spell is a discrete magical effect, a single sha
+- [Casting a Spell](casting-a-spell.md) — ## Casting a Spell When a character casts any spell, the same basic ru
+- [Standard Exchange Rates](standard-exchange-rates.md) — ## Standard Exchange Rates | Coin | CP | SP | EP | GP | PP | |--------
+- [Objects](objects.md) — ## Objects When characters need to saw through ropes, shatter a window
+- [Poisons](poisons.md) — ## Poisons Given their insidious and deadly nature, poisons are illega
+- [Attunement](attunement.md) — ## Attunement Some magic items require a creature to form a bond with 
+- [Wearing and Wielding Items](wearing-and-wielding-items.md) — ## Wearing and Wielding Items Using a magic item's properties might me
+- [Activating an Item](activating-an-item.md) — ## Activating an Item Activating some magic items requires a user to d
+- [Sentient Magic Items](sentient-magic-items.md) — ## Sentient Magic Items Some magic items possess sentience and persona
+- [Fantasy-Historical Pantheons](fantasy-historical-pantheons.md) — ## Fantasy-Historical Pantheons The Celtic, Egyptian, Greek, and Norse
+- [The Planes of Existence](the-planes-of-existence.md) — ## The Planes of Existence The cosmos teems with a multitude of worlds
+- [Traps](traps.md) — ## Traps Traps can be found almost anywhere. One wrong step in an anci
+- [Diseases](diseases.md) — ## Diseases A plague ravages the kingdom, setting the adventurers on a
+- [Madness](madness.md) — ## Madness In a typical campaign, characters aren't driven mad by the 

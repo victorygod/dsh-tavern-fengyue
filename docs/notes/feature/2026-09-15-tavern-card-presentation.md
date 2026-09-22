@@ -1,0 +1,21 @@
+# Agent Note: Tavern card presentation layer (per-card UI)
+
+Status: implemented
+
+English | [中文](2026-09-15-tavern-card-presentation.zh.md)
+
+## Problem
+
+The card authored everything except what the player saw: the page kept a fixed host skin, the transcript rendered escaped plain text, and SillyTavern's proven "card ships its own UI" experience (message HTML state bars, scoped `<style>`, per-card themes, custom panels) had no surface. The settable goal, settled over four review rounds (`docs/tavern-prototype/card-presentation_zh.md`, cross-checked line-by-line against local SillyTavern 1.18.0), demanded per-card themes, per-card layout, HTML/markdown message bodies, and script-driven panels — all without touching `packages/core`, and without letting the presentation face mutate model-visible truth.
+
+## Decision
+
+One data view, one script library, two read faces. The engine now maintains `runtime/.chat.snapshot.jsonl` — a whole-file projection of the bound session's durable user/assistant messages (head line + `{seq,kind,orig,plain}` rows, rewritten from the durable log at every message event and once per rebind; the submission path projects the incoming player text as a pending row BEFORE the wrap render so worldbook scans see the current input, healing itself on the next rewrite when a submission dies). The placeholder grammar collapsed to one meaning: `{{name(args)}}` executes `preset/scripts/name.sh` — quoted argv per argument (16KB cap), nested calls evaluate depth-first (depth 4, 8 spawns per render, memoised per render), deprecated bare `{{name}}` stays a silent verbatim literal. Scripts, tools, and the frontend's `runScript` share one spawn contract (cwd = `runtime/`; no env injection — the workspace tree is the contract). The front end keeps ONE function, `mount(tavern)` with `tavern.runScript`; theme/chat CSS pass a guard (no `@import`, absolute `url()`), `chat.css` selectors auto-prefix `.tavern-stage` (css-tree), message bodies run markdown → DOMPurify → scoped `<style>` (the upstream `chats.js` encode/decode trick), `layout.json` clamps window/panels/html declarations, and dotfiles hide behind a new editor toggle. Consent: one confirm per binding, remembered per session.
+
+## Alternatives considered
+
+**TavernContext env snapshot + `ctx.` expressions** (the earlier draft). It lost because every consumer need reduced to reading files the engine already maintains — the env channel, expression variables, and reserved names bought nothing but a second evaluation plane and a second schema to version. **iframe-sandboxed panels with a postMessage bridge**. Lost once the trust model settled: card scripts already run host-side bash, so the sandbox defended nothing the card could not already reach, while the bridge would own every sync bug. **Server-side unique-name derivation / cross-area moves** (editor file ops). Lost to scope: the client owns naming defaults, and area identity protects the card from the maintenance agent's own writes.
+
+## Consequences
+
+All changes stay in the tavern bundle (engine + api + client); `packages/core` is untouched and the kernel-diff check against `tavern-baseline-2026-09-14` still holds. `api/tavern` gains exactly one RPC (`runScript`) plus the widened `scriptFailures` reason union; tests cover the projector (projection, heal, pending), the evaluator (grammar, quoting, nesting, budgets, cwd), and the editor toggles. Deferred deliberately: the markdownOnly display-rewrite hook, per-card settings toggle in the settings modal (consent dialog covers v1), and ST's alternate greetings. Follow-up under the local single-user stance: the writer guard is REMOVED entirely (2026-09-16): the writer holds the full product face including shell and delegation — no guard line remains, and the writer-guide moves out of code into `packages/extensions/tavern/prompts/writer-guide.md`, re-read per assembly and rebuilt into the full interface reference (hook table + scenario→landing-point table). Preset selection: agent-presets returns to the tavern composition — main/tail run `minimal` (stripped clean by their existing restrict), the writer runs `standard` (full product face); the REAL test pins the model-visible tool boundary for all three agents.

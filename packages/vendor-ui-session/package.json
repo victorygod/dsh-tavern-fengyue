@@ -1,0 +1,26 @@
+{
+  "name": "dsh-tavern-fengyue-vendor-ui-session",
+  "description": "Source snapshot of @deepseek-ai/dsh-client-ui-session for the test loop only (provenance = deepseek-harness tavern-extraction-2026-09-17 / 078257c). Published ./client is a browser closure bundle, not node-importable.",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "exports": {
+    "./client": "./src/client/index.ts",
+    "./src/*": "./src/*"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-client-store": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-session": ">=0.1.5-rc.1 <0.2",
+    "@types/react": "~18.3.1",
+    "immer": "^10.1.1",
+    "zustand": "~4.4.7"
+  },
+  "private": true
+}

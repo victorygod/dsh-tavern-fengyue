@@ -1,0 +1,70 @@
+{
+  "name": "dsh-tavern-fengyue-engine",
+  "description": "RPG world-card engine: setup-carrying workspaces, card prompts, runtime tools, and the turn-tail maintenance agent for DeepSeek Harness tavern profiles",
+  "version": "0.1.0-rc.1",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "prompts/**/*.md",
+    "presets/**",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/victorygod/dsh-tavern-fengyue.git",
+    "directory": "packages/engine"
+  },
+  "homepage": "https://github.com/victorygod/dsh-tavern-fengyue#readme",
+  "bugs": {
+    "url": "https://github.com/victorygod/dsh-tavern-fengyue/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "sillytavern",
+    "rpg"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=4.0.2 <5",
+    "@deepseek-ai/dsh-agent": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-brand": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-home-paths": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-llm": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-session": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-shell": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-subagent": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-system-prompt": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-user-approval": ">=0.1.5-rc.1 <0.2"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": ">=3.18.2 <4"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-agent": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-brand": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-home-paths": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-llm": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-session": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-shell": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-subagent": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-subprocess-local": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-system-prompt": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.1 <0.2",
+    "@deepseek-ai/dsh-user-approval": ">=0.1.5-rc.1 <0.2"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "DND 5e · 原味跑团",
+  "desc": "D&D 5e 原味单人跑团：SRD 语料 1164 篇，六件骰算计算器+两条级联工具+转录落账，悬浮 HUD。",
+  "cover": "preset/assets/cover.webp",
+  "creator": "fengyue 卡工坊",
+  "version": "0.1.0-m3",
+  "tags": [
+    "dnd",
+    "5e",
+    "跑团",
+    "原味"
+  ]
+}

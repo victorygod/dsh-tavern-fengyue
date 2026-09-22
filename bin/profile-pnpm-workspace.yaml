@@ -1,0 +1,9 @@
+# Written into the dev profile directory by bin/dev.mjs bootstrap: build-script
+# approvals for the installed host packages (mirrors the repo's own policy).
+allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': true
+  esbuild: true
+  '@google/genai': false
+  koffi: false
+  node-pty: false
+  protobufjs: false
