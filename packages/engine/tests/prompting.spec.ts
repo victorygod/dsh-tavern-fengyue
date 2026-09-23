@@ -64,7 +64,11 @@ describe('placeholder rendering', () => {
       expect(rendered.text).toBe('现在：第 2 夜')
       expect(rendered.failures).toEqual([])
       expect(calls.length).toBe(1)
-      expect(calls[0]?.command.startsWith('node -e ')).toBe(true)
+      // v3 命令面：文件 runner + b64（脚本路径 / 参数载荷）。runner 路径是命令串
+      // 上唯一的引号 token——PS 5.1 Legacy 再序列化剥不掉"路径引号"（见 runner.cjs）。
+      expect(calls[0]?.command.startsWith('node ')).toBe(true)
+      expect(calls[0]?.command).toContain('runner.cjs')
+      expect(calls[0]?.command).toContain(Buffer.from(join(root, 'preset/scripts/get_turn.mjs')).toString('base64'))
       expect(calls[0]?.command).toContain(Buffer.from('[]').toString('base64'))
       expect(calls[0]?.workdir).toBe(join(root, 'runtime'))
     })
@@ -117,14 +121,15 @@ describe('placeholder rendering', () => {
     writeCardSkeleton(root)
     writeFileSync(join(root, 'preset/scripts/outer.mjs'), 'console.log("OUTER", argv[0])\n')
     writeFileSync(join(root, 'preset/scripts/inner.mjs'), 'console.log("INNER")\n')
+    const sourceB64 = (name: string): string => Buffer.from(join(root, 'preset/scripts', name)).toString('base64')
     const { shell, calls } = fakeShell((entry) => {
-      if (entry.command.includes(Buffer.from('console.log("INNER")\n').toString('base64'))) return { exitCode: 0, stdout: 'INNER' }
+      if (entry.command.includes(sourceB64('inner.mjs'))) return { exitCode: 0, stdout: 'INNER' }
       return { exitCode: 0, stdout: 'ok' }
     })
     return renderPlaceholders('{{outer({{inner()}}, "x")}}', root, shell).then((rendered) => {
       expect(rendered.text).toBe('ok')
       expect(rendered.failures).toEqual([])
-      const outer = calls.find(call => call.command.includes(Buffer.from('console.log("OUTER", argv[0])\n').toString('base64')))
+      const outer = calls.find(call => call.command.includes(sourceB64('outer.mjs')))
       expect(outer?.command).toContain(Buffer.from(JSON.stringify(['INNER', 'x'])).toString('base64'))
     })
   })
@@ -144,7 +149,7 @@ describe('placeholder rendering', () => {
     writeCardSkeleton(root)
     writeFileSync(join(root, 'preset/scripts/fail.mjs'), 'process.exit(1)\n')
     const { shell } = fakeShell((entry) => {
-      if (entry.command.includes(Buffer.from('process.exit(1)\n').toString('base64'))) return { exitCode: 1, stdout: '' }
+      if (entry.command.includes(Buffer.from(join(root, 'preset/scripts/fail.mjs')).toString('base64'))) return { exitCode: 1, stdout: '' }
       return { exitCode: 0, stdout: 'ok' }
     })
     return renderPlaceholders('前 {{missing()}} 后 {{fail()}}', root, shell).then((rendered) => {
@@ -172,7 +177,7 @@ describe('placeholder rendering', () => {
     writeCardSkeleton(root)
     writeFileSync(join(root, 'preset/scripts/a.mjs'), 'console.log("A")\n')
     writeFileSync(join(root, 'preset/scripts/b.mjs'), 'console.log("B")\n')
-    const { shell } = fakeShell(entry => ({ exitCode: 0, stdout: entry.command.includes(Buffer.from('console.log("A")\n').toString('base64')) ? 'A' : 'B' }))
+    const { shell } = fakeShell(entry => ({ exitCode: 0, stdout: entry.command.includes(Buffer.from(join(root, 'preset/scripts/a.mjs')).toString('base64')) ? 'A' : 'B' }))
     return renderPlaceholders('{{a()}}{{b()}}!', root, shell).then((rendered) => {
       expect(rendered.text).toBe('AB!')
     })
@@ -224,7 +229,9 @@ describe('runCardScript', () => {
     const { shell, calls } = fakeShell(() => ({ exitCode: 0, stdout: ' 好 ' }))
     return runCardScript(root, 'echo', ["it's", 'a b'], shell, undefined).then((executed) => {
       expect(executed).toEqual({ ok: true, text: '好' })
-      expect(calls[0]?.command.startsWith('node -e ')).toBe(true)
+      expect(calls[0]?.command.startsWith('node ')).toBe(true)
+      expect(calls[0]?.command).toContain('runner.cjs')
+      expect(calls[0]?.command).toContain(Buffer.from(join(root, 'preset/scripts/echo.mjs')).toString('base64'))
       expect(calls[0]?.command).toContain(Buffer.from(JSON.stringify(["it's", 'a b'])).toString('base64'))
       expect(calls[0]?.workdir).toBe(join(root, 'runtime'))
     })

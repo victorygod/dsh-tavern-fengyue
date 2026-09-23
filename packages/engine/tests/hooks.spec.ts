@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -24,10 +24,11 @@ function freshRoot(hooksJson: string | undefined, scripts: readonly string[]): s
 }
 
 /**
- * Scripted shell: decodes the v2 runner command's base64 script payload back
- * to its marker, so tests key on the script name without a real spawn — the
- * suite stays platform-neutral. Outcome by marker: `flaky.mjs` exits non-zero,
- * everything else succeeds; `onFired` observes each firing mid-phase.
+ * Scripted shell: decodes the v3 runner command's base64 script-path token
+ * and reads the real file back to its marker, so tests key on the script name
+ * without a real spawn — the suite stays platform-neutral. Outcome by marker:
+ * `flaky.mjs` exits non-zero, everything else succeeds; `onFired` observes
+ * each firing mid-phase.
  */
 function fakeShell(onFired?: (name: string) => void): ShellSeam & { readonly fired: string[] } {
   const fired: string[] = []
@@ -36,9 +37,10 @@ function fakeShell(onFired?: (name: string) => void): ShellSeam & { readonly fir
     resolve: (request) => request as never,
     run: async (spec) => {
       const command = (spec as unknown as { command: string }).command
-      const payload = /' -- (\S+) \S+$/.exec(command)?.[1] ?? ''
-      const source = Buffer.from(payload, 'base64').toString('utf8')
-      const name = /^\/\/ marker:(\S+)/m.exec(source)?.[1] ?? '?'
+      // v3 命令面尾两个 token：b64(脚本路径) b64(参数载荷)——取倒数第二个。
+      const payload = /(\S+) \S+$/.exec(command)?.[1] ?? ''
+      const scriptPath = Buffer.from(payload, 'base64').toString('utf8')
+      const name = /^\/\/ marker:(\S+)/m.exec(readFileSync(scriptPath, 'utf8'))?.[1] ?? '?'
       fired.push(name)
       onFired?.(name)
       if (name === 'flaky.mjs') return { exitCode: 7, timedOut: false, aborted: false, stdout: { text: '' } } as never

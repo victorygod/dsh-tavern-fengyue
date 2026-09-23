@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
@@ -118,6 +119,11 @@ export const Config: z<Config> = z.object({
 const SESSION_ID_FILE = '.tavern-session'
 const DRAFT_FILE = '.tavern-draft'
 const EDIT_MARKER_FILE = '.tavern-editing'
+/** deleteSession's rm budget: ~12 × 250 ms of open-handle settle window before
+ *  the denial resurfaces (Windows EPERM on just-cancelled agents; see
+ *  {@link removeTree} and the 2026-09-23 devlog entry). */
+const DELETE_RM_RETRIES = 12
+const DELETE_RM_BACKOFF_MS = 250
 /** Persists each workspace's card-writing agent session id (see {@link ensureWriter}). */
 const WRITER_FILE = '.tavern-writer'
 /** The client-managed writer-session registry (tab strip): live sessions plus
@@ -549,24 +555,61 @@ export class TavernRuntime extends Service {
    * unbind it. The agent teardown capability stays with the session
    * controller, which owns the creation handle; the durable session log is
    * not removed.
+   *
+   * Cancellation is advisory (stop() returns before agents release their
+   * file handles on later ticks), and Windows refuses to unlink a file that
+   * anyone still holds open where POSIX buries the race — so the rm runs
+   * behind a bounded backoff, and a workspace that STILL cannot be removed
+   * keeps its binding (the player can simply retry). The log side is not
+   * load-bearing: its project dir is GC'd at boot by the orphan sweep, so a
+   * residual lock there degrades to a logged warning, never a failed round.
    * @param sessionId - session identity.
    */
-  deleteSession(sessionId: SessionId): void {
+  async deleteSession(sessionId: SessionId): Promise<void> {
     const root = this.root(sessionId)
-    // Cancel first: an in-flight turn or tail run keeps a live agent whose
-    // persistence writer could recreate log directories under our feet after
-    // the rm below (main turn cancelled, tail fork aborted through its stamp).
     this.stop(sessionId)
+    await this.removeTree(root)
     this.workspaces.delete(sessionId)
     this.postStash.delete(sessionId)
     // The workspace's card-writing agent binds to the ROOT, not to this
     // session — its marker dies with the directory, so the map row must go
     // too or the next ensureWriter would return a session with no workspace.
+    // It is stopped before the rm alongside the main session: a live writer
+    // turn (edit page open) holds workspace handles the same way.
     for (const [writerId, writerRoot] of this.writers) {
-      if (writerRoot === root) this.writers.delete(writerId)
+      if (writerRoot === root) {
+        this.stop(writerId)
+        this.writers.delete(writerId)
+      }
     }
-    rmSync(root, { recursive: true, force: true })
-    rmSync(join(this.sessionsRoot() ?? '', this.projectKeyOf(root)), { recursive: true, force: true })
+    try {
+      await this.removeTree(join(this.sessionsRoot() ?? '', this.projectKeyOf(root)))
+    } catch (error) {
+      this.ctx.logger.warn(`tavern: 会话日志清理失败（启动孤儿清理将兜底）: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  /**
+   * rm -rf with a bounded retry: the transient denial codes are the Windows
+   * open-handle family (Access is denied reaches us as EPERM or EACCES, and
+   * the holders' parents cascade into ENOTEMPTY), and the holders here are
+   * our own just-cancelled agents plus the usual ambient suspects (antivirus,
+   * indexer) that hold freshly written files for tens to hundreds of
+   * milliseconds. `fs.rmSync` ships retry-with-backoff only behind an
+   * explicit `maxRetries`, and `force: true` ignores ENOENT alone — without
+   * retries, one lock fails the whole delete.
+   * @param path - the tree root to remove.
+   */
+  private async removeTree(path: string, attempt = 0): Promise<void> {
+    const DENIALS = new Set(['EBUSY', 'EACCES', 'EPERM', 'EMFILE', 'ENFILE', 'ENOTEMPTY'])
+    try {
+      rmSync(path, { recursive: true, force: true })
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === undefined || !DENIALS.has(code) || attempt >= DELETE_RM_RETRIES) throw error
+      await sleep(DELETE_RM_BACKOFF_MS)
+      await this.removeTree(path, attempt + 1)
+    }
   }
 
   /**

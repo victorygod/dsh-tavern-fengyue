@@ -447,8 +447,8 @@ export class TavernApi extends TypertRemoteService {
   @Remote
   async deleteSession(request: TavernSessionRequest, signal: AbortSignal): Promise<TavernAckValue> {
     void signal
-    return await wrap(() => {
-      this.ctx.tavernService.deleteSession(request.sessionId)
+    return await wrap(async () => {
+      await this.ctx.tavernService.deleteSession(request.sessionId)
       return { ok: true as const }
     }, 'tavern/error')
   }

@@ -17,6 +17,7 @@
     "lib/index.js",
     "prompts/**/*.md",
     "presets/**",
+    "runner/*",
     "lib/types/**/*.d.ts"
   ],
   "license": "MIT",

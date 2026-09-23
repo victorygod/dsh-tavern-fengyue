@@ -142,19 +142,20 @@ function bootstrap() {
   warnHostCompatibility()
   const dir = profileDir()
   mkdirSync(dir, { recursive: true })
+  const dependencies = {
+    '@deepseek-ai/dsh-base': COMPATIBILITY.verified.at(-1),
+    '@deepseek-ai/dsh-web-app': COMPATIBILITY.verified.at(-1),
+    'dsh-tavern-fengyue': `link:${join(REPO_ROOT, 'packages', 'bundle')}`,
+    'dsh-tavern-fengyue-engine': `link:${join(REPO_ROOT, 'packages', 'engine')}`,
+    'dsh-tavern-fengyue-api': `link:${join(REPO_ROOT, 'packages', 'api')}`,
+    'dsh-tavern-fengyue-ui': `link:${join(REPO_ROOT, 'packages', 'ui')}`,
+  }
   const manifest = {
     name: `dsh-profile-${PROFILE}`,
     version: readJson(join(REPO_ROOT, 'package.json')).version,
     private: true,
     type: 'module',
-    dependencies: {
-      '@deepseek-ai/dsh-base': COMPATIBILITY.verified.at(-1),
-      '@deepseek-ai/dsh-web-app': COMPATIBILITY.verified.at(-1),
-      'dsh-tavern-fengyue': `link:${join(REPO_ROOT, 'packages', 'bundle')}`,
-      'dsh-tavern-fengyue-engine': `link:${join(REPO_ROOT, 'packages', 'engine')}`,
-      'dsh-tavern-fengyue-api': `link:${join(REPO_ROOT, 'packages', 'api')}`,
-      'dsh-tavern-fengyue-ui': `link:${join(REPO_ROOT, 'packages', 'ui')}`,
-    },
+    dependencies,
     dsh: {
       profile: {
         bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-tavern-fengyue'],
@@ -169,16 +170,69 @@ function bootstrap() {
   try {
     writeFileSync(join(dir, 'pnpm-workspace.yaml'), workspacePolicy)
   } catch { /* the policy file is static; missing it is a repo error, but keep bootstrap flowing */ }
-  // The forwarded dsh plugin child resolves its own home: pin the isolated
-  // dev home into its env or it drifts to ~/.dsh and operates on a real
-  // profile that bootstrap never wrote.
-  const install = spawnSync(process.execPath, [join(hostPackageDir(), cliBinPath()), 'plugin', '--profile', PROFILE, 'install'], {
-    cwd: dir,
-    stdio: 'inherit',
-    env: { ...process.env, DSH_HOME: dshHome(), CI: 'true' },
-  })
-  if (install.status !== 0) throw new Error('bootstrap: dsh plugin install failed in the profile directory')
+  installProfileDeps(dir, dependencies)
   console.log('[dev] bootstrap 完成：dsh-tavern-fengyue 三包以 link: 直连本 repo，bundle 改动 unlink 重装即生效（patchReload live）。')
+}
+
+/**
+ * Install the generated manifest into the profile via `dsh plugin install`,
+ * keyed on a generation stamp (`.bootstrap-generation.json`): the profile's
+ * pnpm-lock.yaml is trusted for a frozen, headless install only when the
+ * dependency set that produced it is still the one just written. A changed
+ * set — verified host bump, moved checkout — used to trip
+ * ERR_PNPM_OUTDATED_LOCKFILE against the stale lockfile (the forced CI:'true'
+ * below makes pnpm default to frozen); it now drops the old lockfile and
+ * resolves once, then re-stamps. The stamp carries the dependencies only:
+ * both the host pin and the link paths live there, so a version bump and a
+ * moved checkout invalidate it alike.
+ */
+function installProfileDeps(dir, dependencies) {
+  const stampPath = join(dir, '.bootstrap-generation.json')
+  const lockfile = join(dir, 'pnpm-lock.yaml')
+  let stamped
+  try {
+    stamped = existsSync(stampPath) ? readJson(stampPath).dependencies : undefined
+  } catch { /* corrupt stamp counts as absent; the install below re-stamps */ }
+  let frozen = existsSync(lockfile) && sameDependencies(stamped, dependencies)
+  for (;;) {
+    if (!frozen && existsSync(lockfile)) {
+      rmSync(lockfile)
+      console.log('[dev] profile lockfile 与 manifest 不同代（依赖集变化），本轮解冻重建')
+    }
+    console.log(`[dev] profile 依赖安装（${frozen ? 'frozen：lockfile 与 manifest 同代' : '解冻：重新解析'}）…`)
+    // The forwarded dsh plugin child resolves its own home: pin the isolated
+    // dev home into its env or it drifts to ~/.dsh and operates on a real
+    // profile that bootstrap never wrote. CI:'true' stays; frozen is decided
+    // here per generation, and an explicit setting beats the CI default. The
+    // override is dual-channel: pnpm ≤10 reads npm_config_* only, pnpm ≥11
+    // reads pnpm_config_* only (verified 10.33 / 11.7.0 — neither knows the
+    // other's spelling), so both are set and each release picks its own.
+    const install = spawnSync(process.execPath, [join(hostPackageDir(), cliBinPath()), 'plugin', '--profile', PROFILE, 'install'], {
+      cwd: dir,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        DSH_HOME: dshHome(),
+        CI: 'true',
+        npm_config_frozen_lockfile: frozen ? 'true' : 'false',
+        pnpm_config_frozen_lockfile: frozen ? 'true' : 'false',
+      },
+    })
+    if (install.status === 0) {
+      writeFileSync(stampPath, `${JSON.stringify({ dependencies }, null, 2)}\n`)
+      return
+    }
+    if (!frozen) throw new Error('bootstrap: dsh plugin install failed in the profile directory')
+    console.warn('[dev] frozen 安装失败（lockfile 可能损坏）——降级解冻重建，重试一次')
+    frozen = false
+  }
+}
+
+/** Order-insensitive equality for the generated dependency set (values are strings). */
+function sameDependencies(a, b) {
+  if (a === undefined) return false
+  const keys = Object.keys(b)
+  return Object.keys(a).length === keys.length && keys.every(key => a[key] === b[key])
 }
 
 /**

@@ -272,7 +272,7 @@ async function evalToken(
   if (budget.spawns > MAX_PLACEHOLDER_SPAWNS) return fail('limit')
   const executed = await runScript(
     shell,
-    cardScriptCommand(readFileSync(script, 'utf8'), JSON.stringify(args)),
+    cardScriptCommand(script, JSON.stringify(args)),
     join(root, RUNTIME_DIR),
     signal,
   )
@@ -389,7 +389,7 @@ export async function runCardScript(
   if (!existsSync(script) || !statSync(script).isFile()) return { ok: false, reason: 'missing' }
   const executed = await runScript(
     shell,
-    cardScriptCommand(readFileSync(script, 'utf8'), JSON.stringify(args)),
+    cardScriptCommand(script, JSON.stringify(args)),
     join(root, RUNTIME_DIR),
     signal,
   )

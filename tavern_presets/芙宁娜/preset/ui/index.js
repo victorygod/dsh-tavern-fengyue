@@ -13,6 +13,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 export function mount(tavern) {
   const views = tavern.views ?? {}
   const stops = []
+
+  // 开场页在场 → 对话框恒为输入态(玩家先说话;开场选项由宿主 updateDraft 填入
+  // .tavern-textarea=停靠位,发送仍由玩家触发)。开场页退场后由状态机接管。
+  const OPENING_SEL = '[class*="openingFrame"],[class*="openingFull"],[class*="openingWrap"],[class*="openingLive"]'
+  const openingPresent = () => document.querySelector(OPENING_SEL) !== null
   const add = fn => { if (typeof fn === 'function') stops.push(fn) }
   let disposed = false
 
@@ -68,6 +73,7 @@ export function mount(tavern) {
     user: root?.querySelector('.gg-user'), dialog: root?.querySelector('.gg-dialog'),
     who: root?.querySelector('.gg-name'), text: root?.querySelector('.gg-text'),
     next: root?.querySelector('.gg-next'), stop: root?.querySelector('.gg-stop'),
+    dots: root?.querySelector('.gg-dots'),
     expand: root?.querySelector('.gg-expand'), collapse: root?.querySelector('.gg-collapse'),
     blBody: root?.querySelector('.gg-bl-body'),
   })
@@ -77,10 +83,9 @@ export function mount(tavern) {
   let cgFront = true
   function crossfade(id, layers) {
     const e = el(); if (!e.root) return
-    const first = cgFront ? e.front : e.back
+    const front = cgFront ? e.front : e.back
     const back = cgFront ? e.back : e.front
     const next = (layers[0] ?? {}).img
-    if (id === state.cgId && back.dataset.cgId === undefined) return
     const load = () => { const p = next ? readAsset(next) : Promise.resolve(undefined)
       p.then(url => { if (typeof url === 'string' && url !== '') back.src = url }) }
     if (back.dataset.cgId !== id) { back.dataset.cgId = id; load() }
@@ -253,7 +258,8 @@ export function mount(tavern) {
       for (const key of (value.assetKeys ?? [])) { const url = await readAsset(key); if (typeof url === 'string' && url !== '') state.assets.set(key, url) }
       state.cgId = d.cg?.id ?? null; state.cgLayers = d.cg?.layers ?? []
       crossfade(state.cgId, state.cgLayers)
-      if (state.userSeq > state.asstSeq || !d.lastAssistant) {
+      if (openingPresent()) setMode('input')   // 开场期:恒输入态(选项点击→宿draft→玩家Enter)
+      else if (state.userSeq > state.asstSeq || !d.lastAssistant) {
         // 开局/中断恢复:队列 = [玩家行(如有)];无任何行 → 直接 input
         if (d.lastUser) { applyTurn(d.lastUser.text, ''); setMode('reading'); startParagraph(0) }
         else setMode('input')

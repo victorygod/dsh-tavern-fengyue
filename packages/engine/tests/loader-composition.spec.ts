@@ -10,11 +10,11 @@
  * composition, the turn-end tail fork, and the pre-step gate all run on the
  * shipped loop, asserted through model-visible and durable surfaces.
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -1575,5 +1575,111 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     // 空白会话上重复 cancelEdit 幂等不炸(返回路径不校验编辑戳在场)。
     engine.cancelEdit(sessionId)
     expect(engine.state(sessionId).hasCard).toBe(false)
+  })
+
+  it('卡工具 REAL spawn：runner.cjs v3 文件面在真实 shell 缝上跑通（Windows CI 即 PS 面真锚）', { timeout: 60_000 }, async () => {
+    // runner 落为文件后，命令串里只剩路径引号——PS 5.1 的 Legacy 再序列化
+    // 无双引号可剥。本锚在三平台 CI 都真 spawn（win32 = pwsh 面、POSIX = bash 面）。
+    root = mkdtempSync(join(tmpdir(), 'tavern-cardtool-'))
+    const workspaceBase = join(root, 'workspaces')
+    const libraryBase = join(root, 'presets')
+    seedCard(libraryBase)
+
+    const ctx = await compose({ workspaceBase, libraryBase })
+    const adapter = new ScriptedTavernAdapter([
+      { kind: 'tool-call', name: 'weather', arguments: JSON.stringify({ city: '港口' }) },
+      { kind: 'text', text: '天晴。' },
+      { kind: 'text', text: '尾记。' },
+      { kind: 'text', text: '尾续。' },
+    ])
+    ctx.llm.registerAdapter(['tavern-mock'], adapter)
+
+    const engine = ctx.tavernService
+    const sessionId = await engine.createSession()
+    engine.importFromLibrary(sessionId, 'probe-card')
+    const agents = ctx.agents as unknown as { get(id: SessionId): { whenIdle(): Promise<void> } | undefined }
+    const agent = agents.get(sessionId)
+    expect(agent).toBeDefined()
+    await submit(engine, sessionId, '看天')
+    await agent!.whenIdle()
+    // 收束尾 fork，避免 teardown 等待在途（与其他用例同款门闩）。
+    await vi.waitFor(() => { expect(engine.state(sessionId).tailRunning).toBe(false) }, { timeout: 20_000, interval: 100 })
+
+    // 工具回执（runner 的 Exit 横幅 + 脚本 stdout）如实进过会话日志。
+    const settled = (ctx.sessions as unknown as {
+      get(id: SessionId): { snapshotEvents(): { data: Record<string, unknown> }[] } | undefined
+    }).get(sessionId)!.snapshotEvents()
+    const trace = settled.map(event => JSON.stringify(event.data)).join('\n')
+    expect(trace).toContain('Exit: 0')
+    expect(trace).toContain('weather for 港口')
+  })
+})
+
+describe('deleteSession REAL composition：销户停业、rm 退避与双侧失败语义', () => {
+  // 会话日志项目目录住 dsh home——env 在 suite 级隔离，home 只为本组存在。
+  const home = join(tmpdir(), `tavern-dshhome-${randomUUID()}`)
+  let previousHome: string | undefined
+  // POSIX 用 chmod 锁目录（children unlink 需父目录写位 → EACCES，落在退避
+  // 集合里）；Windows 的只读属性管不住 rm 的语义，真机测（devlog 2026-09-23）。
+  const chmodLockable = process.platform !== 'win32'
+
+  beforeAll(() => {
+    previousHome = process.env.DSH_HOME
+    process.env.DSH_HOME = home
+  })
+
+  afterAll(() => {
+    if (previousHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previousHome
+    try { chmodSync(home, 0o700) } catch { /* home 可能不存在 */ }
+    rmSync(home, { recursive: true, force: true })
+  })
+
+  it('销户：工作空间目录连日志项目目录一并移除，绑定解除', async () => {
+    root = mkdtempSync(join(tmpdir(), 'tavern-delete-'))
+    const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
+    const engine = ctx.tavernService
+    const sessionId = await engine.createSession()
+    const workspace = engine.workspaceOf(sessionId) as string
+    expect(existsSync(workspace)).toBe(true)
+    await engine.deleteSession(sessionId)
+    expect(existsSync(workspace)).toBe(false)
+    expect(engine.workspaceOf(sessionId)).toBeUndefined()
+  })
+
+  it.skipIf(!chmodLockable)('工作空间 rm 全败：报错且绑定保留（玩家可重试），解锁后重试销净', { timeout: 60_000 }, async () => {
+    root = mkdtempSync(join(tmpdir(), 'tavern-delete-lock-'))
+    const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
+    const engine = ctx.tavernService
+    const sessionId = await engine.createSession()
+    const workspace = engine.workspaceOf(sessionId) as string
+    // 初始重试窗口吃满：锁正确保留绑定，销户的效果可由玩家重试达成。
+    chmodSync(workspace, 0o500)
+    await expect(engine.deleteSession(sessionId)).rejects.toThrow()
+    expect(existsSync(workspace)).toBe(true)
+    expect(engine.workspaceOf(sessionId)).toBeDefined()
+    chmodSync(workspace, 0o700)
+    await engine.deleteSession(sessionId)
+    expect(existsSync(workspace)).toBe(false)
+    expect(engine.workspaceOf(sessionId)).toBeUndefined()
+  })
+
+  it.skipIf(!chmodLockable)('日志项目目录 rm 失败：RPC 不炸降级告警，工作空间照常销净（启动孤儿清理兜底）', { timeout: 60_000 }, async () => {
+    root = mkdtempSync(join(tmpdir(), 'tavern-delete-loglock-'))
+    const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
+    const engine = ctx.tavernService
+    const sessionId = await engine.createSession()
+    const workspace = engine.workspaceOf(sessionId) as string
+    // 在隔离 dsh home 里铺出日志项目目录并锁死——主资产销户后账簿由
+    // sweepOrphanSessionLogs 启动期兜底，不该把这次 RPC 打成失败。
+    const projectDir = join(dshHomePath('sessions'), engine.projectKeyOf(workspace))
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(join(projectDir, 'session-log.bin'), 'log')
+    chmodSync(projectDir, 0o555)
+    await engine.deleteSession(sessionId)
+    expect(existsSync(workspace)).toBe(false)
+    expect(engine.workspaceOf(sessionId)).toBeUndefined()
+    expect(existsSync(projectDir)).toBe(true)
+    chmodSync(projectDir, 0o700)
   })
 })

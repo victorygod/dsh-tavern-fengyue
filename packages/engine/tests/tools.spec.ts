@@ -110,7 +110,9 @@ describe('card tools', () => {
       return 'done'
     }))
     const value = await defs.get('legacy')?.execute({ args: '1d20' }, { signal: undefined }) as string
-    expect(seen[0]).toContain('node -e')
+    expect(seen[0]).toContain('node ')
+    expect(seen[0]).toContain('runner.cjs')
+    expect(seen[0]).toContain(Buffer.from(join(root, 'preset/tools/legacy.mjs')).toString('base64'))
     expect(seen[0]).toContain(Buffer.from(JSON.stringify(['1d20'])).toString('base64'))
     expect(value).toBe('Exit: 0\ndone')
   })

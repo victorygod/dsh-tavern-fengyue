@@ -1,7 +1,7 @@
 /* 芙宁娜 galgame UI(v1 直控)——对话框状态机/CG 层/backlog/输入停靠。
    定位契约:.tavern-stage > .tavern-panel-galgame 全幅 absolute,不碰 composer 常位。 */
 
-.tavern-stage > .tavern-panel-galgame { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.tavern-stage > .tavern-panel-galgame { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 45; }  /* 45>停靠 composer 的 40:输入态名字牌骑在 composer 上 */
 .tavern-panel-galgame .gg { position: absolute; inset: 0; pointer-events: auto; }
 .tavern-panel-galgame .gg * { box-sizing: border-box; }
 
@@ -86,20 +86,28 @@
 .bl-text { white-space: pre-wrap; color: #e9e2d2; font-size: 14.5px; line-height: 1.95;
   background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07);
   padding: 9px 15px; border-radius: 11px; }
-/* 宿主 composer 停靠(输入态;身体类 gal-ui/gal-input 由 index.js 驱动)——
-   附加在 ui.css 之后的正文段落。 */
+/* 宿主 composer 停靠(输入态;身体类 gal-ui/gal-input 由 index.js 驱动)。
+   输入态即一个框:对话框本体脱壳透明,composer 钉在对话框的坐标上取而代之;
+   名字牌(你)骑 composer 上边缘;z 高于其余面板。 */
 body.gal-ui .tavern-composer { display: none; }
+.tavern-panel-galgame .gg-dialog.gg-input {
+  background: none; border: none; box-shadow: none;
+  min-height: 0; max-height: none; padding: 0;
+}
+.tavern-panel-galgame .gg-dialog.gg-input::before { display: none; }
+.tavern-panel-galgame .gg-dialog.gg-input .gg-text,
+.tavern-panel-galgame .gg-dialog.gg-input .gg-dots { display: none; }
 body.gal-ui.gal-input .tavern-composer {
   display: block;
   position: absolute;
-  left: calc(3.5% + 22px);
-  right: calc(3.5% + 22px);
-  bottom: calc(4% + 26px);
+  left: 3.5%;
+  right: 3.5%;
+  bottom: 4%;
   z-index: 40;
   margin: 0;
-  border: 1px solid rgba(201,162,75,.35);
-  border-radius: 12px;
-  background: rgba(9,12,24,.9);
+  border: 1px solid rgba(201,162,75,.5);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(9,12,24,.82), rgba(9,12,24,.93));
 }
 body.gal-ui.gal-input .tavern-usage-line {
   position: absolute;

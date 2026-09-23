@@ -25,6 +25,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ShellExecRequest, ShellExecSpec, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import { defineTool, parameterSchemaSpecToJsonSchema, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -66,38 +67,55 @@ export interface CardToolSchema {
 const SCHEMA_MARKER = /\/\*\*?\s*@tavern-schema\b/
 const SCHEMA_CLOSE_SEQ = '*/'
 /**
- * The node runner line: decodes the base64 card script (`argv[1]`) as a
- * data-module and imports it (ESM — top-level await works); `argv[2]` rides
- * as the base64 args. Under the module the global `args` is filled with the
- * decoded argument value: the parsed object for schema'd scripts, the raw
- * string for schema-less ones. Single-quoted for the unix faces, a bare
- * alphanumeric token for pwsh — shell-neutral by construction. The decoder
- * source contains no single quotes, so the single-quote wrap is literal on
- * every face.
+ * The node runner line: imports the card script file by absolute path (ESM —
+ * top-level await works, relative imports resolve against the script's own
+ * directory) and fills the global `args` with the decoded argument value: the
+ * parsed object for schema'd tools, the raw string for schema-less ones.
  *
- * Stdout hardening: card scripts end with `process.exit(0)` immediately after
- * `console.log(...)` — stdout is an async pipe, so output beyond the kernel
- * pipe buffer (~64KB, e.g. a >1160-entry rulebook manifest) is still queued
- * in the child when exit discards it. The runner therefore defers the real
- * exit until stdout+stderr drain, and swallows output emitted after the
- * first exit call (accidental code falling through a non-terminating exit
- * would otherwise append a second JSON document and break the consumer's
- * parse). Natural exits (no explicit exit) need none of this.
+ * Runner AS A FILE, not `-e` inline: the command string passes through the
+ * deployment's shell face — POSIX bash keeps single quotes literal, and
+ * pwsh ≥ 7.3 passes native arguments Standard-style, but Windows PowerShell
+ * 5.1 (dsh's last-resort executor binary) re-serializes native arguments
+ * Legacy-style and DESTROYS the embedded double quotes of an inline decoder —
+ * node then compiles a mangled `-e` and exits 1 (the 2026-09-23 devlog entry:
+ * every card script dead on PS 5.1 hosts while macOS never noticed). A file
+ * runner leaves exactly one quoted token on the command line — the runner
+ * path itself — and path quotes are unbreakable: `"` is an illegal filename
+ * character on Windows, so the double-quote form cannot carry embedded
+ * quotes there, and the POSIX form uses the standard `'\''` escape.
+ *
+ * The two payloads ride as base64 (the shell-neutral alphabet — b64's real
+ * job, unbowed): `argv[2]`=b64(absolute script path), `argv[3]`=b64(JSON
+ * payload). Tokens cannot start with `-` (base64 alphabet), so the `--`
+ * separator the inline face needed is retired.
+ *
+ * Stdout hardening lives in the runner file (packages/engine/runner/):
+ * card scripts end with `process.exit(0)` right after `console.log(...)`,
+ * and exit would truncate stdout still queued in the pipe — the runner
+ * defers the real exit until streams drain and swallows output past the
+ * first exit call. Same contract byte-for-byte as the retired inline form.
  */
-const NODE_RUNNER_INNER = 'const s=process.argv[1],t=process.argv[2],d=v=>Buffer.from(v,"base64").toString("utf8");globalThis.argv=JSON.parse(d(t));globalThis.args=globalThis.argv;const X=process.exit.bind(process),L=console.log.bind(console);let E=null;process.exit=c=>{if(E!==null)return;E=c??0;const F=()=>process.stdout.writableLength===0&&process.stderr.writableLength===0?X(E):setTimeout(F,1);F()};console.log=(...a)=>{if(E===null)L(...a)};import("data:text/javascript;base64,"+s)'
-const NODE_RUNNER = `node -e '${NODE_RUNNER_INNER}' -- `
-/** b64 助手：脚本体与参数载荷都走 base64（shell 三面逐字等价，零引号损耗）。 */
+const CARD_SCRIPT_RUNNER = fileURLToPath(new URL('../runner/runner.cjs', import.meta.url))
+/** b64 助手：路径与参数载荷都走 base64（shell 中立字母表，零引号损耗）。 */
 const b64 = (text: string): string => Buffer.from(text).toString('base64')
+/** Quote the runner path for the deployment shell face (see the class doc above). */
+function quoteRunner(): string {
+  return process.platform === 'win32'
+    ? `"${CARD_SCRIPT_RUNNER}"`
+    : `'${CARD_SCRIPT_RUNNER.replace(/'/g, `'\\''`)}'`
+}
 /**
- * 卡脚本 v2 的执行命令：`node -e <解码器> -- <b64脚本> <b64参数载荷>`。
+ * 卡脚本 v3 的执行命令：`node <runner> <b64脚本路径> <b64参数载荷>`。
  * 参数载荷恒为 JSON 文本 —— 有 schema 块的脚本收到参数**对象**（`args.x`），
  * 无块脚本收到位置参数**数组**（`argv[0]`…）。解码注入全部 shell 中立。
- * @param scriptText - 卡脚本的完整源文本。
+ * @param scriptPath - 卡脚本的绝对路径（调用方已做过存在性检查；脚本在
+ *   检查与运行之间被删属于 TOCTOU 窗口，runner 会以开头的 stderr 栈说明
+ *   原 exit(1) 面呈现回执）。
  * @param argsPayloadJson - 参数载荷的 JSON 文本（对象或字符串/数组）。
  * @returns the shell command line.
  */
-export function cardScriptCommand(scriptText: string, argsPayloadJson: string): string {
-  return `${NODE_RUNNER}${b64(scriptText)} ${b64(argsPayloadJson)}`
+export function cardScriptCommand(scriptPath: string, argsPayloadJson: string): string {
+  return `node ${quoteRunner()} ${b64(scriptPath)} ${b64(argsPayloadJson)}`
 }
 
 const SCHEMA_CACHE = new Map<string, { mtimeMs: number; schema: CardToolSchema | null }>()
@@ -188,7 +206,7 @@ async function runCardTool(
     throw new Error(`tavern: card has no tool "${name}"`)
   }
   const spec = shell.resolve({
-    command: cardScriptCommand(readFileSync(path, 'utf8'), argv ?? 'null'),
+    command: cardScriptCommand(path, argv ?? 'null'),
     workdir: join(root, RUNTIME_DIR),
     timeoutMs: TOOL_TIMEOUT_MS,
     stdoutMaxBytes: TOOL_OUTPUT_CAP,

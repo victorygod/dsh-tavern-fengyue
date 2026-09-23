@@ -2,6 +2,39 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-23 Windows 删除会话 EPERM：POSIX 掩盖的删-开同秒竞态（已修：退避重试 + 保留绑定 + 日志侧降级）
+
+- **现象（Windows 真机报）**：侧栏「彻底删除」确认后 RPC 失败——`tavern rpc failed: tavern/error: EPERM, Permission denied: \\?\D:\_rehearsal\code_…`（`\\?\` 前缀只是 libuv 在 Windows 的长路径内部写法，非病因；`EPRTM` 为手抄变体）。macOS 同操作从未失败。
+- **链路**：`sidebar.deleteConfirm`（`packages/ui/src/client/locales.ts:201`）→ `deleteSession` RPC，失败面由 unwrap 拼装（`packages/ui/src/client/rpc.ts:97`）→ api `wrap` 把底层 err.message 包成 `RemoteError('tavern/error', …)`（`packages/api/src/index.ts:163-169`）→ 实干方 `engine.deleteSession`（`packages/engine/src/index.ts:554-570`）：`stop(sessionId)` 之后**同步立刻**两个 `rmSync(x, { recursive: true, force: true })`（工作空间目录 + dsh-home 会话日志项目目录）。
+- **根因（POSIX / Windows 删除语义差）**：
+  1. Windows 不允许删除被打开的文件/目录（无 `FILE_SHARE_DELETE` 的句柄 → `DeleteFile` 报 Access is denied → libuv 映射 `EPERM`）；POSIX 下 unlink 打开中的文件成功，句柄随关闭消亡——同一个竞态在 mac 被 POSIX 语义掩盖，到 Windows 现形。**引擎定义里已有一条承认**：`writerLogGC` 注释明写 "a tombstone whose rm failed (**file-lock races on Windows**) stays tombstoned for the next boot"（`packages/engine/src/index.ts:408-409`），但 `deleteSession` 无这层缓冲。
+  2. 竞态构成：`stop()` 只是发出取消（返回 `{accepted, tailStopped}`，`packages/engine/src/index.ts:1651`），主回合收尾、tail fork 收尾、持久层 writer 冲刷日志的句柄要在之后的 tick 才落——`rmSync` 抢跑。写卡 agent **只摘映射行不 stop**（`packages/engine/src/index.ts:565-567`），其 cwd = 同一工作空间根，编辑页开着时句柄可在场。外部锁源同理：Defender 实时扫描/索引器对刚写完的文件短暂持锁。
+  3. Node 侧无重试：`rmSync` 对 `EBUSY/EMFILE/ENFILE/ENOTEMPTY/EPERM` 的线性退避重试**只在显式传 `maxRetries` 时生效，默认 0**；`force: true` 只吞 `ENOENT`。一次锁即整体抛错。
+- **连带影响**：失败时 `workspaces.delete` 已执行、目录树可能已删一半；侧栏是磁盘扫描，残余半个工作空间会以幽灵行驻留。
+- **修复（已落码，语义三面）**：`deleteSession` 改 async（`packages/engine/src/index.ts`），`api` 面相应 await（原先 fire-and-forget 会把引擎失败吞成未处理 rejection 而谎报成功）。
+  1. **rm 退避**：`removeTree` 对 Access-Denied 家族（`EBUSY/EACCES/EPERM/EMFILE/ENFILE/ENOTEMPTY`——Windows 上 Access is denied 以 EPERM 或 EACCES 形态到站）做 12×250ms 有界重试，吃掉"撤销后句柄迟落"的结算窗；`EACCES` 是实测教训：初版集合漏了它，POSIX chmod 锁走 EACCES 直接旁路了重试车道（测试时长露馅：6s 变 4s）。
+  2. **绑定保留**：rm 全败时不再先删名册——重试耗尽抛错原路返回，绑定仍在，玩家可原样重试删除；成功才解除 `workspaces/postStash/writers` 并清日志项目目录。
+  3. **日志侧降级**：工作空间已销而日志项目目录仍被锁 → 只 `logger.warn`（"启动孤儿清理将兜底"），RPC 不带病报成功也不误伤玩家；孤儿留给既有的 `sweepOrphanSessionLogs` 启动期收。写卡 agent 也纳入销户撤单（原版只摘名册不停业）。
+- **验证**：vitest 297/297（新增 `loader-composition.spec.ts` REAL composition 三锚：销户成功路径 / 工作空间 rm 全败抛错且绑定保留、解锁后重试销净 / 日志侧锁死降级不炸 RPC——POSIX chmod 锁定面，Windows skip 注明真机测）；tsc host/client、oxlint 干净（预存 presets 警告与本改无关）。**Windows 真机待复测**（回合进行中删除、编辑页开着删除、以及日志侧锁死三个场景）。
+
+## 2026-09-23 Windows 卡脚本全部 exit(1)：卡脚本 v2 的单引号命令面过不了 Windows PowerShell 5.1（已修：runner 落文件 v3 命令面）
+
+- **现象（Windows 真机报）**：dnd5e 卡左上面板 `hud-left` 报 `脚本失败(exit 1)`（显示面 = vendored `preset/ui/runtime.mjs:55-57`，`failure.reason=exit, exitCode=1`）；macOS 同卡同操作正常。面板数据泵 = `preset/scripts/ui_data.mjs`（前端 `tavern.runScript` → `runCardScript`），内容层面已核跨平台中立（相对读全正斜杠、`pathToFileURL(process.cwd()+'/../preset/lib/core.mjs')` 经 `path.resolve` 归一混合分隔符与 `..`）、本地 POSIX 面复刻命令字节级跑通（exit 0）——故障指向装载链。
+- **证据链（kernel 源码核读 + 本机抽验）**：
+  1. tavern 引擎 `static inject = ['…','shell','…']`（`packages/engine/src/index.ts:277`），脚本执行走 `runCardScript`（`packages/engine/src/prompting.ts:378-397`）把卡脚本包成**单引号命令串** `node -e '<解码器>' -- <b64脚本> <b64参数>`（`packages/engine/src/tools.ts:88`，设计注释声明「unix faces + pwsh shell 中立、解码器源无单引号」）。
+  2. Windows 上这个 `ctx.shell` 是 **PowerShell 执行器**、不是 bash：dsh-base 组装面 `bash-sandbox` 在 win32 禁用、`pwsh-sandbox` 在 win32 启用（`@deepseek-ai/dsh-base/cordis.patch.yml:214-222`，本仓 `packages/bundle/cordis.patch.yml` 无 shell 行 → 继承默认）。
+  3. 执行形态：`[pwsh -NoLogo -NoProfile -NonInteractive -Command <前导+整条命令串>]`（`dsh-pwsh-local/lib/index.js:271-280`），中间无第二层 shell；PowerShell 把 `'…'` 当字符串字面量消费后，**将参数重新序列化给 node.exe**。
+  4. pwsh 解析顺序：先 `%ProgramFiles%\PowerShell\7\pwsh.exe`、再 PATH、兜底 **`System32\WindowsPowerShell\v1.0\powershell.exe`（Windows PowerShell 5.1）**（`dsh-pwsh-local/lib/index.js` candidatePwshPaths）。
+- **根因**：PS 对原生 exe 的参数再序列化分代——**pwsh 7.3+ 默认 `$PSNativeCommandArgumentPassing = Windows`（node.exe 不在 Legacy 白名单 → Standard）**，内嵌双引号按 MSVCRT 转义，node 收到逐字的解码器，命令成立；**Windows PowerShell 5.1 只有 Legacy 式传参**：解码器（`tools.ts:87`）无空格 → 不包引号直接拼接，其**内嵌双引号**（`"base64"`/`"utf8"`/`"data:text/javascript;base64,"`）裸现于命令行，被 CommandLineToArgvW 当引号定界剥掉 → node 的 `-e` 实参碎裂 → **SyntaxError → 子进程退出码 1**。「无单引号」不变式保护了 POSIX 与 pwsh7，未保护 5.1 的引号剥离面。
+- **可见面只是冰山**：`hud-left` 是唯一纯前端消费者所以最先显眼；同一缝隙下**全部卡脚本**（`preset/tools/*` 的工具、提示词 `{{…}}` 脚本）在 PS 5.1 真机上同样 exit(1)，模型面表现为静默失败。
+- **鉴别面（真机一步定位）**：失败回执的 `[stderr]`——① `SyntaxError`（指向 `data:text/javascript;base64`）= 引号剥离本路径；② stderr 空且恰 ~10s = 超时击杀（`TOOL_TIMEOUT_MS = 10_000`，Windows 下 Job 击杀子进程同样结算为 `exit code 1` 无信号标记，`dsh-tool-pwsh` 已注明）；③ `The term 'node' is not recognized` = PATH 缺 node。可证伪检查：Windows 真机装 PowerShell 7（≥7.3）后同卡应复原。
+- **修复（已落码：卡脚本 v3 = runner 落文件）**：命令面改为 `node <runner> <b64脚本路径> <b64参数载荷>`，三个调用点（`prompting.ts` 两处 + `tools.ts` 卡工具）改传脚本**路径**而非文本。
+  1. **runner 落文件**（`packages/engine/runner/runner.cjs`，随 package `files` 分发，src 直跑与 bundled lib 双面经 `../runner/runner.cjs` 解析）：POSIX 单引号加 `'\''` 转义、win32 双引号——路径引号打不坏，因为 `"` 是 Windows 路径非法字符集成员，PS 5.1 剥无可剥；`--` 分隔符退役（b64 字母表不可能以 `-` 开头）。**base64 仅保留给参数载荷**（shell 中立字母表的本职），脚本文本不再上命令串。
+  2. **相对 import 红利**：脚本按真实文件路径 import（不再是 data: 模块），卡脚本内的相对 import 自然成立；落盘 hardening（exit 排空轮询 / 首 exit 后吞输出）逐字节移植旧内联解码器。
+  3. **鉴别面升级**：脚本缺失属 TOCTOU 窗口 → runner 捕 import 错误、stderr 带栈、exit(1)——排序在回执 `[stderr]` 节，天然可辨。
+- **验证（本机）**：vitest **298/298 绿**——新增 REAL composition 锚「卡工具 REAL spawn」（composed 真 shell 缝 + 真 runner 进程跑 `weather` 工具，回执 `Exit: 0` + stdout 进过会话日志）；**Windows CI 通道就是 PS 5.1 面的真锚**（三平台 CI 都跑这具锚，win32 = pwsh 执行器真 spawn）。`runner/runner.cjs` 补测三面（300KB 大 payload 排空 / 失败 stderr+exit 1 / 相对 import）。tsc、oxlint 净增零。
+- **防盗号注**：macOS 本机无法生产 PS 5.1 行为——`docs/notes/devlog.zh.md` 该条的真机复验步骤（PS 5.1 环境复现旧 exit(1) + 新版复原）留给首次 Windows 真机。
+
 ## 2026-09-23 干净检出构建必红：typert 生成物必须携带（生成器无法在仓外运行）
 
 - **现象**：GitHub Actions 6 个 job 全红（Ubuntu / macOS / Windows × Node 22/24），且**本机全绿**——同一提交两处结论相反。CI 日志：`pnpm install --frozen-lockfile` ✅、`pnpm lint` ✅、`pnpm build` ❌、`pnpm test` ⏭ skip；错误为 `packages/api/src/client/index.ts(10,26): error TS2307: Cannot find module 'dsh-tavern-fengyue-api/remote'`。
