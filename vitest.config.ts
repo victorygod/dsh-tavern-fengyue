@@ -23,5 +23,13 @@ export default defineConfig({
     // client.js needs the host's window.__ModuleLoader__ prelude. Wiring them
     // in requires a test shim for that prelude (follow-up, see devlog).
     include: ['packages/*/tests/**/*.{spec,test}.{ts,tsx}'],
+    // Hooks here do real work: a REAL-composition teardown disposes a cordis
+    // fiber, waits out the subprocesses that fiber spawned, and rm's a real
+    // workspace — so vitest's 10s default is a tight budget once a shared runner
+    // is loaded. It has been blown twice, both times on ubuntu-latest/node 24 at
+    // the same afterEach (`await context?.fiber.dispose()`) and reported against
+    // whichever test happened to be in flight, with the other five matrix jobs
+    // green on identical code. Tests keep the default timeout; only hooks move.
+    hookTimeout: 30_000,
   },
 })
