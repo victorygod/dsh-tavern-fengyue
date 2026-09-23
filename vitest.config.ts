@@ -25,11 +25,14 @@ export default defineConfig({
     include: ['packages/*/tests/**/*.{spec,test}.{ts,tsx}'],
     // Hooks here do real work: a REAL-composition teardown disposes a cordis
     // fiber, waits out the subprocesses that fiber spawned, and rm's a real
-    // workspace — so vitest's 10s default is a tight budget once a shared runner
-    // is loaded. It has been blown twice, both times on ubuntu-latest/node 24 at
-    // the same afterEach (`await context?.fiber.dispose()`) and reported against
-    // whichever test happened to be in flight, with the other five matrix jobs
-    // green on identical code. Tests keep the default timeout; only hooks move.
+    // workspace — so vitest's 10s default is a tight budget. The wait is real,
+    // not hypothetical: on Linux a cancelled card-tool child can outlive the
+    // cancel, and `fiber.dispose()` waits it out. That produced four ubuntu-only
+    // hook timeouts, each reported against whichever test was in flight while
+    // macOS and Windows stayed green on identical code. The two sleeper cases in
+    // loader-composition now bound their child to 10s, so teardown costs at most
+    // that; this budget sits comfortably above it rather than at its edge. Tests
+    // keep the default timeout; only hooks move.
     hookTimeout: 30_000,
   },
 })

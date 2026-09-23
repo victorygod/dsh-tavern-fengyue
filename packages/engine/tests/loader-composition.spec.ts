@@ -1231,7 +1231,14 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     engine.importFromLibrary(sessionId, 'probe-card')
     // Engine-side write = a preset mutation point: the slow tool must be
     // visible on the very first request's tools collection.
-    engine.writeText(sessionId, 'preset/tools/slow.mjs', 'await new Promise(r => setTimeout(r, 30000))\n')
+    // The sleep is a bounded 10s, not 30s: it only has to outlast the gap
+    // between the first model call and the stop below, while the elapsed bound
+    // at the end of this case keeps discriminating (it sits well under the
+    // sleep, so a tool child that was NOT killed still fails loudly). A
+    // cancelled child can outlive the cancel on Linux, and teardown's
+    // fiber.dispose() then waits it out — at 30s that held the afterEach past
+    // every hook budget (ubuntu-only hook timeouts, see the 2026-09-23 devlog).
+    engine.writeText(sessionId, 'preset/tools/slow.mjs', 'await new Promise(r => setTimeout(r, 10000))\n')
 
     interface AgentHandle { followup(message: unknown): void; whenIdle(): Promise<void> }
     const agents = ctx.agents as unknown as { get(id: SessionId): AgentHandle | undefined }
@@ -1250,11 +1257,12 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     // tool execution is in flight inside the turn.
     await vi.waitFor(() => { expect(adapter.calls.length).toBe(1) }, { timeout: 20_000, interval: 50 })
     expect(engine.stop(sessionId)).toEqual({ accepted: true, tailStopped: false })
-    // The aborted turn must converge while slow.sh would still be sleeping —
-    // a live bash child would hold whenIdle for ≥30 s.
+    // The aborted turn must converge while the tool child would still be
+    // sleeping — an un-killed child holds whenIdle for the whole sleep, so this
+    // bound (well under it) is what proves the cancel really killed the tool.
     await agent!.whenIdle()
     const elapsed = Date.now() - started
-    expect(elapsed).toBeLessThan(20_000)
+    expect(elapsed).toBeLessThan(6_000)
 
     // The turn closed as aborted, and the agent accepts the next prompt.
     const session = (ctx as unknown as {
@@ -1371,7 +1379,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     const engine = ctx.tavernService
     const sessionId = await engine.createSession()
     engine.importFromLibrary(sessionId, 'probe-card')
-    engine.writeText(sessionId, 'preset/tools/slow.mjs', 'await new Promise(r => setTimeout(r, 30000))\n')
+    engine.writeText(sessionId, 'preset/tools/slow.mjs', 'await new Promise(r => setTimeout(r, 10000))\n')
 
     interface AgentHandle { followup(message: unknown): void; whenIdle(): Promise<void> }
     const agents = ctx.agents as unknown as { get(id: SessionId): AgentHandle | undefined }
