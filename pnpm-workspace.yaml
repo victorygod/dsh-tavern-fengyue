@@ -1,5 +1,12 @@
 packages:
   - packages/*
+# Dependabot flags a high on the default branch: pretty-format@27.0.2 pins
+# ansi-regex to the exact 5.0.0 that carries the ReDoS (CVE-2021-3807), and 5.0.1
+# is that vulnerability's fix release. This redirects that one version only --
+# nothing else in the tree depends on ansi-regex, and pretty-format reaches test
+# tooling alone (via @testing-library/react), never the shipped plugin.
+overrides:
+  ansi-regex@5.0.0: 5.0.1
 allowBuilds:
   # Real bash for engine REAL-composition tests (workspace/project sandboxing).
   '@deepseek-ai/dsh-subprocess-local': true

@@ -82,9 +82,11 @@ prints its full URL (with a login token) on boot. `--port` overrides it:
 `pnpm tavern --port 3099`.
 
 `pnpm tavern` runs the host this repo pins as its own devDependency
-(`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required**. It keeps
-its own harness home (`~/.dsh-tavern-fengyue`), which leaves any existing `~/.dsh` untouched.
-Set `DSH_HOME` to relocate that home, and re-run `pnpm bootstrap` afterwards.
+(`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required**. Unless
+`DSH_HOME` is already exported, it keeps its own harness home (`~/.dsh-tavern-fengyue`) and
+leaves an existing `~/.dsh` untouched — **an exported `DSH_HOME` wins**, and then the profile
+lands there instead. Set `DSH_HOME` to relocate the home, and re-run `pnpm bootstrap` after
+changing it.
 
 ### Daily Use
 
