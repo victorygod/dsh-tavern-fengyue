@@ -16,7 +16,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const PROFILE = 'tavern-fengyue'
@@ -123,7 +123,10 @@ async function probeHostExports() {
       throw new Error(`dsh-compatibility: ${name} is not installed in the repo node_modules; run pnpm install`)
     }
     try {
-      const mod = await import(entry)
+      // require.resolve hands back a native path; the ESM loader only takes a
+      // URL, and on Windows `D:\...` parses as the scheme `d:` (same idiom as
+      // the card tools under tavern_presets/*/preset/).
+      const mod = await import(pathToFileURL(entry).href)
       if (exportName !== undefined && mod[exportName] === undefined) {
         throw new Error(`missing export ${exportName}`)
       }
