@@ -20,7 +20,7 @@
 | `preset/ui/theme.css` | 全页注入（首次启用确认 + 设置按卡总开关） |
 | `preset/ui/chat.css` | 选择器自动前缀 `.tavern-stage`，只作用聊天区（css-tree/postcss 重写） |
 | `preset/ui/layout.json` | 数据侧声明：`transcript.window`（`all`/`{last:N}`）、`panels[]` 容器（`{name, slot, size}`）、`html`（正文 HTML 开关，默认 true）。校验失败回默认 + toast |
-| `preset/ui/index.js` | `export function mount(tavern)`：`tavern = { runScript }` 单方法对象；面板/交互/游戏逻辑全在这里 |
+| `preset/ui/index.js` | `export function mount(tavern)`：宿主注入的面 = `runScript` / `callScript` / `readAsset` / `submit` / `layout` / `views` / `acts` / `runtime`（返回清理函数）；面板/交互/游戏逻辑全在这里 |
 | `preset/scripts/` | 宿主 bash 脚本库——两面共用的全部逻辑与数据访问 |
 
 **提升编辑便利的手段 = 预设脚本**：骨架预置 `read.sh`（`cat "$1"`，把文件内容拉进提示词/返回给前端），示例卡模板（`templates/tavern-tavern/`）再带 `last.sh`（最近 N 条消息）等常用件。卡要"读聊天历史"就是 `runScript('read.sh', '.chat.snapshot.jsonl')`（前端）或 `{{read('.chat.snapshot.jsonl')}}`(提示词面)，剩下的交给 JS/模型逻辑。预设脚本作者可改可删，不是特权内建。
@@ -78,11 +78,11 @@ arg   := call | literal          ; literal = 引号串，或不含 ( ) , 的裸�
 | 取数 | `tavern.runScript(name, ...args)`——轮询读 `.chat.snapshot.jsonl` / `runtime` 文件（本地 bash spawn 毫秒级，2s 网格沿用；真有性能压力将来加只读 RPC 是纯增量） |
 | 写 | **前端没有写文件的 API**——`runScript` 委托脚本完成一切写（唯一写通道） |
 | 执行 | `tavern.runScript` 与提示词面同一 spawn 约定（cwd=`runtime/`、abort signal、超时/上限沿用渲染执行参数），返回 stdout |
-| 回流 | 卡 JS 直接写 `.tavern-textarea`（`tavern-insert` 语义的 DOM 形态），**只填不发**——`send-btn` 由玩家触发 |
+| 回流 | 两条路：**填**——卡 JS 写 `.tavern-textarea`（`tavern-insert` 语义的 DOM 形态），由玩家按宿主的发送键；**发**——卡自绘输入框时走 `tavern.submit(text)`（与宿主 composer 同一条 admission，请求身份由宿主侧铸、浏览器时区随行）。宿主自己的 `.tavern-send-btn` 仍是禁触：那次点击归 composer |
 | 资产 | `runScript('asset64', 'preset/…')`（bash `base64` 输出） |
 | 事件 | 无独立事件通道——`setInterval` + `runScript` 对文件 diff 即事件 |
 
-`mount(tavern)` 幂等渲染、返回清理函数；切会话/载入/重置/发布卡整体重 mount。规则：只认稳定钩子；钩子三类——结构钩子（`.tavern-root / -stage / -transcript / -message(-user/-assistant) / -bubble / -body / -thinking / -tool / -tail-ledger / -timestamp / -model-seat / -context-meter / -usage-line`）供 CSS 换肤、Grid 摆位与 JS 寻址（`.tavern-root` 挂在整页根上，是 `--t-*` token 宿主——`#tavern-theme` 样式表与卡 `theme.css` 的唯一落点）；容器钩子（`.tavern-panel(-<name>)`）由 `layout.json` 声明、`mount` 挂载；交互钩子（`.composer / -textarea / -send-btn`）是回填目标、`send-btn` 卡不得触发。卡自己面板内部 DOM 不进契约。JS 的自由来自主文档信任级，JS 的稳定来自钩子契约。SDK 出 `.d.ts`。（2026-09-17 拍板收缩：`-sidebar / -header / -avatar / -name` 四锚出契约——应用壳的整页表达面 = `.tavern-root` token 面（theme.css 覆盖 `--t-*`），依据与缺锚影响史见 [stable-hook-gaps.zh.md](../notes/stable-hook-gaps.zh.md)。）
+`mount(tavern)` 幂等渲染、返回清理函数；切会话/载入/重置/发布卡整体重 mount。规则：只认稳定钩子；钩子三类——结构钩子（`.tavern-root / -stage / -transcript / -message(-user/-assistant) / -bubble / -body / -thinking / -tool / -tail-ledger / -timestamp / -model-seat / -context-meter / -usage-line`）供 CSS 换肤、Grid 摆位与 JS 寻址（`.tavern-root` 挂在整页根上，是 `--t-*` token 宿主——`#tavern-theme` 样式表与卡 `theme.css` 的唯一落点）；容器钩子（`.tavern-panel(-<name>)`）由 `layout.json` 声明、`mount` 挂载；交互钩子（`.composer / -textarea / -send-btn`）是回填目标、宿主 `-send-btn` 卡不得触发——卡要自己发送就画自己的输入框走 `tavern.submit(text)`（同一条 admission），不劫持宿主那次点击。卡自己面板内部 DOM 不进契约。JS 的自由来自主文档信任级，JS 的稳定来自钩子契约。SDK 出 `.d.ts`。（2026-09-17 拍板收缩：`-sidebar / -header / -avatar / -name` 四锚出契约——应用壳的整页表达面 = `.tavern-root` token 面（theme.css 覆盖 `--t-*`），依据与缺锚影响史见 [stable-hook-gaps.zh.md](../notes/stable-hook-gaps.zh.md)。）
 
 ## 前端渲染面
 
@@ -120,7 +120,7 @@ arg   := call | literal          ; literal = 引号串，或不含 ( ) , 的裸�
 | 世界书（恒定/触发+预算扫描） | `world-info.js:73` 起 | 恒定入 systemPrompt；触发= `{{lorebook()}}` 扫 `./.chat.snapshot.jsonl` | ✅ 核心；递归/概率/分组卡自实现 |
 | 文本宏 | `macros.js:610` | 脚本化（骨架 `read.sh` 抵 boilerplate；per-render 去重控成本） | ✅ 语义等价 |
 | STscript DSL | `SlashCommandParser.js:43` | 不移植 DSL：bash（数据）+ JS（表现）覆盖能力域 | ✅ 能力覆盖、语法不兼容（明示） |
-| Quick Replies（含角色级） | `quick-reply/index.js:144-166` | 面板按钮 + DOM 回填 `.tavern-textarea`（只填不发） | ✅ |
+| Quick Replies（含角色级） | `quick-reply/index.js:144-166` | 面板按钮 + DOM 回填 `.tavern-textarea`（填），或卡自绘输入框经 `tavern.submit` 直发 | ✅ |
 | 扩展插件 JS（主文档 module） | `extensions.js:826-832` | `mount(tavern)` 同形态 | ✅ 同构 |
 | depth_prompt / 总结指令 | `script.js:4423-4431` | 尾代理 runtime 摘要近似；压缩指令定制=后续内核口子 | ⚠️ 近似 |
 | Author's Note 任意深度 | `script.js` floating prompt | 动态 post 尾注段（深度=最后 user 之后；任意深度不可达） | ⚠️ 近似 |

@@ -87,7 +87,7 @@ preset/st-import/
 | 正则 `AI_OUTPUT` + promptOnly / 默认的提示词半边 | —— | drop：消息准入改写 seam 未建（映射 §5.1/§8.6），只进导入报告 |
 | 正则 `AI_OUTPUT` + markdownOnly | —— | pending-render-hook：PR5 渲染钩子评估，不进工作单，报告列 pending |
 | 正则 `REASONING` | —— | 同 markdownOnly（思考行前端聚合流），报告列 pending |
-| Quick Reply（按钮） | `preset/ui/index.js` + `layout.json` + 卡脚本 | `layout.json` 声明面板容器 → `mount(tavern)` 内创建按钮 → 点击 `runScript(名, 实参)`；输出置 `.tavern-textarea` **只填不发** |
+| Quick Reply（按钮） | `preset/ui/index.js` + `layout.json` + 卡脚本 | `layout.json` 声明面板容器 → `mount(tavern)` 内创建按钮 → 点击 `runScript(名, 实参)`；输出置 `.tavern-textarea` 由玩家发送，或（卡自绘输入框时）经 `tavern.submit(text)` 直发——两者同一条 admission |
 | STscript 段 | bash（数据）+ `ui/index.js`（表现）+ 卡工具（副作用） | 按命令意图映射：`/setvar`/`/getvar` → `runtime/` 状态文件；`/echo`/`/input` → 按钮文案或回填；调 ST 内部 API（`/gen`、`/swipe`）→ 有意图等价物则组合卡脚本+面板实现，没有则该段进报告。语法不兼容是明示的（映射 §6） |
 
 ## 4. agent 消化契约（写卡 agent 的操作序）

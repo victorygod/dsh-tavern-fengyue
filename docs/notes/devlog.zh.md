@@ -2,6 +2,21 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-23 ubuntu-only CI 红：teardown 等一个未被回收的卡工具子进程（测试侧收口，回收归内核）
+
+- **现象**：CI 反复在 `ubuntu-latest`（node 22 与 24 都中）红，卡在 `pnpm test`，报 `Hook timed out in 10000ms`；把 hookTimeout 提到 30s 后变成 `Hook timed out in 30000ms`——**是等待而非慢**。macOS / Windows 全程绿。
+- **先排除嫌疑**：不是当时刚改的 `deleteSession` 写卡 agent 撤单顺序——以**完全相同签名**失败的 `b7133da`（纯依赖 override）与 `6e8c957`（只改 `bin/dev.mjs`）**都不含 engine 代码**；而那两个用例走 `engine.stop()`，根本不碰 `deleteSession`。
+- **根因**：两具 sleep 用例（`loader-composition.spec.ts` 的两处 `slow.mjs`）用**睡 30 秒**的卡工具制造"工具在飞"，`stop()` 取消后引擎侧很快收敛（用例自身断言是过的），但 **Linux 上那个 OS 子进程活得比取消更久**，`afterEach` 的 `await context?.fiber.dispose()` 会把它等完 → 任何 hook 预算都被撑破。报错点名"超时时在飞的那具"，故两次报的用例不同、却都落在这两具里。
+- **处置（只动测试侧）**：两处睡眠 30000 → 10000，并把 kill 用例的判别阈值同步 20000 → 6000——那条断言正是"没杀掉就会等满睡眠"的绊线，**只砍睡眠会让它静默通过**（初版我就踩了这个坑，已纠正）；`hookTimeout: 30_000` 稳居 10s 上界之上。CI 6/6 绿。
+- **边界（归内核，按用户裁定不干预）**：进程回收**不是我们的代码**——引擎只是把内核给的 `ToolRunContext.signal` 原样传进 `shell.resolve({… signal})`（`packages/engine/src/tools.ts:213/337`），spawn 与 kill 都在 `@deepseek-ai/dsh-shell` / `dsh-subprocess-local`。Windows 以 Job 对象带走整棵进程树；Linux 侧表现为"引擎收敛、子进程仍活"。**不修内核、也不加会把 CI 弄红的断言**；要根治的方向是上游 PR（让取消真正回收子进程），本条只记录事实与那条 `elapsed` 绊线。
+
+## 2026-09-23 卡自持输入：`tavern.submit` 落地 + 契约文档同步
+
+- **决策（用户）**：芙宁娜卡不再停靠宿主 composer，改自绘输入框；`mount(tavern)` 面新增 `submit(text)`。
+- **语义边界（本次拍定）**：**宿主自己的 `.tavern-send-btn` 仍禁触**——那次点击归 composer；卡要自己发送就画自己的输入框走 `submit`。两者走**同一条 admission**（`rpc.prompt`；请求身份由客户端面 `crypto.randomUUID()` 现铸、浏览器时区随行），于是政策从"卡不许发"收窄为"卡不许劫持宿主那次点击"，其原始理由（单一发送路径 + 每次身份唯一）完整保留。
+- **代码**：`packages/ui/src/client/card-ui.ts` 在 mount 面加 `submit`；芙宁娜 `preset/ui/index.js` 加输入行（textarea + 发送键 + 模型/usage 镜像）与 Enter 路由，500ms 轮询把宿主隐藏 textarea 的 greeting 回填与 usage 文本镜像进卡自己的框（开场选项因此仍落在玩家所见之处）。
+- **文档同步（六处，本次一并修）**：`packages/engine/prompts/writer-guide.md:53`——面清单原文写 "receives **exactly**" 却没有 `submit`，**不补则写卡 agent 永远不会用这个能力、还会继续遵守旧禁令**；同文件 `:71` 的禁触括注改指 `submit`。`docs/cards/card-presentation.zh.md:23`（面清单从"`{ runScript }` 单方法对象"改为八项实名）、`:81`（回流=填/发两条路）、`:85`（交互钩子段政策重述）、`:123`（ST 平价表 QR 行）；`docs/cards/st-import-work-order.zh.md:90`（QR 工作单行）。
+
 ## 2026-09-23 Windows 删除会话 EPERM：POSIX 掩盖的删-开同秒竞态（已修：退避重试 + 保留绑定 + 日志侧降级）
 
 - **现象（Windows 真机报）**：侧栏「彻底删除」确认后 RPC 失败——`tavern rpc failed: tavern/error: EPERM, Permission denied: \\?\D:\_rehearsal\code_…`（`\\?\` 前缀只是 libuv 在 Windows 的长路径内部写法，非病因；`EPRTM` 为手抄变体）。macOS 同操作从未失败。
