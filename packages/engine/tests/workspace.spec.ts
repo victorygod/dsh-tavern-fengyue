@@ -244,9 +244,9 @@ describe('saves', () => {
       vi.setSystemTime(new Date(2026, 8, 14, 0, 12, 35))
       autosave(root, 10)
       const autos = listSaves(root).map(save => save.name)
-      expect(autos).toContain('autosave-2026-09-14-00:12:34')
-      expect(autos).toContain('autosave-2026-09-14-00:12:34-2')
-      expect(autos).toContain('autosave-2026-09-14-00:12:35')
+      expect(autos).toContain('autosave-2026-09-14-00-12-34')
+      expect(autos).toContain('autosave-2026-09-14-00-12-34-2')
+      expect(autos).toContain('autosave-2026-09-14-00-12-35')
     } finally {
       vi.useRealTimers()
     }
@@ -278,7 +278,7 @@ describe('saves', () => {
     } finally {
       vi.useRealTimers()
     }
-    expect(listSaves(root)[0]?.name).toBe('autosave-2026-09-14-00:12:34')
+    expect(listSaves(root)[0]?.name).toBe('autosave-2026-09-14-00-12-34')
   })
 
   it('rejects save names that are not directory names', () => {

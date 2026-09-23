@@ -38,8 +38,8 @@
     }
   },
   "scripts": {
-    "bundle": "tsdown --config-loader tsx",
-    "watch": "tsdown --config-loader tsx --watch"
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
   },
   "files": [
     "lib/index.js",

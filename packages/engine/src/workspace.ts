@@ -10,7 +10,7 @@
  * @module dsh-tavern-fengyue-engine/workspace
  */
 
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, type Dirent } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, type Dirent } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { TavernCardMeta, TavernLibraryCard, TavernSave, TavernSaveStamp, TavernTreeEntry } from './types.ts'
 
@@ -33,8 +33,10 @@ function stampedName(prefix: string, stamp: Date): string {
 /**
  * The next free autosave directory name for one stamp — user-facing, so it
  * reads as local wall-clock date and time to the second
- * (`autosave-2026-09-14-01:22:28`). Same-second saves take a numeric suffix:
- * readable first, disambiguated only on collision.
+ * (`autosave-2026-09-14-01-22-28`). Same-second saves take a numeric suffix:
+ * readable first, disambiguated only on collision. Every field is separated by
+ * a dash and never by a colon: this string becomes a directory name, and `:`
+ * is illegal inside a Windows path segment (mkdirSync fails with ENOENT there).
  * @param root - absolute workspace root (the savings area is checked for occupancy).
  * @param stamp - the save-time date.
  * @returns the save directory name.
@@ -42,11 +44,46 @@ function stampedName(prefix: string, stamp: Date): string {
 function readableSaveName(root: string, stamp: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   const base = `autosave-${stamp.getFullYear()}-${pad(stamp.getMonth() + 1)}-${pad(stamp.getDate())}`
-    + `-${pad(stamp.getHours())}:${pad(stamp.getMinutes())}:${pad(stamp.getSeconds())}`
+    + `-${pad(stamp.getHours())}-${pad(stamp.getMinutes())}-${pad(stamp.getSeconds())}`
   let name = base
   let index = 2
   while (existsSync(join(root, SAVINGS_DIR, name))) name = `${base}-${String(index++)}`
   return name
+}
+
+/**
+ * Copy the contents of directory `from` into directory `to`, creating `to` and
+ * any missing parents first.
+ *
+ * Hand-rolled instead of `cpSync(..., { recursive: true })`: on Windows that
+ * call copies *nothing at all* when the destination path carries non-ASCII
+ * characters, and it fails silently — no throw, no files. Destinations here are
+ * routinely user text (a card title, a manual save name, an editor path), so
+ * the destination is exactly where non-ASCII lands. Verified on Node 24.14.0;
+ * on POSIX the two are equivalent. Entries are typed by `statSync`, so a
+ * symlinked directory is descended into rather than copied as a link.
+ * @param from - absolute source directory.
+ * @param to - absolute destination directory (created when missing).
+ */
+function copyTree(from: string, to: string): void {
+  mkdirSync(to, { recursive: true })
+  for (const entry of readdirSync(from)) {
+    const src = join(from, entry)
+    const dst = join(to, entry)
+    if (statSync(src).isDirectory()) copyTree(src, dst)
+    else copyFileSync(src, dst)
+  }
+}
+
+/**
+ * Copy one path — file or directory — to a destination that must not exist yet
+ * (the copy half of a rename).
+ * @param from - absolute source path.
+ * @param to - absolute destination path.
+ */
+function copyPath(from: string, to: string): void {
+  if (statSync(from).isDirectory()) copyTree(from, to)
+  else copyFileSync(from, to)
 }
 
 /**
@@ -208,7 +245,7 @@ export function seedRuntime(root: string): void {
   const dst = join(root, RUNTIME_DIR)
   rmSync(dst, { recursive: true, force: true })
   mkdirSync(dst, { recursive: true })
-  if (existsSync(src)) cpSync(src, dst, { recursive: true })
+  if (existsSync(src)) copyTree(src, dst)
 }
 
 /**
@@ -287,7 +324,7 @@ export function listLibrary(libRoot: string): TavernLibraryCard[] {
 export function importCardPreset(root: string, sourcePreset: string): void {
   rmSync(join(root, PRESET_DIR), { recursive: true, force: true })
   mkdirSync(join(root, PRESET_DIR), { recursive: true })
-  cpSync(sourcePreset, join(root, PRESET_DIR), { recursive: true })
+  copyTree(sourcePreset, join(root, PRESET_DIR))
   seedRuntime(root)
 }
 
@@ -329,7 +366,7 @@ export function publishIntoLibraryCard(root: string, libraryBase: string, name: 
   const destination = join(libraryBase, name)
   if (!existsSync(join(destination, PRESET_DIR))) throw new Error(`tavern: library card "${name}" has no preset/`)
   rmSync(join(destination, PRESET_DIR), { recursive: true, force: true })
-  cpSync(join(root, PRESET_DIR), join(destination, PRESET_DIR), { recursive: true })
+  copyTree(join(root, PRESET_DIR), join(destination, PRESET_DIR))
   return name
 }
 
@@ -341,7 +378,7 @@ export function publishWorkspaceCard(root: string, libraryBase: string): string 
   while (existsSync(join(libraryBase, name))) name = `${safeTitle}-${String(n++)}`
   const destination = join(libraryBase, name)
   mkdirSync(join(destination, PRESET_DIR), { recursive: true })
-  cpSync(join(root, PRESET_DIR), join(destination, PRESET_DIR), { recursive: true })
+  copyTree(join(root, PRESET_DIR), join(destination, PRESET_DIR))
   return name
 }
 
@@ -369,7 +406,7 @@ function writeSave(root: string, name: string): void {
   const dst = savingsChild(root, name)
   rmSync(dst, { recursive: true, force: true })
   mkdirSync(dst, { recursive: true })
-  cpSync(join(root, RUNTIME_DIR), dst, { recursive: true })
+  copyTree(join(root, RUNTIME_DIR), dst)
 }
 
 /**
@@ -426,7 +463,7 @@ export function loadSave(root: string, name: string): void {
   const src = savingsChild(root, name)
   rmSync(join(root, RUNTIME_DIR), { recursive: true, force: true })
   mkdirSync(join(root, RUNTIME_DIR), { recursive: true })
-  cpSync(src, join(root, RUNTIME_DIR), { recursive: true })
+  copyTree(src, join(root, RUNTIME_DIR))
 }
 
 /**
@@ -787,7 +824,7 @@ export function workspaceFileOp(
     if (existsSync(to)) throw new Error(`tavern: "${op.to}" already exists — rename needs a free target`)
     if (from === to || to.startsWith(from + sep)) throw new Error(`tavern: "${op.to}" sits inside "${op.from}" — a move cannot target its own subtree`)
     mkdirSync(join(to, '..'), { recursive: true })
-    cpSync(from, to, { recursive: true })
+    copyPath(from, to)
     rmSync(from, { recursive: true, force: true })
     return
   }

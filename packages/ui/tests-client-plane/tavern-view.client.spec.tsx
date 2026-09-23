@@ -234,7 +234,7 @@ describe('tavern view routing', () => {
       hasCard: true,
       saves: [
         { name: '第一次抉择', type: 'manual', summary: '我推开酒馆的门' },
-        { name: 'autosave-2026-09-14-00:12:34', type: 'auto', summary: '' },
+        { name: 'autosave-2026-09-14-00-12-34', type: 'auto', summary: '' },
       ],
     })
     render(<TavernView {...writerFaces()} rpc={face} sessionId={SESSION} t={t} initialTab='saves' />)
@@ -245,7 +245,7 @@ describe('tavern view routing', () => {
     expect(screen.getByText('自动')).toBeDefined()
     // 存档行简介：有则渲染，无省略。
     expect(screen.getByText('我推开酒馆的门')).toBeDefined()
-    expect(screen.queryByText('autosave-2026-09-14-00:12:34_saved')).toBeNull()
+    expect(screen.queryByText('autosave-2026-09-14-00-12-34_saved')).toBeNull()
     fireEvent.click(screen.getAllByText('载入')[0]!)
     await waitFor(() => { expect(face.calls).toContain('load') })
   })

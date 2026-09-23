@@ -775,7 +775,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     const autos = rows.filter(row => row.type === 'auto')
     expect(autos).toHaveLength(5)
     for (const row of autos) {
-      expect(row.name).toMatch(/^autosave-\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}(-\d+)?$/)
+      expect(row.name).toMatch(/^autosave-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(-\d+)?$/)
     }
     // Newest first: one row per send, newest = the load-continuation turn.
     expect(autos.map(row => row.summary)).toEqual(['第五回合', '第四回合', '第三回合', '第二回合', '第一回合'])
