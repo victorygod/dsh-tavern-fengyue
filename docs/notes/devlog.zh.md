@@ -2,6 +2,30 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-23 干净检出构建必红：typert 生成物必须携带（生成器无法在仓外运行）
+
+- **现象**：GitHub Actions 6 个 job 全红（Ubuntu / macOS / Windows × Node 22/24），且**本机全绿**——同一提交两处结论相反。CI 日志：`pnpm install --frozen-lockfile` ✅、`pnpm lint` ✅、`pnpm build` ❌、`pnpm test` ⏭ skip；错误为 `packages/api/src/client/index.ts(10,26): error TS2307: Cannot find module 'dsh-tavern-fengyue-api/remote'`。
+- **证据链**：① 该裸导入经 `exports["./remote"]` 解析到 `lib/typert.remote-client.d.ts`，client face 的 `tsc -b` 需要它已存在；② 这四件是 **typert 生成物**，由 `@deepseek-ai/dsh-typert-generator` 的 tsdown 插件在上游 host pass 产出；③ 本仓根 `tsdown.config.ts` 是上游同文件**删掉了 `typertPlugin` 的 import 与 `plugins:` 一行**（diff 实测仅此两处 + 有意的 `workspace` 变动），故本仓**没有任何环节产出它们**；④ 上游 `.gitignore` 同样忽略 `lib/` 与 `.typert-*/` —— 上游是**生成**而非提交；⑤ 本机 `packages/api/lib/` 里躺着快照期（`tavern-extraction-2026-09-17 / 078257c`）手工拷回的四件，**被 `lib/` 规则挡在 git 之外**，所以"本机绿"是陈旧产物撑出来的，干净检出必红。
+- **根因（两层）**：
+  1. **直接原因**：本仓依赖"生成物已存在"，却没有把它们纳入版本控制（`.gitignore` 的 `lib/` 一刀切）。
+  2. **深层原因（为什么不能改为在本仓生成）**：生成器只在"protocol 的声明属于被分析工作空间的工程"时才承认 `@Remote`。`analyzer.js`：
+     ```js
+     isTypeMetaSymbol(node, name) {
+       const registration = this.registrationForFile(declaration.getSourceFile().fileName);
+       if (registration?.name === '@deepseek-ai/dsh-typert-protocol') return true;   // ← 关键
+       ...  // 或声明词法位于 declare module '@deepseek-ai/dsh-typert-protocol' {} 块内
+       return false;
+     }
+     ```
+     而 `registrationForFile()` 的那张表**只从 face aggregate tsconfig 的 `projectReferences` 建立**，且要求被引用目录在 `<root>/packages` 下。上游 protocol 就在同仓（`packages/typert/protocol`，被 `tsconfig.host.json` 引用 + `paths` 指源码）故通过；本仓 protocol 是 npm 已发布包（`node_modules/@deepseek-ai/dsh-typert-protocol@0.1.5-rc.2`），永不进 `projectReferences`，故判定**恒为 false**。后果是**静默**的：每个方法的 `remoteMarker()` 返回 `undefined` → 整个类被跳过 → 模型 `invocations: 0` → 不产出 remote 构件 → 而 `package.json` 声明了 `./remote` → `validateExport()` 才 fail loud：`typert(host): dsh-tavern-fengyue-api publishes Remote artifacts but has no Remote methods`。
+- **修复**：四件生成物纳入版本控制——`.gitignore` 放行 `!packages/api/lib/` + `packages/api/lib/*` + 四条 `!...typert.*` 例外（注意顺序：git 无法重新包含"父目录已被排除"的文件，必须先放行目录再逐条放行文件；`lib/index.js`、`lib/client.js`、`lib/types/**`、`*.tsbuildinfo` 照旧忽略）。根 `tsdown.config.ts` 的注释改写为"本仓**不**在此跑 Typert"（原文案沿袭上游"runs Typert"，与实际不符，正是本次误判的起因之一）。依据与再生成流程写进 `packages/api/REGENERATE.md`。
+- **验证**：① 忽略规则逐条实测（四件 not ignored；`index.js`/`client.js`/`types/**`/tsbuildinfo 仍 ignored）；② **干净检出模拟**：删掉所有 `packages/*/lib` 与 `*.tsbuildinfo`，只 `git checkout -- packages/api/lib` 还原受跟踪内容（其余包 `lib/` 为空），`pnpm build` **exit 0**；③ `pnpm test` 22 文件 / 294 用例全绿；④ 推 `main` 后由 CI 矩阵自证。
+- **防复发**：① "本机绿"不等于"干净检出绿"——凡涉及生成物/构建产物，验收一律以**干净检出模拟**（清空 `lib/` + tsbuildinfo + 只还原受跟踪内容）为准，这已写进 REGENERATE.md 与本节；② 从上游抄配置文件时，注释与代码要一起核对（沿袭的注释会掩盖被删掉的行为）；③ 仓外插件若依赖"上游同工作空间才能生成"的产物，必须在文档里写明**携带**而非"可再生成"。
+- **两条备选方向（尚未落地，明确记录）**：
+  - **（b）vendor protocol 源码**：把 `packages/typert/protocol/src` 作为工作空间工程引进本仓（命名须为 `@deepseek-ai/dsh-typert-protocol`，并在 face aggregate 里引用），使 `registrationForFile()` 可匹配，从而在本仓内真正生成、摆脱快照冻结。**这不是改造 protocol**，而是取未改动快照（本仓已有 `packages/vendor-ui-*` 三例先例）。代价：需连依赖子树一起 vendor，且运行时仍须走已发布包（否则与 typert-loader 的所有权/协议校验冲突）。属独立立项。
+  - **（c）当上游问题提 PR**：`isTypeMetaSymbol` 的"必须同工作空间"是生成器对**所有仓外插件作者**的通用限制，而"仓外 dsh 插件"本身是受支持场景（本仓即证据）。向 `deepseek-harness` 提案：支持按包名匹配，或让 protocol 解析位置可配置。走通即根治、可跟最新 dsh。按本仓 `CLAUDE.md` 第 1 条，依赖侧行为变更正该以 PR 落在依赖仓库而非本仓打补丁。
+- **快照冻结的代价**：四件冻结在 `078257c`；dsh 升级若触及 RPC 面或 typert 协议，所有权/协议校验会 fail loud，须回 monorepo 重跑 REGENERATE.md，并与版本地板三件套（四个 `package.json` 的 version、`dsh-compatibility.json`、peer 范围）同批动。
+
 ## 2026-09-21 叙事agent默认工具开关 v5：旗标落 meta.json 显式字段 + 指示/开关竖列排版
 
 - **现象（用户裁定）**：①「checkbox 根本保存不了——点掉以后重新打开卡片又恢复了，就不能存在一个什么 json 里？meta.json 也行啊？」②「是否允许使用 tools 的 checkbox 应该和是否开启数据维护（tail agent）的指示放在同一竖列」（v4 我又把排版改成了同排横列，接续第三次返工）。

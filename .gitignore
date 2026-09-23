@@ -1,6 +1,19 @@
 node_modules/
 lib/
 !tavern_presets/*/preset/lib/
+# Typert generated sources — the one part of lib/ that IS versioned. This repo
+# cannot regenerate them: the generator only recognises `@Remote` when the
+# protocol's declarations belong to a project of the analyzed workspace, and
+# here the protocol is a published node_modules dependency. See
+# packages/api/REGENERATE.md. Order matters — git cannot re-include a file whose
+# parent directory is excluded, so the directory is re-included first and every
+# other lib/ artifact stays ignored.
+!packages/api/lib/
+packages/api/lib/*
+!packages/api/lib/typert.host.js
+!packages/api/lib/typert.host.d.ts
+!packages/api/lib/typert.remote-client.js
+!packages/api/lib/typert.remote-client.d.ts
 *.tsbuildinfo
 .dsh-build/
 .DS_Store
