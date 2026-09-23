@@ -54,6 +54,14 @@ export function mount(tavern) {
           <button class="gg-expand" title="展开历史"><svg width="12" height="9" viewBox="0 0 12 9"><path d="M6 1 11 8H1Z" fill="currentColor"/></svg></button>
           <button class="gg-stop" title="停止并返回输入">停止</button>
           <div class="gg-text"></div>
+          <div class="gg-input-row">
+            <textarea class="gg-textarea" placeholder="说点什么…(Enter 发送)"></textarea>
+            <div class="gg-input-controls">
+              <span class="gg-model-mirror"></span>
+              <span class="gg-usage-mirror"></span>
+              <button class="gg-send" title="发送(玩家手势)">发 送</button>
+            </div>
+          </div>
           <div class="gg-dots"><i></i><i></i><i></i></div>
           <div class="gg-next">▼</div>
         </div>
@@ -75,7 +83,9 @@ export function mount(tavern) {
     next: root?.querySelector('.gg-next'), stop: root?.querySelector('.gg-stop'),
     dots: root?.querySelector('.gg-dots'),
     expand: root?.querySelector('.gg-expand'), collapse: root?.querySelector('.gg-collapse'),
-    blBody: root?.querySelector('.gg-bl-body'),
+    blBody: root?.querySelector('.gg-bl-body'), ta: root?.querySelector('.gg-textarea'),
+    send: root?.querySelector('.gg-send'), modelMirror: root?.querySelector('.gg-model-mirror'),
+    usageMirror: root?.querySelector('.gg-usage-mirror'),
   })
   const dbg = () => { if (root) root.dataset.state = `mode=${state.mode} · 段 ${state.r + 1}/${Math.max(state.paras.length, 1)}` }
 
@@ -170,7 +180,7 @@ export function mount(tavern) {
 
   /* ── 点击路由 ── */
   function onStageClick(event) {
-    if (event.target.closest('.gg-bl-head, .gg-collapse, .gg-expand, .gg-ta, .gg-send, .gg-bl-body') !== null) return
+    if (event.target.closest('.gg-bl-head, .gg-collapse, .gg-expand, .gg-textarea, .gg-input-controls, .gg-bl-body') !== null) return
     if (state.mode === 'waiting') { forwardStop(); setMode('input'); return }
     if (state.mode === 'input') return
     if (typing !== null) { completeParagraph(); dbg(); return }
@@ -233,6 +243,41 @@ export function mount(tavern) {
     clearInterval(waitHost)
     root = build(host)
     root.addEventListener('click', onStageClick)
+    // 卡自持输入:玩家手势(Enter/发送键) → tavern.submit(text) 直发宿主 admission
+    const ta = el().ta
+    if (ta !== null && ta !== undefined) {
+      ta.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault(); e.stopPropagation()
+          const text = ta.value.trim()
+          if (text !== '' && state.mode === 'input' && typeof tavern.submit === 'function') {
+            ta.value = ''
+            tavern.submit(text).catch(err => console.warn('[gg] submit failed:', err?.message ?? err))
+            setMode('waiting')
+          }
+        }
+      })
+      el().send && el().send.addEventListener('click', e => {
+        e.stopPropagation()
+        const text = ta.value.trim()
+        if (text !== '' && state.mode === 'input' && typeof tavern.submit === 'function') {
+          ta.value = ''
+          tavern.submit(text).catch(err => console.warn('[gg] submit failed:', err?.message ?? err))
+          setMode('waiting')
+        }
+      })
+    }
+    // Greeting 选项(宿主 updateDraft) → 隐藏 composer 的 textarea 值同步进卡输入(greeting选项点击回填)
+    const hiddenMirror = setInterval(() => {
+      const hidden = document.querySelector('.tavern-textarea')
+      const text = (hidden && hidden.value) || ''
+      const mine = el().ta
+      if (mine && document.activeElement !== mine && text !== '' && text !== mine.value) mine.value = text
+      // 镜像 usage 用法行
+      const usage = document.querySelector('.tavern-usage-line')
+      if (usage && el().usageMirror) el().usageMirror.textContent = usage.textContent || ''
+    }, 500)
+    add(() => clearInterval(hiddenMirror))
     el().expand.addEventListener('click', e => {
       e.stopPropagation()
       const bl = el().root.querySelector('.gg-backlog')

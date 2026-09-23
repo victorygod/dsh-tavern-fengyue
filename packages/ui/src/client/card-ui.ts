@@ -208,6 +208,14 @@ export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<Car
         runScript: (name: string, ...args: string[]) =>
           rpc.runScript({ sessionId, name, args }).then(value => value.text),
         callScript: (name: string, ...args: string[]) => rpc.runScript({ sessionId, name, args }),
+        // 玩家手势发送:卡自持输入的 Enter/发送键直接走宿主同一 RPC 通道。
+        // requestId 每次现生成(不可预测不可复用);与原生 composer 完全同 admission。
+        submit: (text: string) => rpc.prompt({
+          sessionId,
+          text,
+          requestId: crypto.randomUUID(),
+          clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
         readAsset: (path: string) =>
           rpc.readAsset({ sessionId, path }).then(value => value.dataUrl).catch(() => undefined),
         layout,
