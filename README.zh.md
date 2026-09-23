@@ -29,7 +29,7 @@
 | 层 | 负责什么 |
 |---|---|
 | **LLM** | 叙事渲染（创造性写作）· 变化值的语义更新（角色情绪、场景、状态） |
-| **脚本**（`preset/scripts/*.mjs` / `preset/tools/*.sh`）| 掷骰、寻路、HTML 渲染、面板样式输出、状态机等一切固定逻辑 |
+| **脚本**（`preset/scripts/*.mjs` / `preset/tools/*.mjs`）| 掷骰、寻路、HTML 渲染、面板样式输出、状态机等一切固定逻辑 |
 
 SillyTavern 同时抬高了使用者和卡作者的理解成本——用户不得不面对正则注入、世界书、注入深度这些概念；卡作者要学多门专有 DSL 才能做出一张功能丰富的卡。本项目把这一切收口回本地脚本：
 
@@ -65,19 +65,31 @@ SillyTavern 同时抬高了使用者和卡作者的理解成本——用户不�
 
 同一份 bundle 正在准备接入 dsh 官方的插件通道（发布到 npm 的 `dsh-tavern-fengyue` 及其三个兄弟包，再按 profile 用 `dsh plugin add` 安装）。该路径尚未端到端演练复现，因此演练完成前本 README 有意不写它。
 
-### 首次安装
+### 从源码安装并运行
 
-在项目目录执行（会将本项目注册为 dsh 的 `tavern-fengyue` profile）：
+在项目目录执行：
 
 ```sh
-pnpm build && pnpm bootstrap && pnpm tavern
+pnpm install       # 克隆后必须先装依赖，检出里不含任何构建产物
+pnpm build
+pnpm bootstrap     # 把本检出注册为 `tavern-fengyue` profile
+pnpm tavern        # 前台启动宿主；Ctrl-C 结束
 ```
+
+`pnpm tavern` 用的是本仓自己钉的宿主（`node_modules/@deepseek-ai/dsh`），**不需要全局安装 `dsh`**。它自带独立的宿主家目录（`~/.dsh-tavern-fengyue`），不会碰你已有的 `~/.dsh`；要换位置就设 `DSH_HOME`，换完重跑一次 `pnpm bootstrap`。
 
 ### 日常运行
 
+在本检出里再跑 `pnpm tavern` 即可。profile 的包与宿主都来自本检出（`link:` 依赖），所以改完源码 `pnpm build` 就够——profile 会实时重新应用 bundle 层。
+
+若想用全局安装的 `dsh` 驱动同一个 profile，那个宿主必须读到 profile 所在的家目录：
+
 ```sh
-dsh --profile tavern-fengyue
+DSH_HOME=~/.dsh-tavern-fengyue dsh --profile tavern-fengyue               # bash / zsh
+$env:DSH_HOME="$HOME\.dsh-tavern-fengyue"; dsh --profile tavern-fengyue   # PowerShell
 ```
+
+（或者一开始就把 profile 写进宿主的默认家：`DSH_HOME=~/.dsh pnpm bootstrap`。）
 
 ### 首次游玩
 

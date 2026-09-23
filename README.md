@@ -6,7 +6,7 @@ English | [中文](README.zh.md)
 
 **Tavern Fengyue (DSH)** — an RPG character-card engine running on the [dsh](https://github.com/deepseek-ai/deepseek-harness) host, with direct support for importing SillyTavern preset cards.
 
-This project aims to guide the development paradigm for tavern-style agents in the agent era: tavern-class applications should stand on mainstream agent infrastructure, not on a bespoke DSL stack.
+This project aims to guide the development paradigm for tavern-style agents in the agent era: tavern-like applications should stand on mainstream agent infrastructure, not on a bespoke DSL stack.
 
 ## Table of Contents
 
@@ -29,7 +29,7 @@ The division of labor, layer by layer:
 | Layer | What it does |
 |---|---|
 | **LLM** | Narrative prose (creative writing) · Semantic updates to changing values (character mood, scene, state) |
-| **Scripts** (`preset/scripts/*.mjs` / `preset/tools/*.sh`) | Dice rolls, pathfinding, HTML rendering, panel styling, state machines — all deterministic logic |
+| **Scripts** (`preset/scripts/*.mjs` / `preset/tools/*.mjs`) | Dice rolls, pathfinding, HTML rendering, panel styling, state machines — all deterministic logic |
 
 SillyTavern raises the learning curve for both players and card authors — players face regex injection, world info, and injection depth; authors need to master multiple bespoke DSLs just to build a card with real functionality. This project folds everything back into traditional scripts:
 
@@ -65,19 +65,37 @@ This repository **is** a DSH profile project: it declares the `tavern-fengyue` p
 
 The same bundle is being prepared for the standard dsh plugin channel (published to npm as `dsh-tavern-fengyue` plus its three sibling packages, then installed per profile with `dsh plugin add`). That path has not been rehearsed end to end yet, so this README deliberately does not document it until it is.
 
-### First Install
+### Install and run from source
 
-Run in the project directory (registers this project as the `tavern-fengyue` profile in local dsh):
+In the project directory:
 
 ```sh
-pnpm build && pnpm bootstrap && pnpm tavern
+pnpm install       # required after cloning — a checkout ships no build output
+pnpm build
+pnpm bootstrap     # registers this checkout as the `tavern-fengyue` profile
+pnpm tavern        # starts the host; Ctrl-C stops it
 ```
+
+`pnpm tavern` runs the host this repo pins as its own devDependency
+(`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required**. It keeps
+its own harness home (`~/.dsh-tavern-fengyue`), which leaves any existing `~/.dsh` untouched.
+Set `DSH_HOME` to relocate that home, and re-run `pnpm bootstrap` afterwards.
 
 ### Daily Use
 
+Run `pnpm tavern` again from this checkout. Both the profile's packages and the host come from
+here (they are `link:` dependencies), so after a source edit `pnpm build` is all it takes — the
+profile re-applies the bundle layer live.
+
+To drive the same profile with a globally installed `dsh` instead, that host has to read the
+home the profile was written into:
+
 ```sh
-dsh --profile tavern-fengyue
+DSH_HOME=~/.dsh-tavern-fengyue dsh --profile tavern-fengyue               # bash / zsh
+$env:DSH_HOME="$HOME\.dsh-tavern-fengyue"; dsh --profile tavern-fengyue   # PowerShell
 ```
+
+(Or put the profile in the host's default home from the start: `DSH_HOME=~/.dsh pnpm bootstrap`.)
 
 ### First Play
 
