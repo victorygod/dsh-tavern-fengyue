@@ -568,20 +568,22 @@ export class TavernRuntime extends Service {
   async deleteSession(sessionId: SessionId): Promise<void> {
     const root = this.root(sessionId)
     this.stop(sessionId)
-    await this.removeTree(root)
-    this.workspaces.delete(sessionId)
-    this.postStash.delete(sessionId)
     // The workspace's card-writing agent binds to the ROOT, not to this
     // session — its marker dies with the directory, so the map row must go
     // too or the next ensureWriter would return a session with no workspace.
-    // It is stopped before the rm alongside the main session: a live writer
-    // turn (edit page open) holds workspace handles the same way.
+    // Cancelled alongside the main session and BEFORE the rm: a live writer
+    // turn (edit page open) holds workspace handles the same way, and the
+    // stop is what asks it to let go — rm-first would spend the whole retry
+    // budget racing a turn nobody had told to end.
     for (const [writerId, writerRoot] of this.writers) {
       if (writerRoot === root) {
         this.stop(writerId)
         this.writers.delete(writerId)
       }
     }
+    await this.removeTree(root)
+    this.workspaces.delete(sessionId)
+    this.postStash.delete(sessionId)
     try {
       await this.removeTree(join(this.sessionsRoot() ?? '', this.projectKeyOf(root)))
     } catch (error) {

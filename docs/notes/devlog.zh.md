@@ -32,7 +32,7 @@
   1. **runner 落文件**（`packages/engine/runner/runner.cjs`，随 package `files` 分发，src 直跑与 bundled lib 双面经 `../runner/runner.cjs` 解析）：POSIX 单引号加 `'\''` 转义、win32 双引号——路径引号打不坏，因为 `"` 是 Windows 路径非法字符集成员，PS 5.1 剥无可剥；`--` 分隔符退役（b64 字母表不可能以 `-` 开头）。**base64 仅保留给参数载荷**（shell 中立字母表的本职），脚本文本不再上命令串。
   2. **相对 import 红利**：脚本按真实文件路径 import（不再是 data: 模块），卡脚本内的相对 import 自然成立；落盘 hardening（exit 排空轮询 / 首 exit 后吞输出）逐字节移植旧内联解码器。
   3. **鉴别面升级**：脚本缺失属 TOCTOU 窗口 → runner 捕 import 错误、stderr 带栈、exit(1)——排序在回执 `[stderr]` 节，天然可辨。
-- **验证（本机）**：vitest **298/298 绿**——新增 REAL composition 锚「卡工具 REAL spawn」（composed 真 shell 缝 + 真 runner 进程跑 `weather` 工具，回执 `Exit: 0` + stdout 进过会话日志）；**Windows CI 通道就是 PS 5.1 面的真锚**（三平台 CI 都跑这具锚，win32 = pwsh 执行器真 spawn）。`runner/runner.cjs` 补测三面（300KB 大 payload 排空 / 失败 stderr+exit 1 / 相对 import）。tsc、oxlint 净增零。
+- **验证（本机）**：vitest **298/298 绿**——新增 REAL composition 锚「卡工具 REAL spawn」（composed 真 shell 缝 + 真 runner 进程跑 `weather` 工具，回执 `Exit: 0` + stdout 进过会话日志）；`runner/runner.cjs` 补测三面（300KB 大 payload 排空 / 失败 stderr+exit 1 / 相对 import）。tsc、oxlint 净增零。**两个执行面分别取证**：本机（无 pwsh 7）走 5.1 面——新版跑绿即 5.1 面已验；CI 的 windows-latest 镜像自带 PowerShell 7 且在 PATH 里，`candidatePwshPaths` 命中第一个候选，故 **CI 验的是 pwsh 7 面（Standard 传参），复现不了 5.1 的 Legacy 剥引号缺陷**——两面合起来才是全覆盖，不能只靠 CI 关门。
 - **防盗号注**：macOS 本机无法生产 PS 5.1 行为——`docs/notes/devlog.zh.md` 该条的真机复验步骤（PS 5.1 环境复现旧 exit(1) + 新版复原）留给首次 Windows 真机。
 
 ## 2026-09-23 干净检出构建必红：typert 生成物必须携带（生成器无法在仓外运行）
