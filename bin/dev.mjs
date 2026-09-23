@@ -223,8 +223,11 @@ function startHost(mode) {
   mkdirSync(logDir(), { recursive: true })
   const env = startEnv()
   // 额外旗标透传给宿主 CLI(如 --no-open:测试自动化重启时不弹浏览器)——仅本脚本自身的
-  // `--bg` 被摘除,其余原样追加。跨平台:纯参数数组,零 shell。
-  const passthrough = process.argv.slice(2).filter(arg => arg.startsWith('--') && arg !== '--bg')
+  // `--bg` 被摘除,其余原样追加。取"命令词之后的全部参数"而不是"以 -- 开头的参数":
+  // 后者会把带值的旗标砍成半截(`--port 3099` 只剩 `--port`)。跨平台:纯参数数组,零 shell。
+  const argv = process.argv.slice(2)
+  const commandIndex = argv.findIndex(arg => arg && !arg.startsWith('--'))
+  const passthrough = argv.slice(commandIndex + 1).filter(arg => arg !== '--bg')
   const hostArgs = [cli, '--profile', PROFILE, ...passthrough]
   // pid file ALWAYS: `pnpm stop`（另一终端）与 cleanup 都按它清场，前台模式也不例外。
   if (mode === 'fg') {

@@ -41,3 +41,20 @@
     roots:
       - path: !!js dshHomePath('profiles', 'tavern-fengyue', 'presets')
         trust: system
+
+# The tavern serves on its own port. `dsh web` and the tavern profile are two
+# profiles that can perfectly well run side by side, and 3080 is the web-app
+# layer's default that `dsh web` takes; leaving it shared means the second one
+# to start dies on EADDRINUSE. `--port` still wins (an explicit CLI flag reaches
+# ctx.webStartup.port), so this only changes the fallback. The row's whole
+# `config` is restated because a patch replaces all of it, not one key.
+- id: webserver
+  name: '@deepseek-ai/dsh-host-webserver'
+  inject:
+    - webStartup
+  config:
+    host: !!js ctx.webStartup.host ?? '127.0.0.1'
+    port: !!js ctx.webStartup.port ?? 3081
+    compression: gzip
+    compressionLevel: 1
+    compressionThresholdBytes: 1024

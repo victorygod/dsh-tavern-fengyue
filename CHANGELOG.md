@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The tavern profile serves on its own port (3081)** — the bundle layer now overrides the `webserver` row, which the web-app layer defaults to 3080. `dsh web` and the tavern profile are two separate profiles that may well run at once, and sharing one port made the second one to start die on `EADDRINUSE`. `--port` still wins (an explicit flag reaches `ctx.webStartup.port`), so only the fallback moved. With that, `bin/dev.mjs` also forwards host arguments verbatim: it kept only arguments starting with `--`, which truncated value-taking flags (`--port 3099` arrived as a bare `--port`).
 - Tail-agent write face rebuilt to mirror the stock dsh fs tools, fenced to `runtime/`: `runtimeEditor` (view/create/str_replace/insert) is retired for `runtimeWrite` (create or fully replace a document) and `runtimeEdit` (exact old_str→new_str replacement with `replace_all`); `runtimeRead` absorbs the view powers (cat -n numbering, optional `view_range`, two-level directory listings, 10k clip marker) and `insert` is dropped (multi-line `new_str` splices lines).
 - The `runtime*` tools now participate in the kernel's parallel tool scheduling: the read pair and the write pair declare parallel-safe, with the write pair serializing same-path mutations through a per-path promise chain (different files write concurrently, one file's edits keep their model order); `runtimeDelete` and the card tools stay exclusive.
 - `bin/dev.mjs` repo-root `.env` credential loading is now guarded by `.gitignore` (plus a committed `.env.example`).
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `fixtures/` — a nine-file stub card (`fixtures/cards/card/preset/…`, 2.1 KB) with no remaining consumer: no code, test, config, or live doc references the path, and the two scripts it carried (`get_state.mjs`, `roll.mjs`) exist only there. The example cards that ARE exercised live under `tavern_presets/` (`dnd`, `dnd5e`, `芙宁娜`).
 - `scripts/llm-debug.sh` — pre-extraction leftover referencing a no-longer-shipped proxy script; the mock-LLM dev flow (`scripts/mock-llm.mjs`) covers keyless debugging.
 
 ## [0.1.0-rc.1] - 2026-09-17

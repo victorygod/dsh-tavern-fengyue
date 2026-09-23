@@ -76,6 +76,8 @@ pnpm bootstrap     # 把本检出注册为 `tavern-fengyue` profile
 pnpm tavern        # 前台启动宿主；Ctrl-C 结束
 ```
 
+宿主的 Web UI 在 **http://127.0.0.1:3081**。酒馆 profile 自带独立端口，因此可以与默认 3080 的 `dsh web` 并存；启动时会打印完整 URL（带登录 token）。`--port` 可覆盖：`pnpm tavern --port 3099`。
+
 `pnpm tavern` 用的是本仓自己钉的宿主（`node_modules/@deepseek-ai/dsh`），**不需要全局安装 `dsh`**。它自带独立的宿主家目录（`~/.dsh-tavern-fengyue`），不会碰你已有的 `~/.dsh`；要换位置就设 `DSH_HOME`，换完重跑一次 `pnpm bootstrap`。
 
 ### 日常运行

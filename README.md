@@ -76,6 +76,11 @@ pnpm bootstrap     # registers this checkout as the `tavern-fengyue` profile
 pnpm tavern        # starts the host; Ctrl-C stops it
 ```
 
+The host serves the Web UI at **http://127.0.0.1:3081**. The tavern profile claims its own
+port so it can run alongside `dsh web`, which defaults to 3080; a longer-running instance
+prints its full URL (with a login token) on boot. `--port` overrides it:
+`pnpm tavern --port 3099`.
+
 `pnpm tavern` runs the host this repo pins as its own devDependency
 (`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required**. It keeps
 its own harness home (`~/.dsh-tavern-fengyue`), which leaves any existing `~/.dsh` untouched.
