@@ -2,6 +2,48 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-24 芙宁娜段级 CG 即切 + 指令协议内联化(单行·分号·结合台词)
+
+- **需求（用户定形）**：①CG 切换时机 = 「当前展示的那段话出现时」就按该段内嵌的 CG 指令执行换场，不要等 durable 整段结束；②提示词协议改为——切 cg 指令放语段中间（非句末）、`<!-- xxx -->` 单行不换行、多指令用 `;` 分号分隔、注释贴合台词不单独一行。
+- **落地**：
+  1. **段级即切**：`view.mjs parseLine` 行内解析展示文本 + 提取 `cg`；`splitParagraphs` 返回 `{text, cg}` 且纯注释残留过滤（旧跨行格式回归保护）。卡侧每个定型段（`pushAssistantLine`/`startParagraph`）出现即 `switchCg(id)` → `ensureCgLayers`（`gal_data op:'manifest'` 一次性缓存全 CG 层索引）+ `crossfade`（幂等，同 id 跳过）。
+  2. **协议与解析**：`cg_brief` 提示词改为「语段内联、单行、分号、贴合台词」写法；`apply_directives` 从「只取末尾注释块、按行命令」改为「全文扫描所有注释块、块内按换行/分号拆命令、取最终一条 cg 落盘」。
+- **验证**：parseLine/splitParagraphs 单测过（分号多指令、残片过滤）；门禁 307/307；lint 0。段级触发依赖真实模型按新协议输出内文 `<!-- cg: n -->`——模型源当前不稳定，真机在窗口期验证。
+
+## 2026-09-24 流式链路啃透：读法与 stock 同 seat，缺 chunk 在模型源整包
+
+- **诉求**：卡流式「chunk 来了就切分」。几轮「看起来等整段」后用户点破「别的卡/普通 web 能流式，为何你不能」——要核对是否方法论错。
+- **啃透（读内核契约，不猜）**：
+  1. 我们的读法：`binding.eventSource.getSnapshot().entries` 找 `type:'transient'`（`assistant/live-chunk`）。`events.d.ts` 契约 `SessionEventWindow.entries` 确实是 `event | transient` 二型，**transient 就该在窗口里**。
+  2. **stock 同 seat**：D `dsh-client-ui-conversation` 读 live delta 也是 `owner.eventSource`（同一个 `assistant/live-chunk` transient 条目）——**读法没有错，方法论不在我们这边**。
+  3. 决定性观测（真实消耗 token）：宿主自建转写 `hostNarr` 也是 `0 → 82 一次性跳变`（非逐字）。即 **eventSource 从未收到任何 live-chunk**——不是卡没接，是**模型链向 eventSource 根本不产生瞬时帧**。
+  4. adapter（`dsh-llm-deepseek`）已 `stream:true` + SSE parser，但理想源（`idealab.alibaba-inc.com` baseURL / glm-4.7）实测整包返回（0→82 一次），故无分行块。
+- **结论**：tavern 前端逐 chunk 的前提 = 模型源真正 SSE 分块到达 eventSource。当前配置下该源整包、任何前端（含宿主自建转写、我们卡）都只能 durable 结算后整体出现。要逐 chunk 需切换能流式的端点/模型（true streaming），卡/桥（feedAssistantLive→handleLive 按行切）代码已就位。
+- **防复发**：排查「前端不流式」先锁定 eventSource 是否真的收到 transient（宿主自建转写 hostNarr 是否逐字增长）；读法照 `events.d.ts`/stock 对齐，不臆造 seat。已落相关：开场白上移中点、emoji 字体回退、防剧透恢复、新回合重置。
+
+## 2026-09-24 芙宁娜流式渲染 + 行级消息 + 防剧透换行一致（流桥入宿主）
+
+- **现象（用户报）**：①回复时对话框把玩家刚说的话又重复展示一次，刷新后重放又消失（两侧不一致）；②要等整个回复返回完才渲染，无流式；③历史切分进 backlog 时少了换行，刷新后与完整历史不一致；④未点完当前回复就拉历史，当前回复那一行显示 `[object Object]`（正文却正常）。
+- **根因（四项）**：
+  1. **object 真身**：`applyTurn` 把对话队列建成 `{role,text}` 对象数组，`renderBacklog` 防剧透分支把 `state.paras[i]` **整个对象**直接传进 `esc()`，`String(object)` 即 `[object Object]`——对话框正文走的是 `.text`（正常），历史分支漏取了 `.text`。与引擎快照/流式无关。
+  2. **玩家话重复**：`applyTurn` 把 role:user 段也塞进对话队列，读段时先播玩家行；刷新后冷读只播 assistant → 两侧不一致。
+  3. **无流式**：卡数据泵只有 `gal_data` 轮询 durable 快照（回合落盘才有整段），没有任何 live 通道——必须宿主把 live assistant 瞬态文本推给卡。
+  4. **历史换行吞**：防剧透 branch 用 `.trim()` 后的行 `join('\n')` 重拼，吞原文换行；刷新后完整历史行（`row.text` 原样含换行）不一致。
+- **修复**：**宿主流桥**（card-ui.ts）——`CardUiHandle.feedAssistantLive(text)` + mount face `assistantLive.subscribe(listener)`（纯加法，旧卡不订阅即零影响）；chat-view `read()` 在 transient `liveBody` 聚合后推给卡（`cardUiRef` 房式防闭包过期）。**卡流式**（index.js）——`handleLive` 按换行切、只推新完整行，剔指令残段（流中未闭合 `<!--…`）与空段（buffer 非空才展示、文本非空）；`syncDurable` 落定以剥指令全文为准**重建队列**（保留已读段位，尾部残片/缺口替换），与刷新后（冷读 `applyTurn`）走同一 `splitParagraphs` 契约，一致。**applyTurn 去玩家段**（对话框只播 assistant 行，玩家话在角落/backlog 用户行）。**lineEndsOf**（view.mjs 纯函数）记录有效行原文末端偏移，防剧透按已读行 `asstRaw.slice` 保留换行。
+- **验证**：全套 **307/307**、tsc/build/lint 0。真机 CDP：发送后玩家话只出现在角落（对话框正文无重复）；回复正文干净（`cg: 2` 残片已剔）；未点完（reading 态）拉历史 = 一条合并气泡 + 完整正文无 object + 换行保留；点开历史输入框隐藏。
+- **防复发**：取段文本一律走 `.text`（队列尾部都是 `{role,text}`）；流式帧到达必须剔指令残段；落定重建与冷读走同一切分契约；流桥保持纯加法（旧卡不订阅）。[2026-09-24-tavern-opening-surface-contract.zh.md](../notes/feature/2026-09-24-tavern-opening-surface-contract.zh.md)。
+- **行为修订（同日，用户定形队列模型）**：`pushAssistantLine` 改「入队等待点击出队」——流式新完整行只 append 到展示队列；仅当无当前展示段时启动队列头；已在展示某条只入队、**不切换**（不再跳最新）；看下一条唯一触发是玩家点击（ADV 双击语义）。落定 `syncDurable` 重建补尾、读段位保留；防剧透边界收敛为「当前展示段之前」——当前段未点不入历史（真机量证：多段回复 landed 时展示段1，backlog 只有玩家行，点击后段 1→2/3）。
+
+## 2026-09-24 opening 统一契约落地：suppress+dock 开面 + composer 停靠恢复 + 真机装配排障
+
+- **现象（用户报）**：芙宁娜进场「没有 input 可输入、greetings 看不到点不到」；跑真机后「没按原型做、交互体验不对」。对照原型 `tavern_presets/芙宁娜/docs/proto_galgame-ui.html`（视觉正本）真卡四处偏差——①输入不再是宿主 composer 原件停靠（模型座/上下文环/usage 原生），成了卡自绘 textarea + `tavern.submit` + 文字镜像；②发送后先播玩家行、点完才 input，无 waiting 三点节奏；③backlog 态点背景仍走 reading 前进、`.gg-backlog-open` 类从未被设置（CG 暗化规则是死代码）；④input 态把展开历史钮藏了。
+- **根因（两层）**：
+  1. **宿主↔卡无开面契约**：greetings 由宿主渲染在转写层默认开场页里，芙宁娜全屏 overlay（`.tavern-panel-galgame` z45）把宿主开场盖死；`bc97464`「composer 停靠路线整体退役」把输入退化成自绘+镜像——设计文档 §4 原本订的「宿主 composer 原件停靠、功能块全原生」被推翻成了降级实现（即设计 §5 发现 A 的镜像退化）。
+  2. **真机装配错位**：宿主 profile 的 workspace 软链（`~/.dsh-tavern-fengyue/profiles/tavern-fengyue/node_modules/dsh-tavern-fengyue-*`）全指向 `learn_code/dsh-tavern-fengyue-main/packages/*`（旧仓，后已被用户删除），当前工作仓所有改动从未被宿主加载——CDP 看到的卡 mount 面无 `opening` face、layout 无 `suppress/dock`（直接证据：mount 面 layout 序列化缺这两字段）。
+- **修复**：`layout.json` 增 `suppress:["opening"]`（宿主不渲染默认开场/宿主 greetings）+ `dock:["composer"]`（宿主仍渲染 composer、卡重定位进自己布局）；`card-ui.ts` parseLayout 解析两词（未知词 fail 拒整份）+ mount face 补 `opening`（greetings/active/subscribe 权威信号）+ `stop`（宿主同语义通道，替代点 send-btn hack）；`TavernChatView` 开 `honorOpening` 条件渲染门。卡侧 `index.js`：退役自绘输入/镜像/`hiddenMirror`/`forwardStop`，开**停靠量尺**——`getBoundingClientRect` + `position:fixed` 把宿主 composer 原件钉进对话框 slot（JS 量真值，根治旧停靠「卡 CSS 猜宿主几何」的跨平台病）；**层序修复**：停靠必须 `z-index:50` 压过全屏面板 45，否则输入被面板里的空 slot 盖住、对话框内看不出 input（`elementsFromPoint` 量证命中点是 slot 而非 textarea）；加 `box-sizing:border-box` 让原件宽度贴合 slot（宿主 composerWrap 自带左右 padding，缺它右缘探出对话框 44px）。视觉定形（用户拍板）：greeting 独立成画布层画面中央块、背景不透明实色 + 金边；input 态对话框恢复可见外框（深底 + 金边），composer 嵌盒内。发送节奏回 waiting 三点 + 停止小键；backlog 展开挂 `gg-backlog-open`（激活 CG 暗化）+ 点背景先收起。
+- **验证**：全套 **306/306**；typecheck 双面 / build 双 bundle / oxlint 0。真机 CDP（headless）：新会话 → 选芙宁娜 → opening 期 greeting ×4（卡渲染、画面中央、`rgb(13,16,32)` 不透明 + 金边）、宿主默认开场未渲染（suppress 生效）、宿主 composer 停靠后 `elementsFromPoint` 在 textarea 中心命中顶层是 `tavern-textarea`（真在对话框盒内，几何相交 `inBox=true`）、点 greeting 经 `tavern-insert` 填宿主 draft、Enter 原生发送 → waiting 三点 + 停止键、发送后 greeting 消失、backlog 开合 + CG 暗化、dnd5e 无声明零回归。「上下文环形缺失」一条为 stock 假阴性（占用投影未达时不渲染环形）。
+- **防复发**：①真机验不过先查宿主 profile workspace 软链指向（`readlink` 四条 `dsh-tavern-fengyue-*`，对照当前工作目录；重指向用绝对路径 + `pnpm tavern restart --bg --no-open`——memory host-workspace-symlinks-matter）；②停靠层序必须压过 overlay 面板 z45；③开面数据/信号一律走 mount face 契约，不回 DOM 探测（[2026-09-24-tavern-opening-surface-contract.zh.md](../notes/feature/2026-09-24-tavern-opening-surface-contract.zh.md)）。
+
 ## 2026-09-23 ubuntu-only CI 红：teardown 等一个未被回收的卡工具子进程（测试侧收口，回收归内核）
 
 - **现象**：CI 反复在 `ubuntu-latest`（node 22 与 24 都中）红，卡在 `pnpm test`，报 `Hook timed out in 10000ms`；把 hookTimeout 提到 30s 后变成 `Hook timed out in 30000ms`——**是等待而非慢**。macOS / Windows 全程绿。
@@ -590,3 +632,15 @@
 - **修复**：`loadCardUi` 探测改直读 preset/ui/ 四件套（读到且非空白才算在场，全缺/全空白 → null），挂载判定与树快照彻底解耦。dnd5e 卡：新增 `preset/scripts/opening_data.mjs`（runtime 直读 openings.json 单源）；ui 桥加 `opening-init` → `opening-init-data` 应答（镜像 dnd 卡握手）；opening.html 场景列表改「内嵌副本兜底 + 桥应答即以库重建」（内嵌副本同步为四场景现文案；用户手改开场白的 dirty 判定保留不覆盖）；`opening_commit` 两处 patch 正则对齐现模板。
 - **行为定案（用户拍板，二次修正）**：「落盘并开始冒险」一键全包且零跳转——落盘成功即把 payload.narration（textarea 现值，所见即所插）经 tavern-insert 直入宿主输入框；完成页整体退役（无任何页面切换），按钮原地变「✓ 已落盘——开场白已填入下方输入框」禁点态 + flash 一句，发送由玩家在输入框完成。payload 带 narration 顺带修掉「手改口播与落盘脚本返回不一致」的潜在分叉。
 - **验证**：引擎子进程同款 runner 跑 fixture runtime 实测（opening_data 四场景直出 / port-tavern commit 篇章·所在·主线·队伍·时间五项 patch 全命中 / 未知 scenario id 兜底生效）；新增 `packages/ui/tests/card-ui.client.spec.ts` 三例（在场→活柄 layout/theme、全缺→null、纯空白→null；tree 快照恒三目录也不影响判定）；vitest 246/246、tsc、client bundle 重建；**真机 playwright e2e 冒烟（headless chrome 打独立端口宿主实例——用户前台实例的 boot URL 打在其终端,全局日志摸不到 token）**：新会话→卡库载 dnd5e→开场页 `.scn`=4→切「海港酒馆」→随机分配→单次点击「落盘并开始冒险」→按钮原地变「✓ 已落盘——开场白已填入下方输入框」（`#ok` 计数=0、表单仍在原地）→输入框即时 156 字含「歪桅杆」（二次点击零参与）→服务器侧 `characters/player.json`+`state.md` 主线 patch 落盘，SMOKE-PASS。冒烟自建会话精确删除（用户既有会话原样保留）；老会话的工作区持有旧卡副本身上不带新脚本——载一次卡/开新会话即吃新件。
+
+## 2026-09-24 「载入最近 autosave 后双 HUD 面板崩坏+卡死」：换绑链三层定罪（Windows 热文件语义）
+
+- **现象（用户报，Windows 侧独有）**：刚说完话载入最近一个 autosave——点「载入」即卡死（弹窗不关、无 toast、F5 才换绑成功且数据回退正确）；引擎侧旧会话解绑后面板泵撞 `not a tavern session`，两块 HUD 面板同时上错误 chip。载入其他存档 1s 正常；停掉尾代理再载依旧卡死；console 全静默。
+- **排障路径与三个被推翻的假设**：① 面板红框=泵调用失败 → 正确（两面板共用 `ui_data.mjs` 泵，泵 RPC 拒=双响）；② 「`rmSync` 被面板泵子进程 cwd 钉住」→ 不足以区分「最近档必死/老档秒过」；③ 「尾代理在跑时载入才有事」→ 用户停了再点依旧卡死，非必要条件。决定性实验 = 在 loader-composition 真组合上一比一复刻用户时序（两回合+记账全落定 → tailRunning=false → `load(最近 autosave)`）——macOS <1s 干净通过，引擎时序无罪，差异收敛到 **loadSave 的 Windows FS 语义**。
+- **定罪链（机制级）**：`loadSave` 原实现 = 裸 `rmSync(runtime)`+整树重拷（`workspace.ts`，零重试）。刚说完话的 runtime 里 `state.md`/`characters/*`/`.chat.*` 全是几秒前的热文件——Windows 上删除热文件与杀软/索引器关闭态句柄相撞报 EPERM/EBUSY（POSIX 删除被占文件合法，开发机永远看不见）；idle 时 runtime 全冷,老载入从不触发。抛点在**解绑旧会话之后** → RPC 落 `tavern/save-failed` → 前端**拒绝分支 `() => undefined` 整个吞掉**（09-18「保存并开始」首犯的同族）→ 弹窗卡死无 toast；且每次失败 runtime 停在半删状态（**载入失败是破坏性的**，用户可能已丢世界数据；savings 快照是完整恢复源）。
+- **修复（三层，全有全无换绑）**：
+  1. `loadSave`（workspace.ts）改**改名换位**：runtime 原地 `renameSync` 让位到隐藏过渡树 `.tavern-runtime-retired`（rename 不受 cwd 占用/热句柄影响）→ 从快照重建 → 兜底退役旧树（rmSync 加 `maxRetries:10/retryDelay:100`,吃掉短命泵子进程的钉窗口）。好性质:删除失败不再拖垮载入（快照已生效,躯壳下次前置清扫）;拷贝失败退回原位世界无损。
+  2. `load()`/`reset()`（index.ts）**换绑全有全无 + 围栏**:开闸先中止在跑收束链（与 stop 同原语）并 `await gate`;runtime 置换移到解绑**之前**——置换失败回滚 fresh 绑定与标记、旧会话原样保持（「新绑了旧世界半截」与「解绑后崩溃窗」两类中间态整个消失）;`composeMainAgent` 移到置换之后。失败经 RPC rejection 上屏。
+  3. 客户端（TavernView SavesPanel）**拒绝分支可见化**:载入按钮 loading 态(防拿已换绑旧 id 连点)、失败行内错误行（`loadError`+,css 复用 `--t-danger` 系）+ `console.warn` 留痕。验尸不再靠 F5。
+- **回归钉**：workspace.spec 新增拷贝失败回滚原位（chmod 000 拦 copyFileSync,root 跳过）与无退役残留/过渡树不出编辑树两例;新增 `packages/ui/tests/saves-load.client.spec.tsx`（失败上屏+按钮复活）——绕开 client-runtime 的 kernel client.js 链（`makeTranslate` 是.ModuleLoader 前递源）,本地 translate stub 直译词表;tests-client-plane 的 KNOWN GAP（vitest glob 不匹配）维持原状。
+- **验证**：vitest 306/306（含 loader-composition 载入/清空真组合走新序）、tsc host/client、oxlint、`pnpm build` 四包全绿。**待 Windows 复现验证**：修复后「说完话→载最新档」应一次成功;若仍有失败,错误原文会首次出现在存档页错误行与宿主日志（`tavern/save-failed: ...`）——不再需要 F5 考古。旧排障笔记（`load-rebind-debug.zh.md` 2026-09-13）的「载入缺回滚」欠账就此清账。

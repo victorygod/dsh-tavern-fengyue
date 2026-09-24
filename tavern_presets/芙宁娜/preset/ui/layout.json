@@ -1,6 +1,8 @@
 {
   "transcript": { "window": "all" },
   "html": true,
+  "suppress": ["opening"],
+  "dock": ["composer"],
   "panels": [
     { "name": "galgame", "slot": "overlay" }
   ]

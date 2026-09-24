@@ -1668,13 +1668,31 @@ function SavesPanel(props: {
   const { rpc, sessionId, t } = props
   const dialogs = useDialogs()
   const [saves, setSaves] = useState<readonly TavernSaveWire[]>([])
+  // 载入的失败面(2026-09-24):此前拒绝分支是 `() => undefined`——任何失败
+  // (引擎换绑中抛错、会话解绑后重试)都被吞成「静默卡死」。现在失败显式上屏:
+  // 行内错误行 + console 留痕,载入中禁用按钮(防拿已换绑的旧 id 连点)。
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadingSave, setLoadingSave] = useState<string | null>(null)
   const reload = useCallback(() => {
     void rpc.saves({ sessionId }).then((value) => { setSaves(value.saves) }, () => { setSaves([]) })
   }, [rpc, sessionId])
   useEffect(() => { reload() }, [reload])
+  const loadSave = useCallback((name: string): void => {
+    if (loadingSave !== null) return
+    setLoadingSave(name)
+    setLoadError(null)
+    void rpc.load({ sessionId, name }).then((value) => {
+      props.onSessionSwitch?.(value.sessionId, 'load', value.draft)
+      reload()
+    }, (error: unknown) => {
+      console.warn('[tavern] rpc failed', error)
+      setLoadError(error instanceof Error ? error.message : String(error))
+    }).finally(() => { setLoadingSave(null) })
+  }, [loadingSave, props.onSessionSwitch, reload, rpc, sessionId])
   return (
     <div className={css.panel}>
       <div className={css.saves}>
+        {loadError !== null && <div className={css.loadError}>{t('header.loadFailed')}：{loadError}</div>}
         {saves.length === 0 && <div className={css.empty}>{t('saves.empty')}</div>}
         {saves.map(save => (
           <div key={save.name} className={css.save}>
@@ -1686,13 +1704,9 @@ function SavesPanel(props: {
             <div className={css.a}>
               <button
                 type="button" className={css.btn}
-                onClick={() => {
-                  void rpc.load({ sessionId, name: save.name }).then((value) => {
-                    props.onSessionSwitch?.(value.sessionId, 'load', value.draft)
-                    reload()
-                  }, () => undefined)
-                }}
-              >{t('save.load')}</button>
+                disabled={loadingSave === save.name}
+                onClick={() => { loadSave(save.name) }}
+              >{loadingSave === save.name ? t('view.loading') : t('save.load')}</button>
               <button
                 type="button" className={`${css.btn} ${css.danger}`}
                 onClick={() => {

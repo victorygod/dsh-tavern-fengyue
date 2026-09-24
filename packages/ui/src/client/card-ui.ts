@@ -6,10 +6,11 @@
  * host-level trust (its scripts run host-side bash), so the pack applies
  * without a consent dialog; `theme.css` is NOT injected here — it is returned
  * as `themeCss` and the caller (themes.ts) folds it into the `#tavern-theme`
- * sheet behind the active built-in tokens. The mount face is deliberately one
- * function — `tavern.runScript` — because that is the card's whole write
- * channel: data reads ride plain file reads inside their scripts, and
- * composer reflows are hook-DOM writes. Styles pass a small guard (no
+ * sheet behind the active built-in tokens. The mount face carries the
+ * card's data channels (`runScript`/`callScript`/`readAsset`), the
+ * admission/stop pair (`submit`/`stop` — the same production paths the
+ * native composer drives), and the opening contract (`opening`) —
+ * data + signal instead of cards polling host DOM. Styles pass a small guard (no
  * `@import`, no absolute-protocol `url()`), `chat.css` selectors are prefixed
  * to `.tavern-stage`, and layout.json is clamped to the known vocabulary —
  * bad input degrades to the default look with a console note, never breaking
@@ -20,6 +21,9 @@
 import type { TavernRpc } from './rpc.ts'
 import { scopeCssRules } from './scope-css.ts'
 
+/** A host default cell a card may claim — render-suppress it or dock into its own layout. */
+export type SuppressCell = 'opening' | 'composer'
+
 /** The layout.json data-side declaration (positioning stays in the card's CSS). */
 export interface CardLayout {
   /** Message-list viewport window: show at most the last N lines (scroll-up loads more). */
@@ -28,6 +32,10 @@ export interface CardLayout {
   readonly html: boolean
   /** Declared panel containers: v1 = the card's own DOM fills them (index.js mount); v2 = host-pumped (data+view). */
   readonly panels: readonly CardLayoutPanel[]
+  /** Host default cells NOT to render (the card owns them and paints its own). Empty = host renders them. */
+  readonly suppress: readonly SuppressCell[]
+  /** Host default cells to STILL render, but positioned by the card into its own layout (dock). Composer only today. */
+  readonly dock: readonly SuppressCell[]
 }
 
 export interface CardLayoutPanel {
@@ -42,11 +50,54 @@ export interface CardLayoutPanel {
   readonly hideDuringOpening?: boolean
 }
 
+/**
+ * The opening facts the host hands a card (opening-surface contract
+ * 2026-09-24): data the card renders itself when it suppresses the
+ * host's default opening (`greetings`), plus the authoritative
+ * "opening surface is on-screen" signal with change notification —
+ * the replacement for cards polling `[class*="openingFrame"]`.
+ */
+export interface CardOpeningFace {
+  /** `preset/greetings.json` entries (host is the only reader); `[]` when absent or malformed. */
+  readonly greetings: readonly string[]
+  /** The host's authoritative fact: the opening surface is currently on-screen. */
+  get active(): boolean
+  /** Notified on every `active` flip; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void
+}
+
+/** * The live assistant stream face: the host pushes the chat view's current
+ * transient text (the per-turn narrative deltas) so a docked card can render
+ * rows as they stream instead of waiting for the durable settlement. Pure
+ * addition — cards that never subscribe are untouched. Reasoning (live think)
+ * rides a sibling channel for the card's folded streaming think row.
+ */
+export interface AssistantLiveFace {
+  /** Current accumulated live assistant text (may be empty when idle/replay). */
+  get text(): string
+  /** Current accumulated live reasoning text (may be empty). */
+  get reasoning(): string
+  /** Notified with the accumulated text on every push; returns the unsubscribe. */
+  subscribe(listener: (text: string) => void): () => void
+  /** Notified with the accumulated reasoning on every push; returns the unsubscribe. */
+  subscribeReasoning?(listener: (reasoning: string) => void): () => void
+}
+
 /** The mounted card UI: layout facts, the guarded card theme, plus the disposer. */
 export interface CardUiHandle {
   readonly layout: CardLayout
   /** The guarded `preset/ui/theme.css` (asset urls resolved), or null when the card ships none. */
   readonly themeCss: string | null
+  /** The opening face mounted through `tavern.opening`. */
+  readonly opening: CardOpeningFace
+  /** The live assistant stream face mounted through `tavern.assistantLive`. */
+  readonly assistantLive: AssistantLiveFace
+  /** Authoritative opening-surface truth; TavernChatView pushes it on every change. */
+  setOpeningActive(active: boolean): void
+  /** Push the chat view's accumulated live assistant text to the card's stream subscribers. */
+  feedAssistantLive(text: string): void
+  /** Push the chat view's accumulated live reasoning text to the card's stream subscribers. */
+  feedLiveReasoning(reasoning: string): void
   dispose(): void
 }
 
@@ -93,7 +144,7 @@ async function resolveAssetUrls(rpc: TavernRpc, sessionId: string, css: string, 
 /** Clamp layout.json to the known vocabulary; any bad shape degrades to the default. */
 /* oxlint-enable @stylistic/max-len, typescript/no-unnecessary-type-conversion, typescript/no-unnecessary-condition */
 function parseLayout(raw: string | null): CardLayout {
-  const fallback: CardLayout = { html: true, panels: [] }
+  const fallback: CardLayout = { html: true, panels: [], suppress: [], dock: [] }
   if (raw === null) return fallback
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
@@ -130,7 +181,27 @@ function parseLayout(raw: string | null): CardLayout {
         })
       }
     }
-    return { ...(windowLast === undefined ? {} : { windowLast }), html, panels }
+    // suppress(可选):被卡接管的宿主默认格。未知词直接拒——覆盖声明
+    // 拼错字号静默通过比 fail-visible 更糟(宿主照样画、卡照旧盖,又一轮互相猜)。
+    const suppress: SuppressCell[] = []
+    if (parsed['suppress'] !== undefined) {
+      if (!Array.isArray(parsed['suppress'])) throw new Error('suppress list')
+      for (const cell of parsed['suppress'] as unknown[]) {
+        if (cell !== 'opening' && cell !== 'composer') throw new Error(`suppress cell "${String(cell)}"`)
+        suppress.push(cell)
+      }
+    }
+    // dock(可选):宿主仍然渲染、卡重新定位进自己的布局。本轮只承认 composer——
+    // 未知词 fail 整份(dock 声明拼错会让卡永远量不到目标,宁 fail 醒目)。
+    const dock: SuppressCell[] = []
+    if (parsed['dock'] !== undefined) {
+      if (!Array.isArray(parsed['dock'])) throw new Error('dock list')
+      for (const cell of parsed['dock'] as unknown[]) {
+        if (cell !== 'composer') throw new Error(`dock cell "${String(cell)}"`)
+        dock.push(cell)
+      }
+    }
+    return { ...(windowLast === undefined ? {} : { windowLast }), html, panels, suppress, dock }
   } catch (error) {
     console.warn('[tavern] card ui: layout.json rejected —', error instanceof Error ? error.message : String(error))
     return fallback
@@ -150,9 +221,16 @@ function setStyleElement(id: string, css: string | null): void {
  * Load and mount one card's UI pack for a binding.
  * @param rpc - the tavern face.
  * @param sessionId - the binding the pack belongs to.
+ * @param extras - faces handed from the chat view (stable refs, see
+ *   the stop note in TavernChatView); `stop` is the host's stop
+ *   semantics so the card never forwards clicks to host DOM again.
  * @returns the live handle, or null when the card ships no `ui/`.
  */
-export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<CardUiHandle | null> {
+export async function loadCardUi(
+  rpc: TavernRpc,
+  sessionId: string,
+  extras: { readonly stop?: () => Promise<unknown> | void } = {},
+): Promise<CardUiHandle | null> {
   // 存在性靠直读六件套判定——不踩 tree（2026-09-20 懒树期曾按「树里翻得到 preset/ui/*」
   // 判定，恒 false 导致卡 UI 整面失挂；懒树已回滚，直读探测保留：挂载从此与树语义无关）。
   // view.mjs/acts.mjs = v2 声明形态（宿主运行时）；index.js = legacy mount 形态。可并存。
@@ -172,6 +250,25 @@ export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<Car
     // 没有卡包可挂 != 挂载失败。草稿卡/无 ui 卡都会走到这里。
     console.warn(`[tavern] card ui: session "${sessionId}" has no preset/ui pack — nothing to mount (draft card or ui-less card)`)
     return null
+  }
+  // Independent read, deliberately NOT part of the presence check
+  // above (that answers "does the card ship a ui pack"; greetings is
+  // opening data). Tolerant parse: bad JSON / non-string rows = [] —
+  // the same semantics the host's own default-opening reader uses.
+  let greetings: readonly string[] = []
+  try {
+    const raw = await tryReadText(rpc, sessionId, 'preset/greetings.json')
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw)
+      const declared = typeof parsed === 'object' && parsed !== null
+        ? (parsed as { greetings?: unknown }).greetings
+        : undefined
+      if (Array.isArray(declared)) {
+        greetings = declared.filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+      }
+    }
+  } catch {
+    greetings = []  // 可选数据文件,静默回退(与默认开场页读侧同口径)
   }
   const guardedTheme = themeRaw === null ? null : guardCss(await resolveAssetUrls(rpc, sessionId, themeRaw, 'preset/ui/'), 'theme.css')
   const guardedChat = chatRaw === null ? null : guardCss(await resolveAssetUrls(rpc, sessionId, chatRaw, 'preset/ui/'), 'chat.css')
@@ -198,6 +295,53 @@ export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<Car
   const acts = await importModule<Record<string, (ctx: unknown, event: Event) => void>>(actsCode, 'acts.mjs')
   const runtime = await importModule<{ mountPanels?: (deps: Record<string, unknown>) => { dispose(): void } }>(runtimeCode, 'runtime.mjs')
 
+  // The opening-surface truth cell: the chat view pushes `setOpeningActive`
+  // (it alone knows 清空/转写), the card reads `active`/`subscribe`.
+  // Dispose clears the listeners so a dropped handle never fires.
+  let openingActive = false
+  const openingListeners = new Set<() => void>()
+  const opening: CardOpeningFace = {
+    greetings,
+    get active(): boolean { return openingActive },
+    subscribe(listener: () => void): () => void {
+      openingListeners.add(listener)
+      return () => { openingListeners.delete(listener) }
+    },
+  }
+  const setOpeningActive = (active: boolean): void => {
+    if (openingActive === active) return
+    openingActive = active
+    for (const listener of [...openingListeners]) listener()
+  }
+  // Live assistant stream face: host pushes the chat view's accumulated
+  // transient text; cards subscribe to render rows as they arrive.
+  let liveAsst = ''
+  const liveListeners = new Set<(text: string) => void>()
+  let liveReasoning = ''
+  const reasoningListeners = new Set<(reasoning: string) => void>()
+  const assistantLive: AssistantLiveFace = {
+    get text(): string { return liveAsst },
+    get reasoning(): string { return liveReasoning },
+    subscribe(listener: (text: string) => void): () => void {
+      liveListeners.add(listener)
+      return () => { liveListeners.delete(listener) }
+    },
+    subscribeReasoning(listener: (reasoning: string) => void): () => void {
+      reasoningListeners.add(listener)
+      return () => { reasoningListeners.delete(listener) }
+    },
+  }
+  const feedAssistantLive = (text: string): void => {
+    if (liveAsst === text) return
+    liveAsst = text
+    for (const listener of [...liveListeners]) listener(text)
+  }
+  const feedLiveReasoning = (reasoning: string): void => {
+    if (liveReasoning === reasoning) return
+    liveReasoning = reasoning
+    for (const listener of [...reasoningListeners]) listener(reasoning)
+  }
+
   let unmount: (() => void) | undefined
   if (indexCode !== null && indexCode.trim() !== '') {
     const mod = await importModule<{ mount?: (tavern: unknown) => (() => void) | void }>(indexCode, 'index.js')
@@ -216,6 +360,16 @@ export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<Car
           requestId: crypto.randomUUID(),
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
+        // 停止:宿主 chat view 的同语义通道(经稳定 ref 转发);卡的
+        // waiting 态停止小键由此直达,替代点宿主 send-btn 的 DOM hack。
+        stop: () => extras.stop?.(),
+        // 开场契约:suppress opening 的卡据此自绘起步(greetings)与
+        // 开场结束(active/subscribe)——三卡共享的 [class*="openingFrame"]
+        // 轮询探测由此退役的第一块砖。
+        opening,
+        // 流式通道:宿主聊天视图把 live assistant 瞬态文本推进来,卡按行切分即时渲染。
+        // 旧卡不缺省 subscribe 即不受影响(纯加法)。
+        assistantLive,
         readAsset: (path: string) =>
           rpc.readAsset({ sessionId, path }).then(value => value.dataUrl).catch(() => undefined),
         layout,
@@ -231,8 +385,15 @@ export async function loadCardUi(rpc: TavernRpc, sessionId: string): Promise<Car
   return {
     layout,
     themeCss: guardedTheme,
+    opening,
+    assistantLive,
+    setOpeningActive,    feedAssistantLive,
+    feedLiveReasoning,
     dispose(): void {
       try { unmount?.() } catch (error) { console.warn('[tavern] card ui: unmount failed —', error) }
+      openingListeners.clear()
+      liveListeners.clear()
+      reasoningListeners.clear()
       setStyleElement(CHAT_STYLE_ID, null)
       setStyleElement(UI_STYLE_ID, null)
       for (const entry of urls) URL.revokeObjectURL(entry.url)

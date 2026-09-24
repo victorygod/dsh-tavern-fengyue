@@ -1,31 +1,59 @@
-/* 芙宁娜 galgame UI(v1 直控)——对话框状态机/CG 层/backlog/输入停靠。
-   定位契约:.tavern-stage > .tavern-panel-galgame 全幅 absolute,不碰 composer 常位。 */
+/* 芙宁娜 galgame UI(v1 直控)——对话框状态机/CG 层/backlog/停靠。
+   定位契约:.tavern-stage > .tavern-panel-galgame 全幅 absolute,不碰 composer 常位。
+   输入回宿主(layout.json dock:["composer"]):input 态宿主 composer 原件经 JS
+   量尺 fixed 停在对话框输入行位;模型座/环形/textarea/发送/usage 全原生。
+   greeting 选项块为开场契约(list-suppress:["opening"])新增的小件。 */
 
-.tavern-stage > .tavern-panel-galgame { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 45; }  /* 45>停靠 composer 的 40:输入态名字牌骑在 composer 上 */
+.tavern-stage > .tavern-panel-galgame { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 45; }
 .tavern-panel-galgame .gg { position: absolute; inset: 0; pointer-events: auto; }
 .tavern-panel-galgame .gg * { box-sizing: border-box; }
 
 /* ── CG 双缓冲(cover + 锚头身;backlog 态变暗微缩)── */
+/* CG 情绪词(manifest intro):画面中央浮层 */
+.gg-cg-mood { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  max-width: 80%; box-sizing: border-box;
+  padding: 6px 20px; text-align: center; pointer-events: none; z-index: 3;
+  font: 700 16px/1.6 var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  letter-spacing: .3em; color: #f0d28a;
+  background: rgba(9,12,24,.55); border: 1px solid rgba(201,162,75,.45); border-radius: 999px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.55); }
 .gg-cg { position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 50% 18%;
   transition: opacity .6s ease, filter .45s ease, transform .45s ease; }
 .gg-front { opacity: 1; } .gg-back { opacity: 0; }
 .tavern-panel-galgame.gg-backlog-open .gg-front { filter: brightness(.55); transform: scale(.965); }
 
-/* ── 玩家上一句(角落小字)── */
-.gg-user { position: absolute; top: 12px; right: 16px; max-width: 36%;
-  font: 500 11px/1.6 -apple-system, "PingFang SC", sans-serif; color: rgba(243,234,214,.55);
-  text-shadow: 0 1px 3px rgba(0,0,0,.7); text-align: right; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* ── 思考折叠行(对话框盒外上方):整条带背景、文本内部滚动,镜像宿主 think 行观感 ──
+   bottom 由 index.js placeThink 跟随对话框顶部定位;reasoning 空由 index.js 隐藏。 */
+.gg-think { position: absolute; left: 3.5%; right: 3.5%; z-index: 10; display: none;
+  box-sizing: border-box; max-height: 220px; overflow-y: auto;
+  padding: 5px 12px;
+  background: rgba(9,12,24,.74); border: 1px solid rgba(201,162,75,.35); border-radius: 10px; }
+.gg-think::-webkit-scrollbar { width: 6px; }
+.gg-think::-webkit-scrollbar-thumb { background: rgba(201,162,75,.3); border-radius: 6px; }
+.gg-think-head { display: flex; align-items: center; gap: 8px; width: 100%; padding: 0;
+  border: 0; background: none; color: rgba(233,226,210,.55);
+  font: 400 13px/24px -apple-system, "PingFang SC", sans-serif; cursor: pointer; text-align: left; }
+.gg-think-head::before { content: "▸"; color: #d9c081; transition: transform .18s ease; font-size: 10px; }
+.gg-think-open .gg-think-head::before { transform: rotate(90deg); }
+.gg-think-label { color: #f0d28a; letter-spacing: .1em; }
+.gg-think-summary { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; color: rgba(233,226,210,.5); font-weight: 400; }
+.gg-think-body { display: none; padding: 2px 0 4px 20px;
+  color: rgba(233,226,210,.72);
+  font: 400 13px/20px var(--t-serif, "Source Han Serif SC", serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  white-space: pre-wrap; word-break: break-word; }
+.gg-think-open .gg-think-body { display: block; }
 
-/* ── 对话框(底贴边;输入态由 composer 停靠承载)── */
+/* ── 对话框(底贴边;input 态脱壳透明,宿主 composer 停靠其上)── */
 .gg-dialog { position: absolute; left: 3.5%; right: 3.5%; bottom: 4%;
   min-height: 120px; max-height: 46%; padding: 24px 30px 16px 30px;
   background: linear-gradient(180deg, rgba(9,12,24,.82), rgba(9,12,24,.93));
   border: 1px solid rgba(201,162,75,.5); border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0,0,0,.5);
   display: flex; flex-direction: column;
-  font-family: var(--t-serif, "Source Han Serif SC", Georgia, serif); }
+  /* emoji 回退字体:否则 emoji 在 serif 栈下渲染成单色(2026-09-24 取证) */
+  font-family: var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"; }
 .gg-dialog::before { content: ""; position: absolute; left: 16px; right: 16px; top: 0; height: 1px;
   background: linear-gradient(90deg, transparent, rgba(240,210,138,.65) 25%, rgba(240,210,138,.65) 75%, transparent); }
 
@@ -37,14 +65,13 @@
   transition: background .3s ease; }
 .tavern-panel-galgame.gg-input .gg-name { background: linear-gradient(180deg, #9fd8d2, #4d9a91); color: #06211f; }
 
-/* 上边缘钮(历史/停止:骑对话框上边缘右翼)── */
+/* 上边缘钮(历史/停止:骑对话框上边缘右翼;input 态展开钮保留——原型同款)── */
 .gg-expand, .gg-stop { position: absolute; top: -15px; padding: 4px 14px;
   font: 600 12px/1.6 -apple-system, "PingFang SC", sans-serif;
   background: rgba(16,21,38,.92); color: #d9c081;
   border: 1px solid rgba(201,162,75,.45); border-radius: 99px; cursor: pointer; z-index: 2; }
 .gg-expand { right: 18px; }
 .gg-stop { right: 92px; color: #e58c86; border-color: rgba(196,84,78,.5); display: none; }
-.tavern-panel-galgame.gg-input .gg-expand { display: none; }
 
 /* 段落正文(空行分段;typing 光标;overflow 内滚)── */
 .gg-text { flex: 1; min-height: 0; color: #f3ead6; font-size: 17px; line-height: 2.05;
@@ -69,6 +96,47 @@
 .gg-dots i:nth-child(2) { animation-delay: .18s; } .gg-dots i:nth-child(3) { animation-delay: .36s; }
 @keyframes gg-dotjump { 0%,100% { transform: translateY(0); opacity: .55; } 50% { transform: translateY(-9px); opacity: 1; } }
 
+/* ── input 态停靠:对话框保留可见外框(深底+金边),宿主 composer 原件以
+   JS 量尺 fixed 落在对话框内的 gg-dock-slot 上——用户在对话框内输入。
+   像素定位由 index.js 内联(仅动 composer 自身 style)。composer 的 usage
+   行随原件一起落位(no 额外镜像)。 */
+.gg-dock-slot { display: none; }
+.tavern-panel-galgame .gg-dialog.gg-input {
+  min-height: 190px; max-height: none; padding: 22px 30px 16px;
+  background: linear-gradient(180deg, rgba(9,12,24,.85), rgba(9,12,24,.95));
+  border: 1px solid rgba(201,162,75,.55); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+}
+.tavern-panel-galgame .gg-dialog.gg-input::before { display: none; }
+.tavern-panel-galgame .gg-dialog.gg-input .gg-text,
+.tavern-panel-galgame .gg-dialog.gg-input .gg-dots,
+.tavern-panel-galgame .gg-dialog.gg-input .gg-next { display: none; }
+.tavern-panel-galgame .gg-dialog.gg-input .gg-dock-slot {
+  display: block; flex: 1; min-height: 0; width: 100%;
+}
+
+/* 宿主 composer 停靠态(JS 只设像素定位;CSS 只开闭与层序)——宿主原件
+   display 默认由下面 body 规则隐去,仅 input 态转 block 并钉到 slot。 */
+body.gal-ui .tavern-composer { display: none; }
+body.gal-ui.gal-input .tavern-composer { display: block; position: fixed; z-index: 40; }
+
+/* ── greeting 开场白块(画布层,画面中央,不透明实底——用户定形 2026-09-24)──
+   数据 = tavern.opening.greetings;显示态由 index.js 的 renderGreet 驱动;
+   点击 postMessage tavern-insert 填宿主 composer draft(只填不发)。 */
+.gg-greet { display: none; position: absolute; top: 40%; left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box; width: min(560px, 82%); max-width: 82%;
+  flex-direction: column; gap: 10px; padding: 24px 28px;
+  background: #0d1020; border: 1px solid rgba(201,162,75,.6); border-radius: 14px;
+  box-shadow: 0 12px 44px rgba(0,0,0,.6); z-index: 6; }
+.gg-greet-label { text-align: center; color: #d9c081; font: 600 12px/2 -apple-system, "PingFang SC", sans-serif; letter-spacing: .3em; }
+.gg-greet-btn { appearance: none; cursor: pointer; text-align: left; white-space: pre-wrap;
+  padding: 9px 15px; border: 1px solid rgba(201,162,75,.4); border-radius: 9px;
+  background: #181c30; color: #ede3c8;
+  font: 14px/1.8 var(--t-serif, "Source Han Serif SC", serif);
+  transition: border-color .15s ease, transform .15s ease; }
+.gg-greet-btn:hover { border-color: #f0d28a; transform: translateY(-1px); }
+
 /* ── backlog(上拉历史;折叠钮固定右上;防剧透截止)── */
 .gg-backlog { position: absolute; left: 3.5%; right: 3.5%; top: 6%; bottom: 4%;
   background: rgba(7,10,20,.93); border: 1px solid rgba(201,162,75,.42);
@@ -85,20 +153,4 @@
 .bl-row.u .bl-name { color: #9fd8d2; }
 .bl-text { white-space: pre-wrap; color: #e9e2d2; font-size: 14.5px; line-height: 1.95;
   background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07);
-  padding: 9px 15px; border-radius: 11px; }
-/* 卡自持输入(玩家手势经 tavern.submit 直发):宿主 composer 恒隐——
-   零停靠、零跨平台定位假设;模型/占用/usage 从宿主隐藏节点镜像文本。 */
-body.gal-ui .tavern-composer, body.gal-ui .tavern-context-meter, body.gal-ui .tavern-usage-line { display: none; }
-.gg-input-row { display: none; }
-.gg-dialog.gg-input .gg-input-row { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; padding: 12px 30px 12px 30px; }
-.gg-textarea { width: 100%; height: 56px; resize: none; background: rgba(0,0,0,.4); color: #f3ead6;
-  border: 1px solid rgba(201,162,75,.35); border-radius: 9px; padding: 10px 14px;
-  font: 15px/1.7 var(--t-serif, "Source Han Serif SC", serif); outline: none; margin: 0; }
-.gg-textarea:focus { border-color: #f0d28a; }
-.gg-input-controls { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
-.gg-model-mirror, .gg-usage-mirror { font: 500 11px/1.4 -apple-system, "PingFang SC", sans-serif;
-  color: rgba(190,186,178,.55); }
-.gg-model-mirror { margin-right: auto; }
-.gg-send { padding: 0 24px; height: 40px; border-radius: 9px; cursor: pointer;
-  border: 1px solid #c9a24b; background: linear-gradient(180deg, #f0d28a, #b07d2b);
-  color: #221607; font: 700 14px/1 sans-serif; letter-spacing: .2em; }
+  padding: 9px 15px; border-radius: 11px; font-family: var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"; }

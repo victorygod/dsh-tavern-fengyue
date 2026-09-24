@@ -4,7 +4,16 @@
 import { readFileSync, statSync } from 'node:fs'
 
 const a = globalThis.argv?.[0] ? JSON.parse(globalThis.argv[0]) : {}
-if ((a.op ?? 'panel') !== 'panel') { console.log(JSON.stringify({ ok: false, error: `未知 op:${a.op}` })); process.exit(1) }
+const op = a.op ?? 'panel'
+const manifest = JSON.parse(readFileSync('../preset/assets/cg/manifest.json', 'utf8'))
+// CG 层索引:前端按段内 cg 序号即时切换时,按 id 取层切片
+if (op === 'manifest') {
+  // { id: { layers, intro } } —— 前端段级切 CG 取层 + 画面中央序号情绪词
+  const cgs = Object.fromEntries(Object.entries(manifest.cgs).map(([id, cg]) => [id, { layers: cg.layers, intro: cg.intro ?? '' }]))
+  process.stdout.write(JSON.stringify({ ok: true, cgs }))
+  process.exit(0)
+}
+if (op !== 'panel') { console.log(JSON.stringify({ ok: false, error: `未知 op:${a.op}` })); process.exit(1) }
 
 const stat = (p) => { try { const s = statSync(p); return `${s.mtimeMs}:${s.size}` } catch { return null } }
 const strip = (t) => String(t ?? '').replace(/<!--[\s\S]*?-->/g, '').trim()
@@ -23,7 +32,6 @@ try {
 } catch {}
 
 // ── 当前 CG(cg.json 缺席=manifest 默认)与层切片 ──
-const manifest = JSON.parse(readFileSync('../preset/assets/cg/manifest.json', 'utf8'))
 let id = manifest.default
 try { id = JSON.parse(readFileSync('cg.json', 'utf8')).id ?? id } catch {}
 const cg = manifest.cgs[id] ?? manifest.cgs[manifest.default] ?? null
@@ -37,7 +45,8 @@ process.stdout.write(JSON.stringify({
   assetKeys,
   data: {
     lastUser: lastUser ? { seq: lastUser.seq, text: strip(lastUser.plain) } : null,
-    lastAssistant: lastAssistant ? { seq: lastAssistant.seq, text: strip(lastAssistant.orig) } : null,
+    // orig = 保留注释原样(text 为去注释展示用);段级 CG 判定必须从 orig 取
+lastAssistant: lastAssistant ? { seq: lastAssistant.seq, text: strip(lastAssistant.orig), orig: lastAssistant.orig } : null,
     cg: { id, layers },
     history,
   },

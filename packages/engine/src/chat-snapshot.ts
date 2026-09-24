@@ -47,10 +47,12 @@ export interface ChatSnapshotHead {
 
 type SnapshotLine = ChatSnapshotHead | ChatSnapshotRow
 
-/** Text of one content block list: joined `type:'text'` blocks (reasoning excluded). */
+/** Text of one content block list: joined `type:'text'` blocks (reasoning excluded).
+ *  Non-string `text` members are dropped, not stringified — an object block must
+ *  never leak as `[object Object]` into the card's history/backlog (2026-09-24). */
 export function textOfBlocks(blocks: readonly { type: string; text?: string }[]): string {
   return blocks
-    .filter(block => block.type === 'text')
+    .filter(block => block.type === 'text' && typeof block.text === 'string')
     .map(block => block.text ?? '')
     .join('')
 }

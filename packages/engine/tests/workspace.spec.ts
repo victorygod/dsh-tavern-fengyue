@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, existsSync, utimesSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, existsSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -286,6 +286,40 @@ describe('saves', () => {
     expect(() =>{  manualSave(root, 'a/b') }).toThrow()
     expect(() =>{  manualSave(root, '.hidden') }).toThrow()
     expect(() =>{  manualSave(root, '') }).toThrow()
+  })
+
+  // 改名换位语义回归(2026-09-24):载入用 rename 让位 + 拷贝回滚,而不是裸
+  // rmSync→copy——Windows 上热文件句柄(杀软/索引器)曾让删除中途抛 EPERM,
+  // 载入与旧树解绑顺序的组合把世界削成半截。三条性质:拷贝失败退回原位、
+  // 成功后无退役残留、退役树对编辑树不可见。
+  it('loadSave rolls the live runtime back in place when the snapshot copy fails', () => {
+    if (process.getuid?.() === 0) return  // root 读穿权限位,置 0 拦不住 copyFileSync
+    const root = freshRoot()
+    seedRuntime(root)
+    writeFileSync(join(root, 'runtime/state.md'), '载入前真身')
+    manualSave(root, '快照')
+    writeFileSync(join(root, 'runtime/state.md'), '被改坏的世界')
+    chmodSync(join(root, SAVINGS_DIR, '快照', 'state.md'), 0o000)
+    try {
+      expect(() =>{  loadSave(root, '快照') }).toThrow()
+    } finally {
+      chmodSync(join(root, SAVINGS_DIR, '快照', 'state.md'), 0o644)
+    }
+    // 回滚:runtime 原位保留(注意:保留的是载入前状态,不是快照),无退役残留。
+    expect(readFileSystem(join(root, 'runtime/state.md'))).toBe('被改坏的世界')
+    expect(existsSync(join(root, '.tavern-runtime-retired'))).toBe(false)
+  })
+
+  it('a successful load leaves no retired runtime behind and the transition tree stays out of the editor tree', () => {
+    const root = freshRoot()
+    seedRuntime(root)
+    writeFileSync(join(root, 'runtime/state.md'), 'day 2')
+    manualSave(root, '快照')
+    loadSave(root, '快照')
+    expect(readFileSystem(join(root, 'runtime/state.md'))).toBe('day 2')
+    expect(existsSync(join(root, '.tavern-runtime-retired'))).toBe(false)
+    // 三个顶层项之外不落地:编辑树/模型可见面不会瞥见过渡树。
+    expect(listTree(root).some(entry => entry.path.includes('retired'))).toBe(false)
   })
 })
 
