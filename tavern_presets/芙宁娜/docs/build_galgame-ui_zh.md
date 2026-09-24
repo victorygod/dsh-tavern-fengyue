@@ -86,3 +86,21 @@ v2 每 2s 重绘一层 HTML,而状态机需要"打字机进度/段落指针/点�
 - 不长持久化段落进度(换绑重读,ADV 习惯);
 - 不重做 token 级直播流(快照 durable 粒度,打字机承担"流式"观感——design §5 声明);
 - 不动 v2 声明形态本身(dnd5e 卡仍在用);芙宁娜只是**改用 v1 直控**,面板运行时 vendoring 路线不变。
+
+## 6. 输入框视觉定形 + 停靠改造 review（2026-09-24）
+
+**定形（用户拍板，原型 `proto_galgame-ui.html` v3 为视觉正本）**
+- 与「assistant 说话」对话框**同一个盒**：同 padding、同高度基准;切输入态不缩条、不突兀;
+- 无金边:textarea 纯深底(与对话框融为一体)、聚焦不发光;
+- 无环形进度条;右侧 = 发送大按钮(可变形填充)+ 其下选模型 chip;
+- textarea 与正文同内边距、随对话框填充高度(滚动),去掉底部 `…tok` usage 行。
+
+**现状确认:仍复用宿主默认 input 框**(`dock:["composer"]`,`mount` 面把宿主 composer 原件以 JS 量尺 fixed 停靠进 `gg-dock-slot`),**不重画**——改造全部走卡 CSS 覆盖宿主稳定类(`.tavern-composer/.tavern-composer-inner/.tavern-textarea/.tavern-composer-row/.tavern-model-seat/.tavern-context-meter/.tavern-send-btn/.tavern-usage-line`),宿主零改动。
+
+**CSS 改动与风险点(会打架的点,必须一起处理,不可单改一项)**
+1. **高度耦合**:textarea flex 填满需要父确定高度——停靠时须把 `composer.style.height` 也钉到 slot 高(≈150,由 dialog input 态 min-height 190 − padding 推导,稳定),textarea `flex:1; overflow:auto`;否则塌/溢出。意味着高度语义从「自然内容高」改「填满滚动」。
+2. **两态不一致(突兀真身)**:reading dialog 高随文本、input 态写死 190 → 切换跳变。要「同盒」:固定说话常见基准高,或离开 reading 时记录 dialog 高度、进 input 复用(JS 缓存)真正无跳。
+3. **模型选择 popover 锚**:面板 absolute 相对 model-seat;把 model-seat 移右下后会从下方展开、易溢出被遮。需让面板 `bottom:100%` 朝上弹,或模型座本轮不挪、保留可靠锚。
+4. **发送按钮 stop 态**:stoppable 时宿主换停止图标;大按钮竖排文字后图标态要能居中适配。
+
+**建议实施顺序**:先做最小版(去 usage/环形、textarea 全高、发送放大、两态高度复用),模型座暂留原位避 popover 风险;逐项 CDP 截图对原型核对后再动 model-seat。

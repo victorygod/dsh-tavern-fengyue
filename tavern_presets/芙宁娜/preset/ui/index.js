@@ -116,9 +116,9 @@ export function mount(tavern) {
     composer.style.left = `${Math.max(0, Math.round(sr.left))}px`
     composer.style.top = `${Math.max(0, Math.round(sr.top))}px`
     composer.style.width = `${Math.max(0, Math.round(sr.width))}px`
-    // height 不设:宿主 composer 原件保持自身自然高度(内容撑开),slot 只作
-    // 左顶锚点——避免 slot 空高 0 把 composer 压扁。
-    composer.style.height = ''
+    // 高度钉到 slot 高:内部 textarea flex 填满(对话框 input 态 min-height 稳定 →
+    // slot 高稳定),与说话对话框同盒、不塌不溢出。
+    composer.style.height = `${Math.max(0, Math.round(sr.height))}px`
     composer.style.margin = '0'
     // 停靠必须压过全屏面板层(z45):inline display block + z50,否则输入被
     // 面板里的空 slot 盖住,对话框内看不出 input(真机 elementsFromPoint 量证)。
@@ -434,9 +434,12 @@ export function mount(tavern) {
 
   /* ── 点击路由 ── */
   function onStageClick(event) {
-    if (event.target.closest('.gg-bl-head, .gg-collapse, .gg-expand, .gg-greet, .gg-dock-slot, .gg-bl-body') !== null) return
+    if (event.target.closest('.gg-bl-head, .gg-collapse, .gg-expand, .gg-greet, .gg-dock-slot, .gg-bl-body, .gg-think') !== null) return
     if (blOpen) { closeBacklog(); return }   // backlog 态点背景先收起,不误触跳段
-    if (state.mode === 'waiting') { requestStop(); return }
+    // 背景(CG 区)点击不推进不停止——避免「随便点一下就停」;
+    // 读段/补全只认对话框内点击。停止仅 .gg-stop 键(绑定自身 click)。
+    if (!event.target.closest('.gg-dialog')) return
+    if (state.mode === 'waiting') return
     if (state.mode === 'input') return
     if (typing !== null) { completeParagraph(); dbg(); return }
     if (state.r < state.paras.length - 1) { startParagraph(state.r + 1); dbg(); return }
@@ -520,6 +523,8 @@ export function mount(tavern) {
     if (typeof unsubReason === 'function') add(unsubReason)
     const thinkHead = el().think?.querySelector('.gg-think-head')
     thinkHead?.addEventListener('click', e => { e.stopPropagation(); toggleThink() })
+    // waiting 停止仅此键(背景点击不再触发 requestStop)
+    el().stop?.addEventListener('click', e => { e.stopPropagation(); requestStop() })
     el().expand.addEventListener('click', e => {
       e.stopPropagation()
       if (blOpen) closeBacklog(); else openBacklog()

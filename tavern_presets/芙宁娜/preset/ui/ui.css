@@ -9,14 +9,14 @@
 .tavern-panel-galgame .gg * { box-sizing: border-box; }
 
 /* ── CG 双缓冲(cover + 锚头身;backlog 态变暗微缩)── */
-/* CG 情绪词(manifest intro):画面中央浮层 */
-.gg-cg-mood { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+/* CG 情绪词(manifest intro):纯金字 + 弱描边,置上方不压脸(无黑底块——2026-09-25 去黑底) */
+.gg-cg-mood { position: absolute; top: 16%; left: 50%; transform: translateX(-50%);
   max-width: 80%; box-sizing: border-box;
-  padding: 6px 20px; text-align: center; pointer-events: none; z-index: 3;
-  font: 700 16px/1.6 var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-  letter-spacing: .3em; color: #f0d28a;
-  background: rgba(9,12,24,.55); border: 1px solid rgba(201,162,75,.45); border-radius: 999px;
-  text-shadow: 0 1px 3px rgba(0,0,0,.55); }
+  text-align: center; pointer-events: none; z-index: 3;
+  font: 600 14px/1.7 var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  letter-spacing: .4em; color: rgba(240,210,138,.92);
+  background: none; border: 0; padding: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6), 0 0 2px rgba(0,0,0,.5); }
 .gg-cg { position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: 50% 18%;
   transition: opacity .6s ease, filter .45s ease, transform .45s ease; }
@@ -102,7 +102,7 @@
    行随原件一起落位(no 额外镜像)。 */
 .gg-dock-slot { display: none; }
 .tavern-panel-galgame .gg-dialog.gg-input {
-  min-height: 190px; max-height: none; padding: 22px 30px 16px;
+  min-height: 150px; max-height: none; padding: 24px 16px 16px;
   background: linear-gradient(180deg, rgba(9,12,24,.85), rgba(9,12,24,.95));
   border: 1px solid rgba(201,162,75,.55); border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0,0,0,.5);
@@ -117,8 +117,92 @@
 
 /* 宿主 composer 停靠态(JS 只设像素定位;CSS 只开闭与层序)——宿主原件
    display 默认由下面 body 规则隐去,仅 input 态转 block 并钉到 slot。 */
-body.gal-ui .tavern-composer { display: none; }
-body.gal-ui.gal-input .tavern-composer { display: block; position: fixed; z-index: 40; }
+body.gal-ui .tavern-stage .tavern-composer { display: none; }
+body.gal-ui.gal-input .tavern-stage .tavern-composer {
+  display: block; position: fixed; z-index: 40;
+  padding: 0; margin: 0; background: transparent;
+}
+
+/* ── 停靠 composer 布局 = 原型输入框(2026-09-24 定形):
+   横排 textarea(自适应填满) + 右侧方形(发送大按钮 + 其下选模型);
+   无金边、深色与对话框一体;去环形/去 usage 行。 ── */
+body.gal-ui.gal-input .tavern-stage .tavern-composer-inner {
+  display: flex; flex-direction: row; align-items: stretch; gap: 10px;
+  /* 宿主 .composer 有 max-width:760 居中——根除,让输入贴满对话框 */
+  width: 100%; height: 100%; max-width: none; margin: 0;
+  box-sizing: border-box;
+  background: transparent; border: 0; box-shadow: none; padding: 0;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-textarea {
+  flex: 1; min-width: 0; min-height: 0;
+  align-self: stretch; height: auto; max-height: 100%;
+  margin: 0; resize: none; overflow-y: auto;
+  border: 0; outline: none; background: rgba(9,12,24,.5); border-radius: 10px;
+  padding: 12px 16px; color: #f3ead6;
+  font: 15px/1.7 var(--t-serif, "Source Han Serif SC", Georgia, serif), "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+}
+body.gal-ui.gal-input .tavern-stage .tavern-textarea:focus { background: rgba(9,12,24,.62); }
+body.gal-ui.gal-input .tavern-stage .tavern-composer-row {
+  flex: none; width: 118px; display: flex; flex-direction: column-reverse;
+  justify-content: space-between; gap: 8px;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-send-btn {
+  flex: 1; min-height: 0; width: 100%; margin: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  writing-mode: horizontal-tb; letter-spacing: .34em; text-indent: .34em;
+  border: 0; border-radius: 9px; cursor: pointer;
+  background: linear-gradient(180deg, #f0d28a, #b07d2b); color: #221607;
+  font: 700 13px/1 -apple-system, "PingFang SC", sans-serif;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-send-btn:hover { filter: brightness(1.06); }
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat {
+  flex: none; width: 100%; display: flex; align-items: center; justify-content: center;
+  padding: 3px 2px; background: rgba(201,162,75,.14); border-radius: 7px;
+  color: #d9c081; font: 600 11px/1.3 -apple-system, "PingFang SC", sans-serif;
+  /* 不可设 overflow:hidden:会把朝上弹出的 modelPop 裁没(2026-09-25 实测) */
+}
+/* model chip 整体可点:button 填满容器;显示固定「模型设置」文案
+   (模型名于弹窗内选择,放得下也语义稳定) */
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat button {
+  width: 100%; height: 100%; margin: 0; padding: 2px 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  max-width: 100%;
+  background: none; border: 0; color: inherit;
+  font: 600 11.5px/1.3 -apple-system, "PingFang SC", sans-serif;
+  cursor: pointer;
+}
+/* chip 文案改「模型设置」:模型名与强度由弹窗承载,chip 固定标签 */
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat button [class*="modelNm"] { display: none; }
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat button [class*="modelCv"] { display: none; }
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat button::after {
+  content: "模型设置"; letter-spacing: .12em;
+}
+/* model chip 整体可点:button 填满容器(点留白也响应),文本截断在 button 上 */
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat [class*="modelPop"] {
+  background: rgba(11,14,26,.96);
+  border: 1px solid rgba(201,162,75,.5);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0,0,0,.6);
+  backdrop-filter: blur(6px);
+  padding: 6px;
+  color: #eadbb8;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat [class*="modelPop"] [class*="group"] {
+  color: #9b8a66; font-size: 11px; letter-spacing: .2em;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat [class*="modelPop"] button {
+  width: 100%; margin: 0; border: 0; border-radius: 8px;
+  background: none; color: #eadbb8; text-align: left;
+  font: 400 13px/1.6 -apple-system, "PingFang SC", sans-serif;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat [class*="modelPop"] button:hover {
+  background: rgba(201,162,75,.16); color: #f0d28a;
+}
+body.gal-ui.gal-input .tavern-stage .tavern-model-seat [class*="modelPop"] [class*="sub"] {
+  color: rgba(234,219,184,.55);
+}
+body.gal-ui.gal-input .tavern-stage .tavern-context-meter,
+body.gal-ui.gal-input .tavern-stage .tavern-usage-line { display: none; }
 
 /* ── greeting 开场白块(画布层,画面中央,不透明实底——用户定形 2026-09-24)──
    数据 = tavern.opening.greetings;显示态由 index.js 的 renderGreet 驱动;

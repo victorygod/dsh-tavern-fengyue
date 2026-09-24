@@ -5,7 +5,7 @@
       "intro": "正常——平常对话的默认神态。",
       "layers": [
         {
-          "img": "preset/assets/cg/1.jpg",
+          "img": "preset/assets/cg/1.png",
           "pos": "cover"
         }
       ]
@@ -14,7 +14,7 @@
       "intro": "高兴——被夸赞、被哄、心情雀跃时。",
       "layers": [
         {
-          "img": "preset/assets/cg/2.jpg",
+          "img": "preset/assets/cg/2.png",
           "pos": "cover"
         }
       ]
@@ -23,7 +23,7 @@
       "intro": "生气——被冒犯、吃醋、不听话时。",
       "layers": [
         {
-          "img": "preset/assets/cg/3.jpg",
+          "img": "preset/assets/cg/3.png",
           "pos": "cover"
         }
       ]
@@ -32,7 +32,7 @@
       "intro": "难过——失落、被辜负、委屈想哭时。",
       "layers": [
         {
-          "img": "preset/assets/cg/4.jpg",
+          "img": "preset/assets/cg/4.png",
           "pos": "cover"
         }
       ]
@@ -41,7 +41,7 @@
       "intro": "惊讶——意外、被吓到、惊喜时。",
       "layers": [
         {
-          "img": "preset/assets/cg/5.jpg",
+          "img": "preset/assets/cg/5.png",
           "pos": "cover"
         }
       ]
@@ -50,7 +50,7 @@
       "intro": "害羞——脸红、被直球告白、不好意思时。",
       "layers": [
         {
-          "img": "preset/assets/cg/6.jpg",
+          "img": "preset/assets/cg/6.png",
           "pos": "cover"
         }
       ]
@@ -59,7 +59,7 @@
       "intro": "得意——骄傲、炫耀、小胜之时。",
       "layers": [
         {
-          "img": "preset/assets/cg/7.jpg",
+          "img": "preset/assets/cg/7.png",
           "pos": "cover"
         }
       ]
@@ -68,7 +68,7 @@
       "intro": "委屈——被误解、求安慰、小情绪时。",
       "layers": [
         {
-          "img": "preset/assets/cg/8.jpg",
+          "img": "preset/assets/cg/8.png",
           "pos": "cover"
         }
       ]
@@ -77,7 +77,7 @@
       "intro": "兴奋——期待活动、出游、玩闹时。",
       "layers": [
         {
-          "img": "preset/assets/cg/9.jpg",
+          "img": "preset/assets/cg/9.png",
           "pos": "cover"
         }
       ]
@@ -86,7 +86,7 @@
       "intro": "怀疑——听出谎言、不信任、思考时。",
       "layers": [
         {
-          "img": "preset/assets/cg/10.jpg",
+          "img": "preset/assets/cg/10.png",
           "pos": "cover"
         }
       ]

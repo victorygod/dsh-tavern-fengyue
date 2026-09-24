@@ -900,7 +900,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     expect(panelValue.failure).toBeUndefined()
     const panel = JSON.parse(panelValue.text) as { ok: boolean; assetKeys: string[]; data: { lastAssistant: { text: string } } }
     expect(panel.ok).toBe(true)
-    expect(panel.assetKeys).toEqual(['preset/assets/cg/1.jpg'])
+    expect(panel.assetKeys).toEqual(['preset/assets/cg/1.png'])
     expect(panel.data.lastAssistant.text).toContain('水色灯光亮起')
     expect(panel.data.lastAssistant.text).not.toContain('<!--')
     // 指令块不在册的软化路径:钩子 warn 后保留现值,回合照常收束(下面的第二轮用 1 号重复幂等)。

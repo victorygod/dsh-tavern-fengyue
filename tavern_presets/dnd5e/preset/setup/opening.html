@@ -118,8 +118,20 @@ summary { cursor: pointer; }
     </div>
 
     <div class="card">
-      <div class="lbl">技能熟练 · 选二</div>
+      <div class="lbl" id="sklabel">技能熟练 · 选二</div>
       <div class="skills" id="skills"></div>
+      <div class="hint" id="skhint"></div>
+    </div>
+
+    <div class="card" id="subcard" style="display:none">
+      <div class="lbl">子职业（1 级分岔）</div>
+      <select id="subclass"></select>
+    </div>
+
+    <div class="card" id="spellcard" style="display:none">
+      <div class="lbl">施法成套（按职业表自动成套,可重掷）</div>
+      <div class="g" id="sp-preview" style="font:500 11px/1.8 var(--sans);color:var(--ink2)"></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="act ghost" id="sp-reroll" style="flex:0 0 auto;padding:6px 14px;font-size:11px">↺ 重掷法术</button></div>
     </div>
 
     <div class="card">
@@ -176,7 +188,20 @@ const SCENARIOS = [
 ]
 
 // ── 随机分配池（一键 roll 全套,可再手动微调）──
-const NAMES = ['洛克', '艾德温', '莉娜', '卡姆', '希尔瓦', '布兰', '露西亚', '格雷', '芙雅', '达伦', '岚', '塞西尔', '薇拉', '奥托', '绯月', '卡尔文', '伊芙', '雷恩', '苏茉', '巴德']
+// 名字按**种族谱系×性别**分段(半兽人不再滚出"薇拉");规则面(技能白名单/选数/子职/法术池)
+// 走 opening-init 桥下发的 META(单源语料)——桥缺席时降级简版技能池并在提交侧被机械层拦下。
+const NAMES_BY_RACE = {
+  human:      { male: ['凯尔', '艾德温', '布兰', '格雷', '达伦'], female: ['莉娜', '露西亚', '薇拉', '伊芙', '苏茉'] },
+  'half-elf': { male: ['塞西尔', '岚', '卡尔文', '维恩', '奥里安'], female: ['芙雅', '绯月', '伊丝拉', '蕾雅', '梅西雅'] },
+  elf:        { male: ['希尔瓦', '奥里安', '艾隆', '瑟兰', '费恩'], female: ['梅西雅', '艾拉瑞', '希露婉', '月见', '缇尔'] },
+  dwarf:      { male: ['索林', '巴林', '铁砧·石须', '杜尔格', '卡尔迪'], female: ['布伦达', '海尔加', '岩石心', '多萝西', '艾伯丝'] },
+  halfling:   { male: ['皮普', '山姆', '梅里', '波佐', '班多'], female: ['罗茜', '明珠', '蒲公英', '蔻蔻', '莉莉'] },
+  gnome:      { male: ['菲兹', '齿轮· crank', '波普林', '奇可', '威尔比'], female: ['妮丝', '叮当', '皮薇', '珠儿', '缇姬'] },
+  'half-orc': { male: ['格罗姆', '卡鲁克', '碎骨', '莫格', '萨尔'], female: ['夏格拉', '乌尔卡', '血手·玛卡', '泰莎', '蓓尔'] },
+  tiefling:   { male: ['斐渊', '亚历坦', '梅菲斯', '灰天堂', '余烬'], female: ['绯红', '尼菲丝', '夜莺', '露米娅', '烛影'] },
+  dragonborn: { male: ['巴拉罕', '克罗夫', '火鳞·达克斯', '纳拉', '铁 луByte'], female: ['丝洛卡', '焰歌', '苍璧', '奈菲拉', '圃鳞'] },
+}
+const FALLBACK_NAMES = { male: ['凯尔', '布兰', '格雷', '达伦', '岚'], female: ['莉娜', '薇拉', '伊芙', '苏茉', '芙雅'] }
 const BACKGROUNDS = ['士兵', '佣兵', '罪犯', '侍僧', '学者', '工匠', '流浪儿', '没落贵族', '渔夫', '猎人', '酒保', '商队护卫', '矿工', '吟游学徒']
 const PERSONALITY = ['谨慎多疑', '豪爽仗义', '沉默寡言', '油嘴滑舌', '心思缜密', '暴烈易怒', '乐观豁达', '冷若冰霜', '古道热肠', '玩世不恭']
 const IDEALS = ['自由', '正义', '财富', '知识', '力量', '守护', '享乐', '秩序', '复仇', '扬名立万']
@@ -184,6 +209,8 @@ const BONDS = ['为同伴而战', '欠了一屁股债', '寻找失踪的亲人',
 const FLAWS = ['贪杯', '多疑', '好赌', '嘴硬', '见钱眼开', '嗜睡', '怕黑', '管不住手', '记仇', '嘴上没把门']
 const pick = arr => arr[Math.floor(Math.random() * arr.length)]
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] } return a }
+// META(桥下发;缺席=简版降级——机械层仍是最后闸)
+let META = null
 
 // ── 表单构建 ──
 const $ = id => document.getElementById(id)
@@ -208,17 +235,71 @@ for (const [cn, key] of ATTRS) {
 }
 
 const skState = new Set()
-for (const [key, cn] of SKILLS) {
-  const lab = document.createElement('label'); lab.className = 'sk'
-  lab.innerHTML = `<input type="checkbox"><span>${cn}</span>`
-  lab.onclick = e => {
-    e.preventDefault()
-    if (skState.has(key)) { skState.delete(key); lab.classList.remove('on') }
-    else if (skState.size >= 2) { flash('最多选两项熟练') }
-    else { skState.add(key); lab.classList.add('on') }
-  }
-  $('skills').append(lab)
+/* 技能区按职业白名单重建（META 单源,简版降级=全 18 选二;机械层最终闸） */
+function classSpec(cls) {
+  const m = META?.classes?.[cls]
+  if (m) return { skills: m.skills, count: m.count, anySkill: m.anySkill === true, subclasses: m.subclasses ?? [], spellCaster: (META.casters ?? META.CASTERS ?? []).includes(cls) }
+  return { skills: SKILLS.map(s => s[0]), count: 2, anySkill: false, subclasses: [], spellCaster: false }
 }
+const SK_CN = Object.fromEntries(SKILLS)
+let curSpec = classSpec('')
+function buildSkills() {
+  const grid = $('skills'); grid.innerHTML = ''; skState.clear()
+  for (const key of curSpec.skills) {
+    const cn = SK_CN[key] ?? key
+    const lab = document.createElement('label'); lab.className = 'sk'; lab.dataset.key = key
+    lab.innerHTML = `<input type="checkbox"><span>${cn}</span>`
+    lab.onclick = e => {
+      e.preventDefault()
+      if (skState.has(key)) { skState.delete(key); lab.classList.remove('on') }
+      else if (skState.size >= curSpec.count) { flash(`本职业最多选 ${curSpec.count} 项熟练`) }
+      else { skState.add(key); lab.classList.add('on') }
+    }
+    grid.append(lab)
+  }
+  $('sklabel').textContent = curSpec.anySkill ? `技能熟练 · 任选 ${curSpec.count}` : `技能熟练 · 选 ${curSpec.count}（本职业白名单）`
+  $('skhint').textContent = ''
+}
+let rolledSpells = { cantrips: [], spells: [], prepared: [] }
+function rebuildClass() {
+  const cls = $('cls').value
+  curSpec = classSpec(cls)
+  buildSkills()
+  // 子职业卡:L1 分岔才现身
+  const subAt = META?.subclassLevel?.[cls] ?? META?.SUBCLASS_LEVEL?.[cls] ?? 99
+  const subs = curSpec.subclasses
+  $('subcard').style.display = subAt === 1 && subs.length ? '' : 'none'
+  $('subclass').innerHTML = `<option value="">子职业（自动 roll 可改）</option>` + subs.map(s => `<option>${esc(s)}</option>`).join('')
+  // 施法卡:L1 有施法者现身(casters 名单)
+  $('spellcard').style.display = curSpec.spellCaster ? '' : 'none'
+  rerollSpells()
+}
+function rerollSpells() {
+  const cls = $('cls').value
+  const spec = META?.classes?.[cls]
+  const pools = META?.pools
+  if (!spec || !pools) { rolledSpells = { cantrips: [], spells: [], prepared: [] }; renderSp(); return }
+  const cN = META?.cantripsL1?.[cls] ?? META?.CANTRIPS_L1?.[cls] ?? 0
+  const kN = META?.knownL1?.[cls] ?? META?.KNOWN_L1?.[cls] ?? 0
+  const cantrips = cN ? (pools.cantrips[cls]?.length ? shuffle(pools.cantrips[cls]).slice(0, cN) : []) : []
+  const spells = kN ? (pools.lv1[cls]?.length ? shuffle(pools.lv1[cls]).slice(0, kN) : []) : []
+  const wisM = Math.floor(((Number($('abilities')?.querySelector('[data-attr=wis]')?.value) || 10) - 10) / 2)
+  const needP = (cls === 'cleric' || cls === 'druid') && spells.length ? Math.min(1 + Math.max(wisM, 0), spells.length) : 0
+  const prepared = needP ? spells.slice(0, needP) : []
+  rolledSpells = { cantrips, spells, prepared }
+  renderSp()
+}
+function renderSp() {
+  const el = $('sp-preview')
+  if (!rolledSpells.cantrips.length && !rolledSpells.spells.length && !rolledSpells.prepared.length) { el.textContent = '（重掷前无成套——或将不由本页定型）'; return }
+  el.innerHTML =
+    `戏法：${esc(rolledSpells.cantrips.join(' · ') || '—')}<br>` +
+    (rolledSpells.spells.length ? `法术：${esc(rolledSpells.spells.join(' · '))}<br>` : '') +
+    (rolledSpells.prepared.length ? `已备：${esc(rolledSpells.prepared.join(' · '))}<br>` : '')
+}
+$('sp-reroll').onclick = rerollSpells
+$('cls').addEventListener('change', rebuildClass)
+buildSkills()
 
 // ── 性别（male/female 两选一——opening 不出 unknown;头像预览经宿主桥，宿主缺席静默隐藏）──
 let gender = 'male'
@@ -290,6 +371,7 @@ window.addEventListener('message', ev => {
   if (!d || d.t !== 'opening-init-data') return
   clearInterval(scenTimer)
   if (d.ok !== true || !Array.isArray(d.data?.scenarios)) return  // 保底:维持内嵌副本
+  if (d.data.meta) { META = d.data.meta; rebuildClass() }          // 规则单源到位→技能/子职/法术区全部按语料重建
   const fresh = d.data.scenarios
     .map(s => ({ id: String(s.id ?? ''), title: String(s.title ?? ''), tagline: String(s.tagline ?? ''), narration: String(s.narration ?? '') }))
     .filter(s => s.id !== '' && s.narration !== '')
@@ -307,24 +389,41 @@ function flash(text, ok = false) {
   flashTimer = setTimeout(() => { m.textContent = '' }, 2600)
 }
 
-// ── 随机分配：全套 roll——姓名/种族/职业/背景/六维(标准数组随机排布)/技能选二/人设/阵营 ──
+// ── 随机分配：耦合链 roll——性别→种族→同族名→职业→主属性序吃标准数组→技能按白名单→
+//    L1 子职→施法成套→人设。每一项都不是均匀滚,roll 出来的组合必须"像个人物"。
 $('roll').onclick = () => {
-  $('name').value = pick(NAMES)
-  $('race').value = pick(RACES)[0]
-  $('cls').value = pick(CLASSES)[0]
   gender = pick(['male', 'female'])
   for (const b of document.querySelectorAll('#gseg button')) b.classList.toggle('on', b.dataset.g === gender)
+  const raceV = pick(RACES)[0]
+  $('race').value = raceV
+  const names = NAMES_BY_RACE[raceV] ?? FALLBACK_NAMES
+  $('name').value = pick(names[gender] ?? FALLBACK_NAMES[gender])
+  const clsV = pick(CLASSES)[0]
+  $('cls').value = clsV
+  rebuildClass()
   askAvatar()
   $('bg').value = pick(BACKGROUNDS)
+  // 主属性序吃标准数组:主属性拿 15/14,副属性那条吃次高,其余随机排——法师不会再滚出智 8
+  const primary = (META?.primary?.[clsV] ?? META?.PRIMARY?.[clsV] ?? ['str', 'dex']).filter(k => ATTRS.some(([, k2]) => k2 === k))
+  const rest = ATTRS.map(([, key]) => key).filter(k => !primary.includes(k))
   const rolled = shuffle(ARRAY)
-  ATTRS.forEach(([, key], i) => { abSel[key].value = String(rolled[i]) })
+  const byKey = {}
+  const order = [...primary, ...shuffle(rest)].filter(k => !byKey[k] && (byKey[k] = true))
+  order.forEach((key, i) => { byKey[key] = rolled[i] ?? rolled[rolled.length - 1] })
+  ATTRS.forEach(([, key]) => { abSel[key].value = String(byKey[key]) })
+  // 技能:本职业白名单里 roll 选数个
   skState.clear()
   for (const lab of document.querySelectorAll('.sk')) lab.classList.remove('on')
-  for (const sk of shuffle(SKILLS).slice(0, 2)) {
-    skState.add(sk[0])
-    const lab = Array.from(document.querySelectorAll('.sk')).find(l => l.textContent === sk[1])
+  for (const sk of shuffle(curSpec.skills).slice(0, curSpec.count)) {
+    skState.add(sk)
+    const lab = Array.from(document.querySelectorAll('.sk')).find(l => l.dataset.key === sk)
     if (lab) lab.classList.add('on')
   }
+  // 子职业(L1 分岔才 roll)
+  if ($('subcard').style.display !== 'none' && $('subclass').options.length > 1)
+    $('subclass').value = pick(Array.from($('subclass').options).slice(1).map(o => o.value))
+  // 施法成套
+  rerollSpells()
   $('p1').value = pick(PERSONALITY)
   $('p2').value = pick(IDEALS)
   $('p3').value = pick(BONDS)
@@ -332,7 +431,7 @@ $('roll').onclick = () => {
   $('align').value = pick(Array.from($('align').options).slice(1).map(o => o.value || o.textContent))
   delete $('avprev').dataset.img
   renderAvPreview()
-  flash('已随机分配——可再手动微调', true)
+  flash('已随机分配——名字/属性/技能互相咬合,可再手动微调', true)
 }
 
 // ── 提交：opening-commit → 宿主桥 → opening_commit.mjs 落盘 → ack ──
@@ -350,18 +449,23 @@ $('go').onclick = () => {
   const race = $('race').value, cls = $('cls').value
   const abilities = {}
   for (const [, key] of ATTRS) if (abSel[key].value !== '') abilities[key] = Number(abSel[key].value)
+  const spellCaster = curSpec.spellCaster && $('spellcard').style.display !== 'none'
   if (!name) return flash('缺姓名')
   if (!race) return flash('选一个种族')
   if (!cls) return flash('选一个职业')
   if (!$('bg').value.trim()) return flash('写一句出身背景')
   if (Object.keys(abilities).length < 6) return flash('六维属性分配未完成')
-  if (skState.size !== 2) return flash('技能熟练须选二')
+  if (skState.size !== curSpec.count) return flash(`技能熟练须选 ${curSpec.count} 项(本职业白名单)`)
+  if (spellCaster && rolledSpells.cantrips.length && rolledSpells.cantrips.length !== (META?.cantripsL1?.[cls] ?? 0))
+    return flash(`戏法成套不符(须 ${META?.cantripsL1?.[cls]} 个)——重掷一次`)
   const payload = {
     character: {
       name, race, class: cls, gender,
       background: $('bg').value.trim(),
       abilities,
       skills: Array.from(skState),
+      subclass: $('subcard').style.display !== 'none' ? ($('subclass').value || null) : null,
+      spells: spellCaster ? { cantrips: [...rolledSpells.cantrips], spells: [...rolledSpells.spells], prepared: [...rolledSpells.prepared] } : undefined,
       persona: { personality: $('p1').value.trim(), ideals: $('p2').value.trim(), bonds: $('p3').value.trim(), flaws: $('p4').value.trim(), alignment: $('align').value || null },
       backstory: '',
     },

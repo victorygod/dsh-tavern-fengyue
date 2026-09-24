@@ -223,3 +223,82 @@ fork 种子切法（现状，坏）：种子 = …turn/end(u1) + [INSERT "u2"]
 - 「保存并开始」= `publishCard`（整卡回写卡库并清编辑戳）+ `reset` 换绑新会话开聊。
 
 验证：tavern 引擎 39 测（组合用例改钉「编辑不碰卡库 / saveEdit 保留编辑态 / publishCard 清戳」）、ui-tavern 51 测（仅保存、返回干净直通、三选弹框取消/不保存/保存三路）全绿；typert 重生成 + api/ui 双 client bundle 重建。
+
+## 五轮（2026-09-25）：改名换位首改名 EBUSY 复发——疑点收敛到泵子进程 CWD 钉住目录对象（诊断完成，定罪实验待跑）
+
+### 现象（用户报，Windows 真机）
+
+09-24 修复落地后真机复验：**只有一张芙宁娜卡**的会话里点「载入」仍高频报错：
+
+```
+载入失败：tavern rpc failed: tavern/save-failed: EBUSY: resource busy or locked,
+rename 'xxx\...\runtime' -> 'xxx\...\.tavern-runtime-retired'
+```
+
+失败点是 `loadSave` 的**第一个** `renameSync`（`workspace.ts:477`，live runtime → 过渡树），不是兜底删除那步（476 前置清扫若失败会报 `rmSync`，483/487 都轮不到）。
+
+### 09-24 修复前提的半截偏差
+
+当时记下的判断「rename 不受 cwd 占用/热句柄影响」（`workspace.ts:465` 注释同句）只对了半截：
+
+- **对的一半**：rename 不需要打开后代文件——runtime 里热文件（state/快照/杀软扫描内容）的句柄、杀软与索引器对文件的关闭态句柄，都不阻塞父目录 rename。这正是修复后成功率大幅改善的原因，也是修复内部对称性的来源：476/487 的 `rmSync`（要逐个 unlink 后代热文件）配了 `maxRetries:10 × retryDelay:100`，477 的 rename 不配是因为当时认为不需要。
+- **错的一半**：**挂在 runtime 目录对象自身**的打开句柄（不带 `FILE_SHARE_DELETE`）会拒绝 rename——Windows 拒绝时报 `ERROR_SHARING_VIOLATION`，libuv 映射为 `EBUSY`，strerror 即用户看到的 `resource busy or locked`（若真是权限类失败，文本会是 `EPERM: operation not permitted` / `EACCES: permission denied`）。错误文案本身就是一次共享检查失败（非权限失败）的指纹。
+
+而**进程的工作目录（CWD）恰恰就是这样一个目录对象句柄**——rename 需要对源目录拿 DELETE 访问，与不共享 DELETE 的既有句柄相撞即共享冲突。
+
+### 句柄从哪来：泵从不静止，载入弹窗也不让它停
+
+- 芙宁娜卡自带轮询泵：`tavern_presets/芙宁娜/preset/ui/index.js:14`（`POLL_MS = 900`）+ `:565`（`setInterval`）→ `tavern.runScript('gal_data.mjs')`；dnd5e 同族 `preset/ui/runtime.mjs:9`（`PERIOD_VISIBLE = 2000`）+ `:133`。
+- 每拍经 `tavern.runScript` RPC → 引擎 `runCardScript`（`prompting.ts:390-395`）spawn 一个真 node 子进程，**cwd = `runtime/`**（gal_data 要启动 node + 读 manifest + 解析 `.chat.snapshot.jsonl`，Windows 上寿命 ≥100ms）。
+- 泵的 `stopped()` 只在面板 dispose 后生效，dispose 发生在重绑完成之后——**载入弹窗打开期间泵照常每 0.9~2s spawn**。子进程寿命占拍周期 ~15-40%，载入链（fork → 前置清扫 → renameSync）全程数百毫秒 ≈ 点一次掷一次骰子。**单卡不豁免**：泵按卡跑，一张卡就是一个 900ms 循环；芙宁娜比 dnd5e 还密。
+- 围栏缺口：`load()` 的换绑围栏（`index.ts:1075-1084`）只 await `gates`/`tailRuns`（回合钩子与尾代理）；泵的 runScript 是**匿名 RPC**（abort signal 攥在客户端），引擎没有将它登记进任何可 await 的结构。
+- 非对称实锤：同一函数里 `rmSync` 有重试吃「短命泵子进程的钉窗口」（注释原话），唯独 rename 零重试、一撞即死——当时的判断已经认识到泵会钉树，只因前提认为 rename 免疫而没把这处理搬过去。
+
+### 置信度声明（如实）
+
+「CWD 句柄 → `ERROR_SHARING_VIOLATION` → EBUSY」这条 errno 归属是承重推断（~75%）：libuv/MSDN 一手源当时未拿到（webFetch 抓正文失败、搜索结果噪音）。竞争假说：**OneDrive/同步盘**（Windows 上工作区若落在 OneDrive 接管的桌面/文档下，同步客户端持有目录句柄高频产出 rename EBUSY，症状同型）与杀软/索引器对目录本身的常驻句柄——都可能产 EBUSY，但频率稳定性不如泵整齐。以下两实验负责把推断钉死或推翻。
+
+### 实验 A：最小复现（Windows 上 3 分钟，一锤定音 errno 归属）
+
+放在 workspace 根目录跑 `node pin-test.mjs`：
+
+```js
+// pin-test.mjs —— CWD 钉住目录时 renameSync 报什么?
+import { spawn } from 'node:child_process'
+import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { setTimeout as sleep } from 'node:timers/promises'
+
+mkdirSync('runtime-pin-test', { recursive: true })
+writeFileSync('runtime-pin-test/a.txt', 'x')
+// 起一个 cwd 钉在该目录里、活 4 秒的子进程;必须用异步 spawn——
+// spawnSync 会阻塞到子进程退出才走下一行,CWD 句柄已释放,实验必假阴性
+const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 4000)'], { cwd: 'runtime-pin-test' })
+await sleep(300) // 等子进程起来、CWD 句柄落定
+try {
+  renameSync('runtime-pin-test', '.pin-test-retired')
+  console.log('RENAME OK —— CWD 不阻塞 rename,泵假说翻车,外部句柄假说上升')
+} catch (e) {
+  console.log(`RENAME FAILED: ${e.code}: ${e.message} —— CWD 钉死 rename 实锤(EBUSY 即逐字复现载入错误)`)
+} finally {
+  child.kill()
+  rmSync('runtime-pin-test', { recursive: true, force: true })
+  rmSync('.pin-test-retired', { recursive: true, force: true })
+}
+```
+
+### 实验 B：对照（不改仓库代码，判频率耦合对象）
+
+1. 把芙宁娜卡 `index.js:14` 的 `POLL_MS` 临时 900 → 10000 真机跑：载入失败率显著下降 = 失败与泵节奏耦合（泵实锤）；不变 = 外部句柄。
+2. Procmon 定句柄持有者：Filter = `Path` contains `runtime`（及 `BeginsWith .tavern-runtime-retired`），Operation = RenameFile / CreateFile；复现一次载入失败，看 rename 失败瞬间持句柄的进程名——`node.exe` = 泵子进程实锤；`OneDrive.exe` / `MsMpEng.exe`（Defender）/ `SearchProtocolHost.exe` = 外部假说成立。
+3. 廉价旁证：把卡窗口切后台（`doc.hidden` → 芙宁娜照跑、dnd5e 降 10s）观察 dnd5e 失败率是否随降频下降。
+
+### 判定矩阵与去向
+
+| 实验结果 | 结论 | 后续 |
+| --- | --- | --- |
+| A：RENAME FAILED (EBUSY) | CWD 钉住 rename 实锤，泵假说成立 | 修复方向见下，择一拍板 |
+| A：RENAME OK | CWD 免疫 rename | 泵假说翻车；Procmon 定外部持有者（OneDrive/杀软），工作区迁出同步盘验证 |
+| B：失败率随 POLL_MS 显著降 | 频率耦合泵实锤 | 同上第一行 |
+| B：不变 | 外部句柄 | 同上第二行 |
+
+修复方向候选（**仅记录，实验出结果前不动手**）：① `renameSync` 加 maxRetries 重试（最小面，吸收泵子进程短命窗口，与同函数 rmSync 对称）；② 引擎把在途 runCardScript 子进程登记为可 await 结构，load 围栏扩展覆盖泵（最彻底，动 spawn 生命周期管理）；③ 泵 spawn cwd 挪出 runtime——**非纯引擎改**：卡脚本契约依赖 cwd=runtime（gal_data 直读 `'../preset/assets/...'`），会被连动；④ 客户端载入动作前置暂停泵（跨客户端-卡两层，时序最难钉）。

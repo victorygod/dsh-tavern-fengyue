@@ -575,3 +575,16 @@
 - 写档总则改写(用户令):旧「直接编辑(runtimeEdit 为主)」节重置为「写档(主要工作道)」——正文不点名工具,级联/骰算工具因是硬调用契约保留实名;末条「写与编辑的取舍」实名给建议:小文件多处改动 → 先 runtimeRead 现档、runtimeWrite 整档重写一次到位(characters/*.json 皆属此类),大文件零星几处 → 才用 runtimeEdit 点对点替换(old_str 全唯一/new_str 空即删除/多笔 runtimeEdit 同帧按序);新增「能并行就并行」条(互不依赖读写同帧,不同文件互不等待);铁律 3 改「禁止一切写与删除类工具」。
 - 措辞三清(用户令):①全文「账」字清零(落账→落盘/结算/写入;登记表系 state.md 数据层术语,无账字,保留);②不提 HUD `???`(get_npc_state 直接 stringify JSON,DM 与尾代均不可见 `???`——那是玩家侧渲染);③runtime 工具名只在写档节末条取舍建议出场(runtimeWrite/runtimeEdit,取数 runtimeRead),其余正文自然动词。
 - 验证:vitest 全套 23 files/307 tests 绿;grep 实证两 prompt 「账」0 处,runtime 名仅存取舍条三处。asi-pending_zh.md 状态两分行同步(P1–P3 提案→已落)。
+
+## 2026-09-25 · 成长流入册实施——呼吸标题/居中学习框/候选清单/±列表行(playwright 全链验收)
+
+原型 `docs/hud-proto-grow.html` 二轮定案落地到实现层(五件套:ui_data/view/acts/runtime/ui.css),`fc` 待办模态整体退役:
+
+- **提醒非按钮**:hero 待办 chip 改`◆未分配成长·N`(呼吸 pp 动画保留,去 data-act)——点卡整体开册语义不变。
+- **册版面重排**(用户令):左栏=Ability Scores→Saving Throws→Vitals→Skills→Proficiencies,右栏=Spellcasting→Conditions→Equipment/Gear→Features→Resistances/Immunities;速览入左栏,六维与施法齐平;空数「无」版面常驻。
+- **术语锚**:节标题=SRD 英文原文(uppercase 排印,不二转译),每一个英文名词挂中文 `data-tip` 悬停解释;Proficiencies 组名=中文(护甲/武器/工具熟练+语言掌握),Proficiency Bonus 单值居节首;**逐项 alt** 由 view 层 PROF_TIPS 词典驱动。
+- **学习对话框**(acts grow 系六动作/pop):呼吸节标题(data-act=grow)弹出,**视口居中 translate 自适应**、册不关;属性点=**±列表行**(行=属性名/现值(调整值)→预览值/已加值 delta 常驻/－＋钮,恰 2 可保存);学法术=**候选清单**(`ui_data op:candidates` 泵层过滤:本职业表∩环位≤可施∩未收录∩非戏法——玩家零输入零杜撰);保存=front_commit(恰 2 卡点),fail-visible(.g-msg 上屏不吞错);取消/外侧/Esc=放弃。`.g-dlg` 双类自携 dnd-hud(透明底回归钉);两层同拍旗标防重渲染脱挂误关(册/框各一)。
+- **施法三行拆分**:`ui_data spellSplit` 按法术卡 level:0 拆 戏法/已知/已备(未知卡名落环术行不冒充);**熟练度呈现**:PB 本体+资格名单(panel-data 冻结口径,未熟练不显)。
+- **头像 138% 内裁层**(av-clip)与 **#vtip 悬停浮签**(runtime 全局单件,0.1s 统一延迟,title 全量退役)。
+- **测试**(307→339 绿):view 结构钉/acts 对话框行为钉(jsdom)/runtime vtip 钉/jsdom 各一;`dnd5e-ui-data-candidates.spec` 真脚本+临时树(cwd 与 preset 兄弟——部署同构);`dnd5e-grow.browser.spec` playwright 无头 Chrome(--allow-file-access-from-files)全链:呼吸→居中(几何断言)→token 不透明→±分点→双通道保存(fixture 机械层真改 player)→泵拍回落→vtip 0.1s→截图留证 `packages/ui/tests/__artifacts__/grow-dialog.png`(对照原型逐点相符)。**browser 层当场抓出并修掉两枚真 bug**:shellDlg 缺 open 类(真浏览器永不可见)、dlg 居中测量时序(入场动画盖 translate→改 CSS translate 自适应)。
+- 遗留:front_commit 侧三检(环位资格)未落——候选列表已从源头约束,直改存量攥写防线上仍靠 prompt;L4 语料列/准备制长休句未动(asi-pending L 批次照旧)。

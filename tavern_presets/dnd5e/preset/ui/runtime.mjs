@@ -177,6 +177,44 @@ export function mountPanels(deps) {
   doc.addEventListener('click', handler)
   add(() => doc.removeEventListener('click', handler))
 
+  // vtip 悬停浮签（2026-09-24 定案）:全 data-tip 走自制浮签,统一 0.1s 延迟出、移开/滚动即收——
+  // 原生 title 延迟约 1s 且不可控,弃用。body 级单件;dispose 连监听带元素一起收。
+  const tipEl = doc.createElement('div')
+  tipEl.id = 'vtip'
+  tipEl.className = 'dnd-hud'
+  ;(doc.body ?? doc.documentElement).appendChild(tipEl)
+  let tipTimer = null, tipHost = null
+  const hideTip = () => { clearTimeout(tipTimer); tipTimer = null; tipHost = null; tipEl.classList.remove('open') }
+  const showTip = (el) => {
+    tipHost = el
+    tipTimer = setTimeout(() => {
+      tipEl.textContent = el.getAttribute('data-tip') ?? ''
+      tipEl.classList.add('open')
+      const r = el.getBoundingClientRect()
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight
+      const vw = doc.defaultView?.innerWidth ?? 1200, vh = doc.defaultView?.innerHeight ?? 800
+      const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8))
+      let top = r.bottom + 6
+      if (top + h > vh - 8) top = Math.max(8, r.top - h - 6)
+      tipEl.style.left = left + 'px'
+      tipEl.style.top = top + 'px'
+    }, 100)
+  }
+  const overTip = (e) => {
+    const el = (e.target instanceof Element ? e.target : null)?.closest?.('[data-tip]') ?? null
+    if (el === tipHost) return
+    hideTip()
+    if (el !== null) showTip(el)
+  }
+  doc.addEventListener('mouseover', overTip)
+  doc.addEventListener('scroll', hideTip, true)
+  add(() => {
+    doc.removeEventListener('mouseover', overTip)
+    doc.removeEventListener('scroll', hideTip, true)
+    clearTimeout(tipTimer)
+    tipEl.remove()
+  })
+
   loop()
   // 调试钉:页面 console 直接读(window.__panelRuntime)——挂载/act 接线排障用
   globalThis.__panelRuntime = {
