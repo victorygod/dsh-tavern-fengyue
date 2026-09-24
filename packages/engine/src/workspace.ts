@@ -10,7 +10,7 @@
  * @module dsh-tavern-fengyue-engine/workspace
  */
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, type Dirent } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, type Dirent } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import type { TavernCardMeta, TavernLibraryCard, TavernSave, TavernSaveStamp, TavernTreeEntry } from './types.ts'
 
@@ -456,14 +456,40 @@ export function listSaves(root: string): TavernSave[] {
 
 /**
  * Load a save: replace the runtime with the save's snapshot.
+ *
+ * 改名换位(2026-09-24,Windows 语义):裸的 rmSync→copy 在 Windows 上是脆断
+ * 的——被删的 runtime 里有几秒前刚写过的热文件(回合+记账落盘的 state/角色/
+ * 快照),杀软与索引器的关闭态句柄让 unlink/rmdir 报 EPERM/EBUSY;POSIX 上
+ * 这些删除合法,开发机永远看不见。新序:先把 live runtime 原地改名让位
+ * (rename 不受 cwd 占用/热句柄影响)→ 从快照重建 → 兜底退役旧树。
+ * 好性质:删除失败再也拖不垮载入(快照已生效,旧树留给下次清扫);
+ * 拷贝失败则退回原位,世界无损。
  * @param root - absolute workspace root.
  * @param name - save directory name.
  */
 export function loadSave(root: string, name: string): void {
   const src = savingsChild(root, name)
-  rmSync(join(root, RUNTIME_DIR), { recursive: true, force: true })
-  mkdirSync(join(root, RUNTIME_DIR), { recursive: true })
-  copyTree(src, join(root, RUNTIME_DIR))
+  const runtime = join(root, RUNTIME_DIR)
+  // 隐藏名约定(同 .tavern-boundaries.json):编辑树只看 preset/runtime/savings
+  // 三个顶层项,这块过渡树对编辑器/模型不可见;固定名 + 前置清扫支持重入。
+  const retired = join(root, '.tavern-runtime-retired')
+  rmSync(retired, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  renameSync(runtime, retired)
+  try {
+    copyTree(src, runtime)
+  } catch (error) {
+    // 拷贝失败:新风不完整,退回原位(引擎侧 load 的回滚会话绑定仍需 self-care)。
+    rmSync(runtime, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    renameSync(retired, runtime)
+    throw error
+  }
+  try {
+    rmSync(retired, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  } catch (error) {
+    // 退役失败不再拖垮载入(面板泵 cwd 钉住旧树的窗口or杀软锁):载入已生效,
+    // 躯壳留给下一次 loadSave 的前置清扫。
+    console.warn(`tavern: retired runtime cleanup deferred: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 /**

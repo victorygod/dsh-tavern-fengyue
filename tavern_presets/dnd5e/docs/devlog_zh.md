@@ -567,3 +567,11 @@
 - 根因:面板运行时下沉(B 路线)的收尾同步循环用 `[ -d preset/ui ]` 当谓词,把 **dnd5e 的 runtime.mjs+index.js 盲拷进所有带 ui 目录的工作区**——dnd 卡的 075621 中招:layout=codex 声明,入口却被换成 dnd5e 的(panels 过滤 data+view=空,只画工具条,codex mount 不在场)。库未受染(循环只写工作区)。
 - 修复:075621 的 index.js 从库复位、runtime.mjs 移除;全工作区交叉污染审计(按卡 id 对直读,零残余)。浏览器验收:codex 五页签+数据泵(勇者 LV1 正文)+composer codex-shift 避让+外来工具条消失。
 - 教训:**工作区同步必须按卡身份键(meta.json title→库源)拷文件,「有 ui 目录」不是充分谓词**——多卡并存时代一张卡的自带件绝不能落到另一张卡的工作区。后续把同步收进 card-keyed 脚本(队列)。
+
+## 2026-09-24(prompt-P123) P1–P3 提示词批次落地:成长宣告链 + 战斗面懒生成 + 写档总则改写
+- P1(systemPrompt「事实与面板」末条新增「同伴与 NPC 的未分配成长」):面板 `pending` 由 DM 按独立人格叙事宣告去向(属性/新术),宣告即生效、转录照叙写入;纯场景 NPC 缺席的战斗数值(HP 上限/AC/豁免)由 DM 接战时当场确定——落实 B4-② 的 DM 侧指引(此前实测:无提示即无动作,pending 悬死)。
+- P2(maintenancePrompt 清单新条 3「成长写入」+ 顺延 4~7):宣告成长 → 读现档整档写回(六维/CON 追溯 hp/spells_known),同一笔**同步移除对应 pending 单条**(其余标记保留)——补上 `panel-data_zh.md:31`「尾代清」从未接线的指令缺口,消除重复宣告风险;清单 5 条交叉引用「战斗」节改「按第 4 条」。
+- P3-a(条 4 战毕句):命名敌战毕回写时,战中首次宣告的战斗面(HP 上限/六维/AC/save_prof/施法块)一并补齐写回——战斗面懒生成的唯一自然落档时机。P3-b(条 5 精简形态句):纯场景 NPC 连战斗数值也省略,接战前可全无、按 DM 宣告起算,敌对施法者接战补施法块。
+- 写档总则改写(用户令):旧「直接编辑(runtimeEdit 为主)」节重置为「写档(主要工作道)」——正文不点名工具,级联/骰算工具因是硬调用契约保留实名;末条「写与编辑的取舍」实名给建议:小文件多处改动 → 先 runtimeRead 现档、runtimeWrite 整档重写一次到位(characters/*.json 皆属此类),大文件零星几处 → 才用 runtimeEdit 点对点替换(old_str 全唯一/new_str 空即删除/多笔 runtimeEdit 同帧按序);新增「能并行就并行」条(互不依赖读写同帧,不同文件互不等待);铁律 3 改「禁止一切写与删除类工具」。
+- 措辞三清(用户令):①全文「账」字清零(落账→落盘/结算/写入;登记表系 state.md 数据层术语,无账字,保留);②不提 HUD `???`(get_npc_state 直接 stringify JSON,DM 与尾代均不可见 `???`——那是玩家侧渲染);③runtime 工具名只在写档节末条取舍建议出场(runtimeWrite/runtimeEdit,取数 runtimeRead),其余正文自然动词。
+- 验证:vitest 全套 23 files/307 tests 绿;grep 实证两 prompt 「账」0 处,runtime 名仅存取舍条三处。asi-pending_zh.md 状态两分行同步(P1–P3 提案→已落)。

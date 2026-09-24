@@ -62,6 +62,23 @@ describe('conversation snapshot projection', () => {
     ])
   })
 
+  it('drops non-string text blocks: an object must not stringify into "[object Object]" in the backlog', () => {
+    freshRoot()
+    // 某些 provider/数据把 text 块塞成对象;textOfBlocks 必须丢弃而非 String() 泄漏
+    const session = fakeSession([
+      userEvent(1, 'hi'),
+      { type: 'assistant/message', seq: 2, data: { message: { content: [
+        { type: 'text', text: { hello: 'world' } },
+        { type: 'text', text: '正常正文。' },
+      ] } } } as unknown as SessionEvent,
+    ], 3)
+    const rows = chatSnapshotRows(session)
+    expect(rows[1]?.kind).toBe('assistant')
+    expect(rows[1]?.orig).not.toContain('object Object')
+    expect(rows[1]?.orig).toBe('正常正文。')
+    expect(rows[1]?.plain).toBe('正常正文。')
+  })
+
   it('writes the whole file with a head line and heals a previously mangled copy', () => {
     const root = freshRoot()
     const snapshot = chatSnapshotPath(root)

@@ -15,29 +15,37 @@ try {
 } catch { fail('快照不可读,跳过'); process.exit(0) }
 if (last === null || last === '') { process.exit(0) }
 
-// ── 取最后一个 <!-- ... --> 块,逐行「命令: 值」派发(中段散落块被忽略,以末块为准) ──
+// ── 扫描全文所有 <!-- ... --> 注释块;块内按换行或分号拆「命令: 值」──
+// 协议(2026-09-24 用户定形):cg 注释随语段出现、单行、可多指令分号分隔;
+// 只认最终一条 cg(持久回溯取最后画面;段级即时切换已由前端段内解析承担)。
 const blocks = [...last.matchAll(/<!--([\s\S]*?)-->/g)]
-if (blocks.length === 0) { fail('回复末尾无指令块(契约要求每回合输出)'); process.exit(0) }
-const lines = blocks.at(-1)[1].split('\n').map(l => l.trim()).filter(Boolean)
+if (blocks.length === 0) { fail('回复无指令块'); process.exit(0) }
+const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
 
+let finalId = null
 const receipt = []
-for (const line of lines) {
-  const m = /^([a-zA-Z_]+)\s*[:：]\s*(.+)$/.exec(line)
-  if (m === null) { fail(`无法解析的指令行:"${line.slice(0, 40)}"`); continue }
-  const [, name, value] = m
-  if (name !== 'cg') { fail(`未知命令 "${name}"(未注册)`); continue }
+for (const [, inner] of blocks) {
+  for (const part of inner.split(/[\n;；]+/)) {
+    const line = part.trim()
+    if (line === '') continue
+    const m = /^([a-zA-Z_]+)\s*[:：]\s*(.+)$/.exec(line)
+    if (m === null) { fail(`无法解析的指令:"${line.slice(0, 40)}"`); continue }
+    const [, name, value] = m
+    if (name === 'cg') { finalId = value.trim() } else { fail(`未知命令 "${name}"(未注册)`); }
+  }
+}
 
-  const id = value.trim()
-  const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'))
-  if (manifest.cgs[id] === undefined) { fail(`cg 序号不在册:${id} — 保持现值`); continue }
-
-  const next = { id }
-  let changed = true
-  try {
-    if (existsSync('cg.json') && JSON.stringify(JSON.parse(readFileSync('cg.json', 'utf8'))) === JSON.stringify(next)) changed = false
-  } catch { /* 坏文件照覆写(可弃缓存自愈语义) */ }
-  if (changed) { writeFileSync('cg.json.tmp', JSON.stringify(next) + '\n'); renameSync('cg.json.tmp', 'cg.json') }
-  receipt.push(`cg → ${id}${changed ? '' : '(未变,幂等跳过)'}`)
+if (finalId !== null) {
+  if (manifest.cgs[finalId] === undefined) { fail(`cg 序号不在册:${finalId} — 保持现值`) }
+  else {
+    const next = { id: finalId }
+    let changed = true
+    try {
+      if (existsSync('cg.json') && JSON.stringify(JSON.parse(readFileSync('cg.json', 'utf8'))) === JSON.stringify(next)) changed = false
+    } catch { /* 坏文件照覆写(可弃缓存自愈语义) */ }
+    if (changed) { writeFileSync('cg.json.tmp', JSON.stringify(next) + '\n'); renameSync('cg.json.tmp', 'cg.json') }
+    receipt.push(`cg → ${finalId}${changed ? '' : '(未变,幂等跳过)'}`)
+  }
 }
 
 if (receipt.length) process.stdout.write(`[directives] ${receipt.join(' · ')}\n`)

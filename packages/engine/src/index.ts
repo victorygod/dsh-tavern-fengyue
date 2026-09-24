@@ -1068,6 +1068,20 @@ export class TavernRuntime extends Service {
   async load(sessionId: SessionId, name: string): Promise<{ sessionId: SessionId; draft: string }> {
     const root = this.root(sessionId)
     const stamp = readSaveStamp(root, name)
+    // 换绑围栏(2026-09-24):收束链在跑时绝不换 runtime——帧链的钩子/尾代理
+    // 脚本 cwd 钉着 runtime,且快照仍在落盘;与 runtime 置换竞态在 Windows 上
+    // 是确定性事故。中止方式与 stop() 同原语(吸收链自会落定释放 gate),
+    // 随后等 gate 释放(已中止则极快)。
+    const gate = this.gates.get(sessionId)
+    if (gate !== undefined) {
+      const run = this.tailRuns.get(sessionId)
+      if (run !== undefined) {
+        run.controller.abort()
+        const child = run.childId === undefined ? undefined : this.ctx.agents.get(run.childId)
+        child?.cancel({ kind: 'parent' })
+      }
+      await gate
+    }
     if (stamp === undefined || stamp.seq === null) {
       // No durable point to fork from (a save taken before any turn — an
       // empty-history checkpoint). The old behavior kept the previous session
@@ -1086,10 +1100,19 @@ export class TavernRuntime extends Service {
         writeFileSync(join(rootNow, SESSION_ID_FILE), `${sessionId}\n`)
         throw error
       }
+      // 全有全无:换绑动作里唯一会失败的是 runtime 置换(loadSave——Windows 上
+      // 与热文件句柄竞态可抛)。失败则回滚 fresh 绑定与标记,旧会话原样保持,
+      // 前端收到 rejection 而旧会话面板照常(不再出现双面板 not-a-tavern-session)。
+      try {
+        loadSave(rootNow, name)
+      } catch (error) {
+        this.workspaces.delete(freshId)
+        writeFileSync(join(rootNow, SESSION_ID_FILE), `${sessionId}\n`)
+        throw error
+      }
       this.postStash.delete(sessionId)
       this.postStash.delete(freshId)
       this.workspaces.delete(sessionId)
-      loadSave(rootNow, name)
       return { sessionId: freshId, draft: stamp?.draft ?? '' }
     }
     const { sessionId: freshId } = await this.ctx.sessionController.fork({
@@ -1098,19 +1121,29 @@ export class TavernRuntime extends Service {
     })
     // The fork command already created and announced the child agent (seeded
     // with the prefix), so its creation announcement ran before the workspace
-    // rebind — compose it here (the WeakSet guard keeps this idempotent). The
-    // seed carries the composed prompt messages verbatim, so the wrapped
-    // world needs no baseline re-derivation.
+    // rebind — compose the workspace face (the WeakSet guard keeps this
+    // idempotent). The seed carries the composed prompt messages verbatim, so
+    // the wrapped world needs no baseline re-derivation.
     this.workspaces.set(freshId, root)
     const freshSession = this.ctx.sessions.get(freshId)
     // The seed can carry a severed inbox ledger pair (a post-boundary message
     // queued before the fork's cut, claimed after it) — without repair the
-    // child's first claim re-runs the parent's consumed input. Cancellations
-    // run before the load RPC returns, so no claim can race them; the source's
-    // full log decides which pending entries are genuinely alive.
+    // child's first claim re-runs the parent's consumed input. The rebind is
+    // all-or-nothing now: nothing below throws the OLD session out of the map
+    // until the runtime swap has succeeded.
     if (freshSession !== undefined) {
       const sourceSession = this.ctx.sessions.get(stamp.sessionId)
       repairSeedInbox(freshSession, sourceSession === undefined ? undefined : livePendingIds(sourceSession))
+    }
+    // Runtime swap BEFORE the rebind lands: loadSave 是换绑链上唯一可能抛错的
+    // 一步(见上),失败即抛回、旧会话保持绑定(客户端活着,错误经新拒绝面上屏);
+    // 成功后才落标记、解绑旧会话——「解绑先于恢复」的双面板崩坏窗口整个消失。
+    try {
+      loadSave(root, name)
+    } catch (error) {
+      this.workspaces.delete(freshId)
+      this.postStash.delete(freshId)
+      throw error
     }
     writeFileSync(join(root, SESSION_ID_FILE), `${freshId}\n`)
     const freshAgent = this.ctx.agents.get(freshId)
@@ -1121,7 +1154,6 @@ export class TavernRuntime extends Service {
     this.postStash.delete(sessionId)
     this.postStash.delete(freshId)
     this.workspaces.delete(sessionId)
-    loadSave(root, name)
     return { sessionId: freshId, draft: stamp.draft ?? '' }
   }
 
@@ -1186,10 +1218,18 @@ export class TavernRuntime extends Service {
       writeFileSync(join(root, SESSION_ID_FILE), `${sessionId}\n`)
       throw error
     }
+    // 全有全无(与 load() 同律):runtime 重播种失败则回滚 fresh 绑定与标记,
+    // 旧会话保持绑定——不再「新会话已绑、世界已清半截」。
+    try {
+      seedRuntime(root)
+    } catch (error) {
+      this.workspaces.delete(freshId)
+      this.postStash.delete(freshId)
+      writeFileSync(join(root, SESSION_ID_FILE), `${sessionId}\n`)
+      throw error
+    }
     this.postStash.delete(sessionId)
-    this.postStash.delete(freshId)
     this.workspaces.delete(sessionId)
-    seedRuntime(root)
     return freshId
   }
 

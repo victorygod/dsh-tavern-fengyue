@@ -983,10 +983,17 @@ function TavernChatView(props: {
   // 卡片界面：绑定/换绑时加载 preset/ui/（授权一次、样式注入、mount(tavern)）。
   const [cardUi, setCardUi] = useState<CardUiHandle | null>(null)
   const [extraShown, setExtraShown] = useState(0)
+  // 卡的 stop face 载体：stop 每渲染重建（闭包吃当前 binding/闸门态），
+  // loadCardUi 只在换绑时调一次——经 ref 间接换入最新闭包（同 escHandler.current 房式）。
+  const cardStopRef = useRef<() => void>(() => undefined)
+  // 卡的 live 流载体：read() 订阅回调在 dose/liveBody 发生时才跑,经 ref 拿最新句柄
+  // push live assistant 文本(同 cardStopRef 房式,避免 effect 闭包过期)。
+  const cardUiRef = useRef<CardUiHandle | null>(null)
+  cardUiRef.current = cardUi
   useEffect(() => {
     let disposed = false
     let handle: CardUiHandle | null = null
-    void loadCardUi(rpc, sessionId).then((loaded) => {
+    void loadCardUi(rpc, sessionId, { stop: () => cardStopRef.current() }).then((loaded) => {
       if (disposed) { loaded?.dispose(); return }
       handle = loaded
       setCardUi(loaded)
@@ -1247,6 +1254,10 @@ function TavernChatView(props: {
       setThinking(thinking)
       setTexting(liveNarrative)
       if (sawOutput) setPending(false)
+      // live 流桥:把聚合出的当前 assistant 瞬态文本推给卡(dock 的卡按行切分即时渲染)。
+      // 非瞬时(重放/idle)liveBody 为空,卡侧 diff 判定无新行即不动作。
+      cardUiRef.current?.feedAssistantLive(liveBody)
+      cardUiRef.current?.feedLiveReasoning(liveThink)
       setLines(out)
     }
     read()
@@ -1322,6 +1333,9 @@ function TavernChatView(props: {
       },
     )
   }
+  // 卡 stop face 的最新闭包（card-ui.ts 经 extras.stop 间接调用）——
+  // stop 每渲染重建，ref 每渲染换入，卡永远打到当前绑定/闸门态。
+  cardStopRef.current = stop
 
   // 重试：retryPoint 完成换绑与 runtime 回滚（载入发送时刻存档），随后立刻把
   // 存下的原文按正常发送管线重发到新会话——wrap 重渲染、新 requestId、独立
@@ -1449,9 +1463,15 @@ function TavernChatView(props: {
     })
   }
 
-  // 默认开场页成立条件（卡无自绘 opening.html 且转写为空/清空后）：stage 的封面
-  // 背景与本页渲染共用，抽成单项免得两处各写各的。
-  const defaultOpeningOn = (cleared || lines.length === 0) && opening === null
+  // 开场面事实（face 信号，不依赖 opening.html 拉取态——含加载期）：转写空/清空即开场期。
+  const openingActive = cleared || lines.length === 0
+  // 卡 opening face 的通知口：suppress opening 的卡据此自绘开场/退场（宿主权威
+  // 信号，替代三张卡各自轮询 [class*="openingFrame"] 的时代）。
+  useEffect(() => { cardUi?.setOpeningActive(openingActive) }, [cardUi, openingActive])
+  // 默认开场页仅供宿主自己渲染——suppress opening 的卡接管开场视觉（含
+  // greetings），宿主整块不画（条件渲染，非 display:none）。stage 封面背景同门。
+  const honorOpening = !(cardUi?.layout.suppress ?? []).includes('opening')
+  const defaultOpeningOn = openingActive && opening === null
 
   return (
     <div
@@ -1460,7 +1480,8 @@ function TavernChatView(props: {
         // 封面模式的默认开场页把封面画在 stage 这一层：元素自身 background 垫在
         // 一切子孙之下（顶栏/输入卡保持各自表面浮在图上，磨砂/实底都自洽），
         // 图得以一路延伸到窗口底部、不再停在输入框上沿，也能透进输入卡四周的留白。
-        defaultOpeningOn && coverAsset !== undefined
+        // suppress opening 的卡接管开场视觉——封面背景也不画（卡的开场即画面）。
+        openingActive && honorOpening && opening === null && coverAsset !== undefined
           ? { backgroundImage: `url(${coverAsset})`, backgroundSize: 'cover', backgroundPosition: 'center' }
           : undefined
       }
@@ -1475,7 +1496,7 @@ function TavernChatView(props: {
                 <iframe className={css.openingFrame} title={t('opening.title')} sandbox="allow-scripts" srcDoc={opening} />
               </div>
             )}
-            {defaultOpeningOn && (
+            {defaultOpeningOn && honorOpening && (
               <div className={css.openingFull}>
                 <div className={`${css.defaultOpening} ${coverAsset !== undefined ? css.coverPage : ''}`}>
                   <div className={`${css.defaultOpeningTitle} ${coverAsset !== undefined ? css.onCover : ''}`}>
