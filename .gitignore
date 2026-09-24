@@ -26,3 +26,4 @@ tavern_workspace/
 .env.*
 !.env.example
 .dsh-tavern-fengyue
+packages/ui/tests/__artifacts__/

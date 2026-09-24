@@ -2,6 +2,36 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-25 芙宁娜收尾批:输入框定形/CG 素材重做/写卡列隔离/背景误停
+
+- **输入框定形（用户拍板,原型 proto v3 正本）**：复用宿主 composer 停靠,卡 CSS 覆盖——
+  横排(textarea 撑满 + 右侧方形 96px:发送大按钮可变 + 其下选模型)、无金边深色一
+  体、去 usage/环形;`dockComposer` 高度钉到 slot 高(≈150,textarea flex 填满滚动);
+  根除宿主 `.composer max-width:760 居中`(inner `max-width:none`),输入贴满对话框
+  (实测 slot 1170≈dialog 1204−内边距16)。
+- **model 弹窗两坑**：①`model-seat overflow:hidden` 误裁宿主朝上弹出的 modelPop(能点
+  但框不可见)→ 溢出裁切移到 button;②弹窗皮肤改暗金(深底+金边+blur+圆角,项/hover 配色)。
+- **背景误停**：onStageClick 对非对话框(CG 背景)点击 no-op(不推进/不停止);waiting
+  停止仅 `.gg-stop` 键(自身绑定)——修复「回复中随便点一下就停止」。
+- **写卡列隔离**：卡 composer 覆盖规则全部加 `.tavern-stage` 前缀——`WriterColumn` 复用
+  同一 `ChatComposer` 稳定类,原 `body.gal-ui` 全局命中写卡列;限定后仅 RP 舞台生效,
+  真机采写卡列 composer `inStage:false`、默认样式。
+- **CG 素材重做（用户纠正思路）**：废弃「抠黑底字」;清空 cg,以立绘原图
+  `6D293CE9…png` 为底 × 每 mood 一处情绪色蒙版(blend α≈0.2-0.26)生成 10 张
+  `cg/<id>.png`(无字无黑底),manifest 引用切 .png;`loader-composition` 断言同步。
+- **验证**：307/307 绿；CDP 全路径(停靠/同盒/usage/无金边/model 弹窗/等待背景不停止/
+  写卡列默认样式/存档直达 input 不演绎/fixture 段级 CG 与历史完整)。模型源不稳样本
+  以 fixture 兜底。
+
+## 2026-09-24 芙宁娜输入框定形落地：停靠 composer 横排 + 去 usage/环形/金边 + 同盒
+
+- **定形（用户拍板，原型 proto v3 为正本）**：input 与说话对话框同一盒(同 padding/高度基准)、无金边深色融为一体、无环形、右侧发送大按钮+其下选模型、textarea 自适应填满、去 `…tok` usage 行。
+- **落地**（宿主零改动，仍复用宿主 composer 停靠）：
+  1. `dockComposer` 把 `height` 也钉到 slot 高(≈148,dialog input min-height 190 − 内边距推导)→ textarea `flex:1; overflow:auto` 填满,不塌不溢;
+  2. 卡 CSS 覆盖稳定类:`composer-inner` 横排、`textarea` 无边框深色(与正文同 12/16 padding)、`composer-row` 右侧竖排(发送大按钮变形+model 下)、隐藏 `context-meter/usage-line`;dialog input 态 top padding 对齐 reading(24)。
+- **验证（playwright）**：composer fixed 停靠、高=slot(148/148)、usage 隐藏、环形无渲染(无 occupancy 时宿主不产元素)、横排、无金边、padding 对齐、greeting 填入/发送 waiting/思考折叠摘要=最末行/读完→input;存档重开会话直接 input 不演绎。「回复未落盘」样本因模型源不稳仅出思考,非代码问题(fixture 另证历史完整/段级 CG)。
+- **风险后续**：模型 popover 锚(若 model 座下移需朝上弹)、发送 stop 态居中 —— 本轮 model 座留原位、按 build §6 推进。
+
 ## 2026-09-24 芙宁娜段级 CG 即切 + 指令协议内联化(单行·分号·结合台词)
 
 - **需求（用户定形）**：①CG 切换时机 = 「当前展示的那段话出现时」就按该段内嵌的 CG 指令执行换场，不要等 durable 整段结束；②提示词协议改为——切 cg 指令放语段中间（非句末）、`<!-- xxx -->` 单行不换行、多指令用 `;` 分号分隔、注释贴合台词不单独一行。

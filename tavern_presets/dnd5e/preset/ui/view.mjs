@@ -27,11 +27,12 @@ const genderOf = c => GENDER_META[c.gender] ?? GENDER_META.unknown
 const dashId = r => norm(r).replace(/_/g, '-').replace(/[\s_-]+/g, '-')   // 图片槽键=连字符形('half-elf')
 const avatarKey = c => `${dashId(c.race)}-${c.gender === 'female' ? 'female' : c.gender === 'male' ? 'male' : 'unknown'}`
 
-// 头像两形态：图槽命中→img；缺席→名字首字（宿主运行时负责拉取与缓存）
+// 头像两形态：图槽命中→img（138% 内裁层——图缘可被框沿吃掉,不溢出圆外,2026-09-24 定案）；缺席→名字首字
 function avatarFor(c, avatars) {
   const url = avatars?.[avatarKey(c)]
-  if (url) return `<img class="pix-av" src="${String(url).replace(/"/g, '%22')}" alt="">`
-  return `<span class="pix-letter">${esc((c.name ?? '?')[0] ?? '?')}</span>`
+  const letter = `<span class="pix-letter">${esc((c.name ?? '?')[0] ?? '?')}</span>`
+  if (url) return letter + `<span class="av-clip"><img class="av-img" src="${String(url).replace(/"/g, '%22')}" alt=""></span>`
+  return letter
 }
 
 // ── 渲染数据小件 ──
@@ -66,19 +67,19 @@ function heroCard(p, avatars) {
             <div class="h-nm">${esc(p.name ?? '')}</div>
             <div class="h-tags">
               <span class="h-tag">${esc(cn(RACE_CN, p.race) ?? '')}</span>
-              ${g.glyph ? `<span class="g-glyph ${g.cls}" title="性别">${g.glyph}</span>` : ''}
+              ${g.glyph ? `<span class="g-glyph ${g.cls}" data-tip="性别">${g.glyph}</span>` : ''}
             </div>
           </div>
         </div>
         <div class="h-hp">
-          <div class="hpbar ${low ? 'low' : ''}" title="HP ${esc(hpText(p))}${p.temp_hp > 0 ? '（含临时）' : ''}">
+          <div class="hpbar ${low ? 'low' : ''}" data-tip="HP ${esc(hpText(p))}${p.temp_hp > 0 ? '（含临时）' : ''}">
             <div class="fill" style="width:${hpP}%"></div>
             ${tw ? `<div class="tmp" style="width:${tw}%; left:${hpP}%"></div>` : ''}
             <div class="cap"><span class="lb">HP</span><span class="nn">${esc(hpText(p))}</span></div>
           </div>
         </div>
-        ${xb ? `<div class="h-exp" title="EXP ${esc(xb.exp)}${xb.next === null ? '（已到 20 级顶）' : ' / 升至 LV' + esc(p.level == null ? '?' : p.level + 1) + ' 需 ' + esc(xb.next)}"><div class="bar"><div class="fill" style="width:${xp}%"></div></div><span class="lb">EXP ${esc(xb.exp)}/${xb.next === null ? 'MAX' : esc(xb.next)}</span></div>` : ''}
-        ${(p.statuses ?? []).length || (p.pending ?? []).length ? `<div class="h-status">${chipsSmall(p.statuses)}${(p.pending ?? []).length ? `<span class="stc i pending" data-act="pending" style="cursor:pointer" title="成长待办（点开分配）"><span class="k">◆</span>待办${(p.pending ?? []).length > 1 ? '×' + (p.pending ?? []).length : ''}</span>` : ''}</div>` : ''}
+        ${xb ? `<div class="h-exp" data-tip="EXP ${esc(xb.exp)}${xb.next === null ? '（已到 20 级顶）' : ' / 升至 LV' + esc(p.level == null ? '?' : p.level + 1) + ' 需 ' + esc(xb.next)}"><div class="bar"><div class="fill" style="width:${xp}%"></div></div><span class="lb">EXP ${esc(xb.exp)}/${xb.next === null ? 'MAX' : esc(xb.next)}</span></div>` : ''}
+        ${(p.statuses ?? []).length || (p.pending ?? []).length ? `<div class="h-status">${chipsSmall(p.statuses)}${(p.pending ?? []).length ? `<span class="stc i pending" data-tip="存在未分配的成长项（属性点/新法术）——点卡打开数据册，进对应节分配"><span class="k">◆</span>未分配成长${(p.pending ?? []).length > 1 ? '·' + (p.pending ?? []).length : ''}</span>` : ''}</div>` : ''}
       </div>`
 }
 
@@ -134,8 +135,34 @@ function dialSvg(h) {
     : `<circle cx="20" cy="20" r="1.9" fill="#f0d28a"/><g stroke="#f0d28a" stroke-width="1" stroke-linecap="round"><line x1="20" y1="16.6" x2="20" y2="17.9"/><line x1="20" y1="22.1" x2="20" y2="23.4"/><line x1="16.6" y1="20" x2="17.9" y2="20"/><line x1="22.1" y1="20" x2="23.4" y2="20"/></g>`
   return `<svg class="dial" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18.4" fill="rgba(0,0,0,.4)" stroke="rgba(201,162,75,.55)" stroke-width="1.4"/>${ticks}<g transform="rotate(${ang.toFixed(1)} 20 20)"><line x1="20" y1="20" x2="20" y2="6.2" stroke="#f0d28a" stroke-width="1.6" stroke-linecap="round"/><circle cx="20" cy="6.2" r="1.5" fill="#f0d28a"/></g><circle cx="20" cy="20" r="4.7" fill="rgba(20,14,6,.78)" stroke="rgba(201,162,75,.4)" stroke-width=".8"/>${icon}</svg>`
 }
-const sec = (t, inner) => `<div class="bk-sec"><div class="bk-cap">${esc(t)}</div>${inner}</div>`
+const sec = (t, inner, tip) => `<div class="bk-sec"><div class="bk-cap"${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(t)}</div>${inner}</div>`
 const chip = (k, v) => `<span class="bk-chip"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></span>`
+/* 成长节：标题栏呼吸底（有待办时）→ acts 'grow' 弹出学习框；节 tip=中文锚（2026-09-24 术语案：标题=SRD 原文） */
+const CAP_TIPS = {
+  ability: '六维属性——力量/敏捷/体质/智力/感知/魅力,顶点即数值+调整值',
+  saves: '豁免检定——抵抗法术与效果,仅列熟练豁免',
+  vitals: '生存速览——护甲AC/速度/暗视/被动察觉/临时HP/力竭级/治愈骰',
+  skills: '技能检定——仅列熟练项(★=专精,熟练加值翻倍)',
+  profs: '熟练与语言——护甲/武器/工具熟练+语言掌握(组名悬停见规则解释)',
+  cast: '施法——主属性/法术DC/法术攻击/环位/戏法与已知已备',
+  cond: '状态——增益绿/减益红/信息金,effect 逐行小注',
+  equip: '装备——已持有实装的武器/护甲/盾牌',
+  gear: '背包——零碎持有(杂物/消耗品),随叙事增减',
+  feats: '特征——职业能力(名｜说明｜回充时机｜已用),池类资源随长休/短休回充',
+  resists: '抗性=伤害减半;免疫=伤害为零',
+}
+const PROF_TIPS = {
+  '护甲熟练': 'Armor——穿该类护甲不吃劣势且可施法',
+  '武器熟练': 'Weapons——攻检加熟练加值;未熟练=白板攻击',
+  '工具熟练': 'Tools——用该工具做检定加熟练加值',
+  '语言掌握': 'Languages——会说/会读/会写(SRD 语言不属熟练家族)',
+}
+function capPend(t, pend, open, kind, tip) {
+  const cap = pend
+    ? `<div class="bk-cap g-pend ${open ? 'on' : ''}" data-act="grow" data-kind="${kind}" data-tip="${esc(tip ?? '')}（有待分配——点开分配对话框，册保持在后）">${esc(t)}<span class="g-wait">有待分配</span></div>`
+    : `<div class="bk-cap"${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(t)}</div>`
+  return cap
+}
 
 function worldHtml(st) {
   if (!st || (st.place ?? '') === '') return ''
@@ -230,7 +257,16 @@ function radarSvg(c, d) {
     + ATTRS.map((_, i) => { const [x, y] = pt(i, RR); return `<line class="axis" x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>` }).join('')
     + `<polygon class="poly" points="${poly}"/>` + labels + `</svg>`
 }
-export function bookHtml(c, avatars = {}) {
+const hasKind = (c, kind) => (c?.pending ?? []).some(x => String(x).includes(kind))
+const profGroups = (c) => [
+  (c.armor_prof ?? []).length ? ['护甲熟练', c.armor_prof] : null,
+  (c.weapon_prof ?? []).length ? ['武器熟练', c.weapon_prof] : null,
+  (c.tool_prof ?? []).length ? ['工具熟练', c.tool_prof] : null,
+  (c.languages ?? []).length ? ['语言掌握', c.languages] : null,
+].filter(Boolean)
+const NONE_ROW = '<span class="bk-empty">无</span>'
+
+export function bookHtml(c, avatars = {}, grow = {}) {
   const g = genderOf(c)
   const d = c.derived ?? {}
   const unk = d.hpPct == null   // 缺席=未知:满血充+??? 文本,不算濒死
@@ -245,77 +281,74 @@ export function bookHtml(c, avatars = {}) {
           <div class="bk-sub2">${c.background ? esc(c.background) : ''}${c.background && c.persona?.alignment ? ' · ' : ''}${c.persona?.alignment ? esc(c.persona.alignment) : ''}</div>
         </div>
         <div class="bk-hp">
-          <div class="hph" title="HP ${esc(hpText(c))}${c.temp_hp > 0 ? '（含临时）' : ''}">
+          <div class="hph" data-tip="HP ${esc(hpText(c))}${c.temp_hp > 0 ? '（含临时）' : ''}">
             <div class="fill" style="width:${hpP}%"></div>
             ${tw ? `<div class="tmp" style="width:${tw}%; left:${hpP}%"></div>` : ''}
             <div class="cap"><span class="lb">HP</span><span class="nn">${esc(hpText(c))}</span></div>
           </div>
-          ${d.expBar ? `<div class="bke" title="EXP ${esc(d.expBar.exp)}${d.expBar.next === null ? '（20 级顶）' : ' / 升至 LV' + esc(c.level == null ? '?' : c.level + 1) + ' 需 ' + esc(d.expBar.next)}"><div class="fl" style="width:${d.expBar.next === null ? 100 : Math.round(((d.expBar.exp - d.expBar.min) / Math.max(1, d.expBar.next - d.expBar.min)) * 100)}%"></div><div class="cap"><span class="lb">EXP</span><span class="nn">${esc(d.expBar.exp)}/${d.expBar.next === null ? 'MAX' : esc(d.expBar.next)}</span></div></div>` : ''}
-          <div class="bk-coin" title="钱包（不属于装备——挂在账条下,右对齐）">${esc(val(c.gp))}gp · ${esc(val(c.sp))}sp · ${esc(val(c.cp))}cp</div>
+          ${d.expBar ? `<div class="bke" data-tip="EXP ${esc(d.expBar.exp)}${d.expBar.next === null ? '（20 级顶）' : ' / 升至 LV' + esc(c.level == null ? '?' : c.level + 1) + ' 需 ' + esc(d.expBar.next)}"><div class="fl" style="width:${d.expBar.next === null ? 100 : Math.round(((d.expBar.exp - d.expBar.min) / Math.max(1, d.expBar.next - d.expBar.min)) * 100)}%"></div><div class="cap"><span class="lb">EXP</span><span class="nn">${esc(d.expBar.exp)}/${d.expBar.next === null ? 'MAX' : esc(d.expBar.next)}</span></div></div>` : ''}
+          <div class="bk-coin" data-tip="钱包（不属于装备——挂在账条下,右对齐）">${esc(val(c.gp))}gp · ${esc(val(c.sp))}sp · ${esc(val(c.cp))}cp</div>
         </div>
-        <button class="bk-x" data-act="bookClose" title="合上册子">✕</button>
+        <button class="bk-x" data-act="bookClose" data-tip="合上册子">✕</button>
       </div>`
 
-  /* 左栏：大雷达 + 豁免 + 技能全列 */
-  const left = c.role === 'pc' || d.skills ? `
-      ${sec('六维', radarSvg(c, d))}
-      ${sec('豁免', `<div class="bk-saves">${(d.saves ?? []).filter(s2 => s2.prof).map(s2 => `<span class="bk-sv prof">${esc(ATTRS.find(a => a[1] === s2.key)?.[0] ?? s2.key)} ${sign(s2.mod)}</span>`).join('') || '<span class="bk-sv" style="opacity:.55">无熟练豁免</span>'}</div>`)}
-      ${sec('技能', `<div class="bk-skills">${(d.skills ?? []).filter(s2 => s2.prof).map(s2 => `
-        <div class="bk-sk prof"><span class="dot"></span><span class="nm2">${esc(cn(SKILL_CN, s2.key))}${s2.exp ? '<span class="exp">★</span>' : ''}</span><span class="attr-tag">${esc((ATTRS.find(a => a[1] === s2.attr)?.[0] ?? s2.attr).toUpperCase())}</span><span class="md2">${sign(s2.mod)}</span></div>`).join('') || '<div class="bk-sk"><span class="nm2" style="opacity:.55">无熟练技能</span></div>'}</div>`)}` : ''
-
-  /* 右栏：速览→状态→施法→装备→特征→训练语言→抗性 */
-  const vital = sec('速览', `<div class="bk-chips">
+  /* 左栏：Ability Scores(呼吸+学习框入口) → Saving Throws → Vitals → Skills → Proficiencies（2026-09-24 版面定案） */
+  const asiPend = c.role === 'pc' && hasKind(c, 'ASI')
+  const spellsPend = c.role === 'pc' && hasKind(c, '新法术')
+  const vitChips = `<div class="bk-chips">
       ${chip('AC', d.ac ?? '???')}${c.speed != null ? chip('速度', c.speed + '尺') : ''}
       ${c.darkvision ? chip('暗视', c.darkvision + '尺') : ''}${chip('被动察觉', d.passive ?? '???')}
       ${c.temp_hp > 0 ? chip('临时HP', '+' + c.temp_hp) : ''}
       ${c.exhaustion > 0 ? chip('力竭', c.exhaustion + '级') : ''}
       ${(c.hd_available != null && c.level != null) ? chip('治愈骰', c.hd_available + '/' + c.level) : ''}
-    </div>`)
-  const sts = c.statuses ?? []
-  const stHtml = sts.length ? `
-      <div class="bk-sec" style="margin-top:8px">
-        <div class="bk-st">${sts.map(s2 => `<span class="stc ${esc(s2.kind ?? 'i')}"><span class="k">${esc(s2.name)}</span>${esc(s2.remaining ?? '')}</span>`).join('')}</div>
-        <div class="bk-stnotes">${sts.filter(s2 => s2.effect).map(s2 => `<p>${esc(s2.name)}：${esc(s2.effect)}</p>`).join('')}</div>
-      </div>` : ''
-  const castHtml = (d.slotsLv ?? []).length ? sec('施法', `
+    </div>`
+  const left = c.role === 'pc' || d.skills ? `
+      ${capPend('Ability Scores', asiPend, grow?.open === 'asi', 'asi', CAP_TIPS.ability)}
+      ${radarSvg(c, d)}
+      ${sec('Saving Throws', `<div class="bk-saves">${(d.saves ?? []).filter(s2 => s2.prof).map(s2 => `<span class="bk-sv prof">${esc(ATTRS.find(a => a[1] === s2.key)?.[0] ?? s2.key)} ${sign(s2.mod)}</span>`).join('') || NONE_ROW}</div>`, CAP_TIPS.saves)}
+      ${sec('Vitals', vitChips, CAP_TIPS.vitals)}
+      ${sec('Skills', `<div class="bk-skills">${(d.skills ?? []).filter(s2 => s2.prof).map(s2 => `
+        <div class="bk-sk prof"><span class="dot"></span><span class="nm2">${esc(cn(SKILL_CN, s2.key))}${s2.exp ? '<span class="exp">★</span>' : ''}</span><span class="attr-tag">${esc((ATTRS.find(a => a[1] === s2.attr)?.[0] ?? s2.attr).toUpperCase())}</span><span class="md2">${sign(s2.mod)}</span></div>`).join('') || NONE_ROW}</div>`, CAP_TIPS.skills)}
+      ${sec('Proficiencies', `<div class="bk-pb" data-tip="熟练加值——随等级 2→6,只加在熟练事项上(攻检/豁免/检定/DC)">Proficiency Bonus<b>+${d.pb ?? 2}</b></div><div class="bk-prof-groups">${profGroups(c).map(([lb, items]) => `<div class="bk-pg"><span class="gl">${esc(lb)}</span><span class="gs">${items.map(x => `<span data-tip="${esc(PROF_TIPS[lb] ?? '')}">${esc(x)}</span>`).join('') || NONE_ROW}</span></div>`).join('')}</div>`, CAP_TIPS.profs)}` : ''
+
+  /* 右栏：Spellcasting(呼吸+学习框入口) → Conditions → Equipment/Gear → Features → Resistances / Immunities */
+  const spFaces = c.spellSplit ?? { cantrips: [], known: c.spells_known ?? [] }
+  const spRow = (lb, arr) => `<div class="bk-sp-row"><span class="lv">${lb}</span><span class="nms">${(arr ?? []).length ? esc(arr.join(' · ')) : NONE_ROW}</span></div>`
+  const castInner = (d.slotsLv ?? []).length ? `
         <div class="bk-cast-top">
           ${chip('主属性', ({ wis: '感知', cha: '魅力', int: '智力' })[c.caster_attr] ?? c.caster_attr ?? '—')}${chip('法术DC', d.dc ?? '—')}${chip('法术攻击', sign(d.atk ?? 0))}
         </div>
         <div class="bk-slots">${d.slotsLv.map(s2 => `<div class="bk-slot"><span class="lv">${s2.lv}环</span><span class="pips">${Array.from({ length: s2.total }, (_, i) => `<span class="pip ${i < s2.now ? '' : 'used'}"></span>`).join('')}</span></div>`).join('')}</div>
-        <div class="bk-spells">
-          ${(c.spells_known ?? []).length ? `<div class="bk-sp-row"><span class="lv">已知</span><span class="nms">${esc(c.spells_known.join(' · '))}</span></div>` : ''}
-          ${(c.spells_prepared ?? []).length ? `<div class="bk-sp-row"><span class="lv">已备</span><span class="nms">${esc(c.spells_prepared.join(' · '))}</span></div>` : ''}
-        </div>`) : ''
-  const moneyHtml = ''
-  const eqHtml = sec('装备', `
+        <div class="bk-spells">${spRow('戏法', spFaces.cantrips)}${spRow('已知', spFaces.known)}${spRow('已备', c.spells_prepared)}</div>` : NONE_ROW
+  const castHtml = `
+      <div class="bk-sec">${capPend('Spellcasting', spellsPend, grow?.open === 'spells', 'spells', CAP_TIPS.cast)}${castInner}</div>`
+  const sts = c.statuses ?? []
+  const stHtml = `
+      <div class="bk-sec"><div class="bk-cap" data-tip="${esc(CAP_TIPS.cond)}">Conditions</div>
+        ${sts.length ? `<div class="bk-st">${sts.map(s2 => `<span class="stc ${esc(s2.kind ?? 'i')}"><span class="k">${esc(s2.name)}</span>${esc(s2.remaining ?? '')}</span>`).join('')}</div>
+        <div class="bk-stnotes">${sts.filter(s2 => s2.effect).map(s2 => `<p>${esc(s2.name)}：${esc(s2.effect)}</p>`).join('')}</div>` : NONE_ROW}
+      </div>`
+  const eqHtml = sec('Equipment', `
         <div class="bk-rows">
           ${(d.weapons ?? []).map(w => `<div class="bk-row"><span class="a">${fmtWeapon(w)}</span></div>`).join('')}
-          ${c.armor ? `<div class="bk-row"><span class="a">${esc(cn(ARMOR_CN, c.armor))}</span><span class="b">AC ${esc(d.ac ?? '—')}</span></div>` : ''}
+          ${c.armor ? `<div class="bk-row"><span class="a">${esc(cn(ARMOR_CN, c.armor))}</span><span class="b">AC ${esc(d.ac ?? '—')}</span></div>` : `<div class="bk-row"><span class="a">护甲</span><span class="b">无</span></div>`}
           ${(c.shield === true || c.shield === 'true') ? `<div class="bk-row"><span class="a">盾牌</span><span class="b">+2 AC</span></div>` : ''}
         </div>
         <div class="bk-sec" style="margin-top:8px">
-          <div class="bk-cap">背包</div>
-          <div class="bk-rows bk-note-rows">${(c.gear ?? []).map(t => `<div class="bk-row"><span class="a">${esc(t)}</span></div>`).join('')}</div>
-        </div>${moneyHtml}`)
-  const ftHtml = (c.features ?? []).length ? sec('特征', `
+          <div class="bk-cap" data-tip="${esc(CAP_TIPS.gear)}">Gear</div>
+          <div class="bk-rows bk-note-rows">${(c.gear ?? []).map(t => `<div class="bk-row"><span class="a">${esc(t)}</span></div>`).join('') || NONE_ROW}</div>
+        </div>`, CAP_TIPS.equip)
+  const ftHtml = sec('Features', `
         <div class="bk-rows bk-note-rows">
-          ${c.features.map(f => { const seg = String(f).split('|'); const right = [seg[1], seg[2]].filter(Boolean).join(' · '); return `<div class="bk-row"><span class="a">${esc(seg[0])}</span>${right ? `<span class="b">${esc(right)}</span>` : ''}</div>` }).join('')}
-        </div>`) : ''
-  const groups = [
-    (c.armor_prof ?? []).length ? ['护甲', c.armor_prof] : null,
-    (c.weapon_prof ?? []).length ? ['武器', c.weapon_prof] : null,
-    (c.tool_prof ?? []).length ? ['工具', c.tool_prof] : null,
-    (c.languages ?? []).length ? ['语言', c.languages] : null,
-  ].filter(Boolean)
-  const profHtml = groups.length ? sec('训练与语言', `
-        <div class="bk-prof-groups">${groups.map(([lb, items]) => `<div class="bk-pg"><span class="gl">${esc(lb)}</span><span class="gs">${items.map(x => `<span>${esc(x)}</span>`).join('')}</span></div>`).join('')}</div>`) : ''
-  const defHtml = ((c.resist ?? []).length || (c.immune ?? []).length) ? `
-      <div class="bk-sec" style="margin-top:8px">
+          ${(c.features ?? []).map(f => { const seg = String(f).split('|'); const right = [seg[1], seg[2]].filter(Boolean).join(' · '); return `<div class="bk-row"><span class="a">${esc(seg[0])}</span>${right ? `<span class="b">${esc(right)}</span>` : ''}</div>` }).join('') || NONE_ROW}
+        </div>`, CAP_TIPS.feats)
+  const profHtml = ''
+  const defHtml = sec('Resistances / Immunities', `
         <div class="bk-chips">
           ${(c.resist ?? []).map(r => chip('抗', r)).join('')}
           ${(c.immune ?? []).map(r => chip('免', r)).join('')}
-        </div>
-      </div>` : ''
+          ${((c.resist ?? []).length + (c.immune ?? []).length) === 0 ? NONE_ROW : ''}
+        </div>`, CAP_TIPS.resists)
   /* 小传：[秘] 行 NPC 永不显示；玩家显示但去前缀（biography 双职能=背景+记忆） */
   const isPC = c.role === 'pc'
   const bio = (c.biography ?? [])
@@ -340,7 +373,7 @@ export function bookHtml(c, avatars = {}) {
       ${taleHtml}
       <div class="bk-cols">
         <div>${left}</div>
-        <div>${vital}${stHtml}${castHtml}${eqHtml}${ftHtml}${profHtml}${defHtml}</div>
+        <div>${castHtml}${stHtml}${eqHtml}${ftHtml}${defHtml}</div>
       </div>
     </div>${CHROME}</div>`
 }

@@ -64,9 +64,8 @@ body { display: flex; align-items: center; justify-content: center;
 @keyframes bob { from { transform: translateY(0); } to { transform: translateY(5px); } }
 
 /* token 统计:对话框外·正下方·灰色小字(常驻) */
-#usage { position: absolute; bottom: 1.2%; left: 0; right: 0; text-align: center;
-  font: 500 10.5px/1.4 -apple-system, "PingFang SC", sans-serif;
-  color: rgba(190,186,178,.5); letter-spacing: .03em; pointer-events: none; z-index: 9; }
+/* #usage:2026-09-24 用户定形本卡不需要 …tok 一行;节点保留供 JS 引用,恒隐藏 */
+#usage { display: none; }
 
 /* 输入态功能块:模型座(左)+环形(右),随 inputRow 仅 input 出现,右缘不越发送键 */
 #ring { position: relative; width: 30px; height: 30px; flex-shrink: 0; }
@@ -88,21 +87,32 @@ body { display: flex; align-items: center; justify-content: center;
 #dots i:nth-child(2) { animation-delay: .18s; } #dots i:nth-child(3) { animation-delay: .36s; }
 @keyframes dotjump { 0%,100% { transform: translateY(0); opacity: .55; } 50% { transform: translateY(-9px); opacity: 1; } }
 
-/* ── 输入态:行1=textarea(矮)+发送同排(发送键右),行2=模型座+环形(右缘对齐发送键) ── */
-#inputRow { display: none; flex-direction: column; gap: 10px; }
-#dialog.mode-input #inputRow { display: flex; }
-#dialog.mode-input { min-height: 0; padding-bottom: 12px; }
+/* ── 输入态(2026-09-24 用户定形 v3):与说话对话框同一盒——同 padding、填满同高度;
+   无环形/无金边;右侧发送大按钮 + 其下选模型。 */
+#dialog.mode-input { display: flex; flex-direction: column; }   /* 保留默认 padding(与说话一致),不缩边 */
 #dialog.mode-input #text { display: none; }
-#taRow { display: flex; align-items: stretch; gap: 12px; }
-#ta { flex: 1; resize: none; height: 64px; background: rgba(0,0,0,.4); color: #f3ead6;
-  border: 1px solid rgba(201,162,75,.35); border-radius: 9px; padding: 11px 15px;
-  font: 15px/1.7 var(--t-serif, serif); outline: none; }
-#ta:focus { border-color: #f0d28a; }
-#send { padding: 0 24px; border-radius: 9px; cursor: pointer; display: inline-flex;
-  align-items: center; justify-content: center;
-  border: 1px solid #c9a24b; background: linear-gradient(180deg, #f0d28a, #b07d2b);
-  color: #221607; font: 700 14px/1 sans-serif; letter-spacing: .2em; }
-#metaRow { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+#inputRow { display: none; flex-direction: row; align-items: stretch; gap: 10px; flex: 1; min-height: 0; }
+#dialog.mode-input #inputRow { display: flex; }
+#ta { flex: 1; min-width: 0; min-height: 0; height: 100%; resize: none; overflow-y: auto;
+  padding: 12px 16px;               /* 与正文内边距对齐 */
+  background: rgba(9,12,24,.5);     /* 深色,与对话框融为一体 */
+  border: 0; border-radius: 10px;   /* 无金边 */
+  color: #f3ead6; font: 15px/1.7 var(--t-serif, serif); outline: none; }
+#ta:focus { background: rgba(9,12,24,.62); }
+#sideSquare { flex: none; width: 64px; display: flex; flex-direction: column;
+  gap: 8px; justify-content: space-between; box-sizing: border-box;
+  padding: 0; }
+#send { flex: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 9px; cursor: pointer; writing-mode: vertical-rl;
+  border: 0; background: linear-gradient(180deg, #f0d28a, #b07d2b);
+  color: #221607; font: 700 13px/1 sans-serif; letter-spacing: .18em; }
+#send:hover { filter: brightness(1.06); }
+#modelSeat { flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  padding: 3px 0; border-radius: 7px; cursor: pointer;
+  background: rgba(201,162,75,.14); color: #d9c081;
+  font: 600 11px/1.3 -apple-system, "PingFang SC", sans-serif;
+  overflow: hidden; white-space: nowrap; }
+#modelSeat:hover { background: rgba(201,162,75,.24); }
 
 /* ── backlog(上拉历史,防剧透截止);折叠钮固定右上角(不随内容滚)── */
 #backlog { position: absolute; left: 3.5%; right: 3.5%; top: 6%; bottom: 4%;
@@ -151,16 +161,10 @@ body { display: flex; align-items: center; justify-content: center;
     <div id="text"></div>
     <div id="dots"><i></i><i></i><i></i></div>
     <div id="inputRow">
-      <div id="taRow">
-        <textarea id="ta" placeholder="说点什么…(Enter 发送)"></textarea>
-        <button id="send">发 送</button>
-      </div>
-      <div id="metaRow">
-        <div id="modelSeat" title="选择模型"><span>glm-4.7</span><span class="sub">思考·高</span></div>
-        <div id="ring" title="上下文占用 41%">
-          <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="rgba(201,162,75,.22)" stroke-width="3"/><circle cx="15" cy="15" r="12" fill="none" stroke="#c9a24b" stroke-width="3" stroke-linecap="round" stroke-dasharray="30.9 75.4"/></svg>
-          <span class="lbl">41</span>
-        </div>
+      <textarea id="ta" placeholder="说点什么…(Enter 发送)"></textarea>
+      <div id="sideSquare">
+        <button id="send" title="发送(Enter)">发 送</button>
+        <div id="modelSeat" title="选择模型">glm-4.7</div>
       </div>
     </div>
     <div id="next">▼</div>

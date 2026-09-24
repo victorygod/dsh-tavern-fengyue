@@ -156,6 +156,50 @@ function derive(c) {
     passive: c.wis == null ? null : 10 + (skills.find(s2 => s2.key === 'perception')?.mod ?? 0),   // 被动察觉=10+察觉技巧（wis 缺席=未知）
   }
 }
+// ── 成长流（2026-09-24 定案）:戏法/环术拆行 + 学法术候选择 ──
+// cantrip 判定读法术卡 frontmatter level:0;名单里存中文名卡无英文 slug → 归环术行(不误标戏法)。
+const _slug = n => String(n ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+const _spellCache = new Map()
+function spellFm(name) {
+  const slug = _slug(name)
+  if (_spellCache.has(slug)) return _spellCache.get(slug)
+  let fm = null
+  try { fm = readFM(`spells/${slug}.md`) } catch {}
+  _spellCache.set(slug, fm)
+  return fm
+}
+function splitSpells(c) {
+  const known = Array.isArray(c.spells_known) ? c.spells_known : []
+  const cantrips = [], leveled = []
+  for (const n of known) {
+    const lvl = spellFm(n)?.level
+    ;(lvl === 0 ? cantrips : leveled).push(n)
+  }
+  return { cantrips, known: leveled }
+}
+if (op === 'candidates') {  // 学新法术候选:本职业表 ∩ 环位≤当前可施 ∩ 未收录 ∩ 非戏法（SRD「Learning Spells」限制）
+  const c = player
+  const isCaster = c && c.caster_attr != null && c.slots_l1 != null
+  let candidates = []
+  if (isCaster) {
+    const lv = Math.min(Math.max(Number(c.level ?? 1), 1), 20)
+    const maxLv = FULL_CASTER_SLOTS[lv - 1].reduce((m, t, i) => t > 0 ? i + 1 : m, 0)
+    const cls = norm(c.class)
+    const known = new Set((Array.isArray(c.spells_known) ? c.spells_known : []).map(n => norm(n)))
+    try { for (const f of readdirSync('dnd5e-srd-lorebook/spells').filter(f => f.endsWith('.md'))) {
+      const fm = readFM(`spells/${f}`)
+      if (!fm.name || fm.level == null) continue
+      if (!(fm.level >= 1 && fm.level <= maxLv)) continue
+      const classes = Array.isArray(fm.classes) ? fm.classes.map(norm) : []
+      if (!classes.includes(cls)) continue
+      if (known.has(norm(fm.name)) || known.has(norm(f.replace(/\.md$/, '')))) continue
+      candidates.push({ name: String(fm.name), level: Number(fm.level), ritual: fm.ritual === true })
+    } } catch (e) { console.error("CAND-DBG", e && e.message) }
+    candidates.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
+  }
+  await emit({ ok: true, candidates }); process.exit(0)
+}
+
 // ── panel(layout v2 宿主泵):按面板给切片,rev=各自真身文件的 mtime:size 摘要 ──
 if (op === 'panel') {
   const enemyNames = new Set((combat?.enemies ?? []).map(e => e.name))
@@ -164,11 +208,12 @@ if (op === 'panel') {
     const gk = c.gender === 'female' ? 'female' : c.gender === 'male' ? 'male' : 'unknown'
     return `${norm(c.race ?? '').replace(/_/g, '-')}-${gk}`
   }
+  const withSpells = c => c ? { ...c, spellSplit: splitSpells(c) } : null
   if (a.name === 'hud-left') {
     await emit({
       ok: true,
       rev: `${secStat('characters/player.json')}:${agg('characters', f => f !== 'player.json')}`,
-      data: { player: player ? { ...player, derived: derive(player) } : null, companions: mates.map(c => ({ ...c, derived: derive(c) })) },
+      data: { player: withSpells(player ? { ...player, derived: derive(player) } : null), companions: mates.map(c => withSpells({ ...c, derived: derive(c) })) },
       avatarKeys: [player, ...mates].filter(Boolean).map(avKey),
     })
     process.exit(0)
