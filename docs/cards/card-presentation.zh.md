@@ -19,8 +19,9 @@
 |---|---|
 | `preset/ui/theme.css` | 全页注入（首次启用确认 + 设置按卡总开关） |
 | `preset/ui/chat.css` | 选择器自动前缀 `.tavern-stage`，只作用聊天区（css-tree/postcss 重写） |
-| `preset/ui/layout.json` | 数据侧声明：`transcript.window`（`all`/`{last:N}`）、`panels[]` 容器（`{name, slot, size}`）、`html`（正文 HTML 开关，默认 true）。校验失败回默认 + toast |
-| `preset/ui/index.js` | `export function mount(tavern)`：宿主注入的面 = `runScript` / `callScript` / `readAsset` / `submit` / `layout` / `views` / `acts` / `runtime`（返回清理函数）；面板/交互/游戏逻辑全在这里 |
+| `preset/ui/layout.json` | 数据侧声明：`transcript.window`（`all`/`{last:N}`）、`panels[]` 容器（`{name, slot, size}`）、`html`（正文 HTML 开关，默认 true）、`dock:["composer"]`（G3 停靠，见下表行）、`modules[]`（卡自家 UI 模块清单，2026-09-25 manifest——宿主按单装载 `preset/ui/<名>.mjs` 注入 `tavern.mods`，卡声明、宿主装载）。校验失败回默认 + toast |
+| **G3 停靠（2026-09-25）** | `dock:["composer"]` 声明 + 卡面板内 `<div data-dock-slot="composer">` 槽 + mount 时 `tavern.dockComposer(slotEl)` 一次注册（返回解停函数，入卡 stops）。声明者（宿主）执行：宿主把自己的 composer 子树经 **React portal** 挂进槽——卡零接触宿主 DOM（不量尺、不写内联样式、不卸载），几何=槽内流式布局、显隐=槽的 display、回收=宿主清空槽态（结构保证，无卡侧 undo）。未声明即调用 → console 留痕拒绝（fail-visible）。卡样式一律**面板作用域后代选择器**点名 `.tavern-*` 稳定类换肤。事故史与裁度：[composer-dock-g3-portal](../notes/feature/2026-09-25-composer-dock-g3-portal.zh.md) |
+| `preset/ui/index.js` | `export function mount(tavern)`：宿主注入的面 = `runScript` / `callScript` / `readAsset` / `submit` / `stop` / `dockComposer` / `opening` / `assistantLive` / `files` / `layout` / `views` / `acts` / `runtime` / `mods`（声明模块装配面，2026-09-25）（返回清理函数）；面板/交互/游戏逻辑全在这里 |
 | `preset/scripts/` | 宿主 bash 脚本库——两面共用的全部逻辑与数据访问 |
 
 **提升编辑便利的手段 = 预设脚本**：骨架预置 `read.sh`（`cat "$1"`，把文件内容拉进提示词/返回给前端），示例卡模板（`templates/tavern-tavern/`）再带 `last.sh`（最近 N 条消息）等常用件。卡要"读聊天历史"就是 `runScript('read.sh', '.chat.snapshot.jsonl')`（前端）或 `{{read('.chat.snapshot.jsonl')}}`(提示词面)，剩下的交给 JS/模型逻辑。预设脚本作者可改可删，不是特权内建。
@@ -82,7 +83,7 @@ arg   := call | literal          ; literal = 引号串，或不含 ( ) , 的裸�
 | 资产 | `runScript('asset64', 'preset/…')`（bash `base64` 输出） |
 | 事件 | 无独立事件通道——`setInterval` + `runScript` 对文件 diff 即事件 |
 
-`mount(tavern)` 幂等渲染、返回清理函数；切会话/载入/重置/发布卡整体重 mount。规则：只认稳定钩子；钩子三类——结构钩子（`.tavern-root / -stage / -transcript / -message(-user/-assistant) / -bubble / -body / -thinking / -tool / -tail-ledger / -timestamp / -model-seat / -context-meter / -usage-line`）供 CSS 换肤、Grid 摆位与 JS 寻址（`.tavern-root` 挂在整页根上，是 `--t-*` token 宿主——`#tavern-theme` 样式表与卡 `theme.css` 的唯一落点）；容器钩子（`.tavern-panel(-<name>)`）由 `layout.json` 声明、`mount` 挂载；交互钩子（`.composer / -textarea / -send-btn`）是回填目标、宿主 `-send-btn` 卡不得触发——卡要自己发送就画自己的输入框走 `tavern.submit(text)`（同一条 admission），不劫持宿主那次点击。卡自己面板内部 DOM 不进契约。JS 的自由来自主文档信任级，JS 的稳定来自钩子契约。SDK 出 `.d.ts`。（2026-09-17 拍板收缩：`-sidebar / -header / -avatar / -name` 四锚出契约——应用壳的整页表达面 = `.tavern-root` token 面（theme.css 覆盖 `--t-*`），依据与缺锚影响史见 [stable-hook-gaps.zh.md](../notes/stable-hook-gaps.zh.md)。）
+`mount(tavern)` 幂等渲染、返回清理函数；切会话/载入/重置/发布卡整体重 mount。规则：只认稳定钩子；钩子三类——结构钩子（`.tavern-root / -stage / -transcript / -message(-user/-assistant) / -bubble / -body / -thinking / -tool / -tail-ledger / -timestamp / -model-seat / -context-meter / -usage-line`）供 CSS 换肤、Grid 摆位与 JS 寻址（`.tavern-root` 挂在整页根上，是 `--t-*` token 宿主——`#tavern-theme` 样式表与卡 `theme.css` 的唯一落点）；容器钩子（`.tavern-panel(-<name>)`）由 `layout.json` 声明、`mount` 挂载；交互钩子（`.composer / -textarea / -send-btn`）是回填目标、宿主 `-send-btn` 卡不得触发——卡要自己发送就画自己的输入框走 `tavern.submit(text)`（同一条 admission），不劫持宿主那次点击（停靠的 composer 换肤走 G3 dock 的面板作用域，见上表 G3 行）。卡自己面板内部 DOM 不进契约。**卡样式一律落自家 panel 容器作用域**——`body` 级全局选择器会波及写卡 Agent 列等宿主其他语境（566fbb3 串台铁训，2026-09-25 升格为总则）。JS 的自由来自主文档信任级，JS 的稳定来自钩子契约。SDK 出 `.d.ts`。（2026-09-17 拍板收缩：`-sidebar / -header / -avatar / -name` 四锚出契约——应用壳的整页表达面 = `.tavern-root` token 面（theme.css 覆盖 `--t-*`），依据与缺锚影响史见 [stable-hook-gaps.zh.md](../notes/stable-hook-gaps.zh.md)。）
 
 ## 前端渲染面
 

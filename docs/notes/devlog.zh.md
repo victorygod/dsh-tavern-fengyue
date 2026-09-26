@@ -2,6 +2,31 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-25 转写着陆合约落地：按会话阅读锚 + cause 贯通仲裁；滚动链路从零锚定到双侧钉死
+
+- **现象（用户报）**：芙宁娜回复中切到别的会话再切回，视图自动跳到最新一行；需求「点到哪里回来就到哪里、历史点开不剧透、不丢消息」。
+- **根因（三层叠加，见 [scroll-landing-contract](feature/2026-09-25-tavern-scroll-landing-contract.zh.md)）**：① `useBottomPinnedScroll` 挂载恒钉（09-14 明文设计）；② 钉布尔是组件实例单例不分会话，换绑高度抖动经 clamp→scroll 事件必然重新钉上；③ 客户端无 cause 感知、无阅读锚——唯一不剧透的载入落点是「引擎 fork 切短＋全量重放＋钉底」三层 coincident，无人承诺。**测试面**：09-14 的三个 bottom-pin 用例住在 `tests-client-plane`（KNOWN GAP 从未被 include），滚动链路真实锚定为零。
+- **修复**：四层架构（数据/锚存 `reader-anchor.ts`/机械 `transcript-scroll.ts`/仲裁 `landing.ts` 表驱动），`ChatLine.seq` + 行 `data-seq` 作锚身份，`send()` 清锚打架竞态，回底灯 affordance，wire `TavernRebindValue.anchorSeq` 把载入切刻升格为引擎背书契约。WriterColumn 保持旧语义。
+- **验证**：新增 `transcript-landing.unit.spec`（锚存/决策表/DOM 捕获/机械四段）+ `transcript-landing.client.spec`（换绑整链五用例，jsdom 原型级几何垫片）；全套 413/413 绿；双面构建；Playwright 真机链路实测（`scripts/e2e-landing.mjs`，粘 stop 键形态做「落定」判据——早期版本误点流式中的停止键把回合掐停，教训：**发送/停止是同一节点变身，行数计数不可当落定信号**）。
+- **防复发**：着陆语义全部收敛到 `decideLanding` 纯函数表，未来换绑入口只需加 cause 枚举行；锚以 durable seq 为身份，重放/窗口规则改动不漂移；E2E 脚本入库可重复跑。
+- **同日补刀（用户真机实测抓到漏网场景）**：落定后切走再切回 ✓，但**流式中**切走切回仍跳位（±32px/56px 不定）。逐行坐标取证（`scripts/e2e-stream-switch.mjs` 流式定向 repro，行高差「无」却仍错位）→ 定罪：**同一 assistant 事件渲染两行（`思考`折叠行 + 叙事行）共享同一 seq**——捕获的 straddle 是叙事行、`querySelector([data-seq])` 找回的是思考行，同 seq 不同行 = 常数漂移。修复 = **思考折叠行不承载 data-seq**（锚由叙事/用户/工具行携带；代码注释+本条双录）。修复后真机复跑：捕获 `{seq:25,offsetPx:-216}` → 切回 482=482 精确保持 ✓。教训两条：①锚的身份必须「捕获与查找双向唯一」，一个 seq 渲染多行就是隐患；②E2E 的 `锚=踩DOM` 写法必须让 jsdom 组件 spec 与真机 repro 双覆盖——jsdom spec 曾三绿而真机仍错位，因为假面几何里没造出「同 seq 双行」形态。
+
+## 2026-09-25 galgame 段读位持久化：「点到第几句」跨切卡/刷新存活（用户实测补批）
+
+- **现象（用户实测）**：芙宁娜一回合说 4 句，玩家点到第 2 句切卡再切回——卡直接把全部段点完落到 input。宿主转写行锚管不到卡内演出：病灶在**卡自己的 boot 契约**——09-24 定的「存档/刷新:不重播,直接进 input,`r = 末段`」把玩家读到第几句这一事实抹掉了。
+- **修复（卡侧三件，宿主零契约变更）**：① `gal_data.mjs` 从 `.chat.snapshot.jsonl` head 行透出 `session`（会话身份）；② `index.js` 段指针持久化——`gg.reader.pointers` 单键 LRU≤16（同宿主 reader-anchor 口径），`startParagraph/setMode('input')/syncDurable` 三处落盘；③ boot 恢复三分支：**同回合(asstSeq 相等)有读位 → 复位到读到的那段完整上屏（不打字机重播）；缺席期新回复(seq 前进) → 回队头从头演绎（未读，防剧透同义）；无存位/身份缺席/存储不可用 → 保持「直落 input」旧契约**（载入存档重开的退化形态原样保留）。
+- **同场教训**：改卡库正本（`tavern_presets/芙宁娜/`）**不会**传导进已建工作区——`preset/` 是导入时刻的快照，运行中会话仍跑旧卡件（存位恒 null 的第一现场）。迁移 = 卡文件同步进工作区（等价「编辑卡保存」落盘）；本批已对全部芙宁娜工作区就地同步。
+- **验证**：galgame-card.client.spec 增三例（恢复/新回复重演绎/input 旧契约）9/9 绿；真机定向 repro `scripts/e2e-gal-reader.mjs`：真回复落定→点读到段2（存位 `{r:1,asstSeq:50,mode:"reading"}` 落盘）→ 整页 reload → **恢复 `mode=reading · 段 2/4`** ✓；全套 vitest 413+3 绿。
+
+## 2026-09-25 载入改名换位 EBUSY 复发（单卡仍高频）：疑点收敛到泵子进程 CWD 钉住目录对象，定罪实验待跑
+
+- **现象（用户报，Windows 真机）**：09-24 换绑链修复落地后真机复验——**单张芙宁娜卡**点「载入」仍高频报 `tavern/save-failed: EBUSY: resource busy or locked, rename '...\runtime' -> '...\.tavern-runtime-retired'`。失败点 = `loadSave` 的**第一个** `renameSync`（`workspace.ts:477`，非兜底删除步）。
+- **分析（本轮只诊断，零代码改动）**：09-24 的前提「rename 不受 cwd 占用/热句柄影响」（`workspace.ts:465` 注释）半截成立——rename 确实免疫**后代文件**句柄（热文件，故改善显著），但**runtime 目录对象自身**的打开句柄（不带 `FILE_SHARE_DELETE`）仍拒绝 rename，报 `ERROR_SHARING_VIOLATION` → libuv 映射 `EBUSY`（strerror 文案 `resource busy or locked` 即共享冲突专属；权限类失败会是 EPERM/EACCES 文案）。而泵就是这种句柄的稳定生产者：芙宁娜卡 `preset/ui/index.js:14` `POLL_MS=900`（dnd5e `runtime.mjs:9` 2s）每拍经 `runCardScript`（`prompting.ts:393`）spawn **cwd=runtime** 的 node 子进程（寿命 ≥100ms，占空比 ~15-40%）；泵 `stopped()` 到面板 dispose 才生效，载入弹窗期间照常 spawn；`load()` 围栏（`index.ts:1075-1084`）只 await gates/tailRuns，泵 runScript 是匿名 RPC 不在登记内；rename 零重试 vs 同函数 rmSync 带 `maxRetries:10×100ms`——非对称。**单卡不豁免**：泵按卡跑。
+- **置信度如实**：errno 归属是承重推断（~75%）——libuv/MSDN 一手源本轮未拿到（webFetch 抓正文失败、搜索全噪音）。竞争假说：OneDrive/同步盘对目录的句柄（若 Windows 工作区落在同步盘接管的桌面/文档下，症状同型）与杀软/索引器常驻目录句柄。
+- **定罪实验（已落档 `load-rebind-debug.zh.md` 五轮节，含可跑脚本全文）**：A = 最小复现脚本（异步 spawn 一个 cwd 钉目录、活 4s 的 node 子进程后 `renameSync`，看报 EBUSY 还是成功——**必须用 spawn 不能 spawnSync，否则阻塞到子进程退出、句柄已释放、假阴性**）；B = `POLL_MS` 900→10000 对照（失败率随降频下降=泵实锤）+ Procmon 过滤 `Path contains runtime` 看 rename 失败瞬间持句柄进程名（node.exe=泵；OneDrive.exe/MsMpEng.exe/SearchProtocolHost.exe=外部）。
+- **修复方向候选（仅记录，实验出结果前不动手）**：① renameSync 加 maxRetries（最小面，与同函数 rmSync 对称）；② 引擎登记在途 runCardScript 子进程入围栏（最彻底）；③ 泵 spawn cwd 挪出 runtime（会连动卡脚本契约——gal_data 直读 `'../preset/...'`，非纯引擎改）；④ 客户端载入前置暂停泵（跨两层，时序最难钉）。
+- **状态**：未改任何生产代码；诊断 + 实验清单 + 判定矩阵落档，真机实验出结果后回填本条与修复裁定。09-25 本机先跑掉能跑的：实验 A 脚本调试完毕（macOS 对照组 RENAME OK）、毒泵压力基线 100ms/拍 100% 占空比下 20 轮换位全过（编排逻辑无罪，Windows 失败可收敛到内核共享语义单变量）；CWD→EBUSY 的一锤定音**本机模拟不可达**（无虚拟化件、Wine 即便有也证伪不了、网络取不到 libuv 一手源），仍需真 Windows 跑实验 A/B。
+
 ## 2026-09-25 芙宁娜收尾批:输入框定形/CG 素材重做/写卡列隔离/背景误停
 
 - **输入框定形（用户拍板,原型 proto v3 正本）**：复用宿主 composer 停靠,卡 CSS 覆盖——
@@ -674,3 +699,28 @@
   3. 客户端（TavernView SavesPanel）**拒绝分支可见化**:载入按钮 loading 态(防拿已换绑旧 id 连点)、失败行内错误行（`loadError`+,css 复用 `--t-danger` 系）+ `console.warn` 留痕。验尸不再靠 F5。
 - **回归钉**：workspace.spec 新增拷贝失败回滚原位（chmod 000 拦 copyFileSync,root 跳过）与无退役残留/过渡树不出编辑树两例;新增 `packages/ui/tests/saves-load.client.spec.tsx`（失败上屏+按钮复活）——绕开 client-runtime 的 kernel client.js 链（`makeTranslate` 是.ModuleLoader 前递源）,本地 translate stub 直译词表;tests-client-plane 的 KNOWN GAP（vitest glob 不匹配）维持原状。
 - **验证**：vitest 306/306（含 loader-composition 载入/清空真组合走新序）、tsc host/client、oxlint、`pnpm build` 四包全绿。**待 Windows 复现验证**：修复后「说完话→载最新档」应一次成功;若仍有失败,错误原文会首次出现在存档页错误行与宿主日志（`tavern/save-failed: ...`）——不再需要 F5 考古。旧排障笔记（`load-rebind-debug.zh.md` 2026-09-13）的「载入缺回滚」欠账就此清账。
+
+## 2026-09-25 段读位键源缺口:新会话首挂整页无键,点读存位被守卫吞光(补批的补批)
+
+- **现象（用户实测）**:任意一回合点到第 2 句等未读完状态,刷新/切卡再回——直接 n 段全已读、跳下一轮 input。与上午批(见上条)同形但**复现位置不同**:上午修的是「有历史的会话」,这次炸在**新会话的首次页面生命周期**(会话首挂时还没有任何 assistant 行)。
+- **根因(赋值时序洞,一处拧两半)**:读位键源 `state.sid` 全文件只在 boot 的「有 assistant 行」分支里赋值——空会话/开场期 boot 走另两分支,sid 恒 null;`poll()` 也从不补设。`savePointer()` 首行守卫 `if (state.sid === null) return` 把本页整段生命周期里**每一次**点读(startParagraph/syncDurable/setMode('input') 三处)静默吞光。刷新后 boot 拿得到 session 了,但 localStorage 里无位——落入兜底分支 `r = 末段 + input`,并顺手把这个「伪点完」位写进存储(粘性:再刷新还是全已读,直到新回合 seq 前进才翻篇)。数据面无恙:快照 head.sessionId 从首条 submit 起就在,`gal_data` 一直如实透出,是前端拿到没接。
+- **修复(卡侧两行,缺一不可)**:① sid 赋值提升到 boot 分支梯外(session 与有无回复行无关);② `poll()` 键自愈——`sid === null` 时从 `d.session` 补设,接住「快照晚于 boot 出生」的会话(全新会话首 submit 才落盘,随后 files 事件带 poll 回来)。宿主/泵零改动。
+- **为什么上午批没拦住**:三例 spec 与 e2e-gal-reader 全部从「已有 assistant 行」的 boot 起步(预置存位/切入既有会话),恰好绕开键源缺口;两例新 spec 钉的就是这个形态——一例「boot 有 session 无回复+live 推流后点读、**零 poll 参与**即存位」(钉提升本身),一例「boot 连 session 都没有、落盘拍 poll 补键」(钉自愈)。红证:回滚成修前形态,恰好这两条红、其余 9 条绿;恢复修复 11/11。
+- **同步与验证**:存量 4 个芙宁娜工作区就地同步(与库 diff 确认恰好只差本修复,无漂移);全套 vitest **418/418** 绿;真机 `e2e-gal-reader.mjs` 切卡往返恢复段 2 ✓。
+
+## 2026-09-25 芙宁娜分域重构批:单闭包袋子拆五胶囊六文件 + 宿主声明装载(门B)
+
+- **缘起(立案证据,见两份设计定案)**:642 行 index.js 是「19 键公共袋子 + 双摄取通道 + 唯一写手靠自觉」——v10.1 两起键源事故同为双摄取失同步;防剧透存在双定义(view.mjs 死代码 backlogHTML 与活版 renderBacklog 两轨语义);design §3「不落盘」/build §5「不做 token 流」早被后续批推翻而未回写。用户直言「改啥都不明不白」。
+- **两案定案(对抗评审 3 严重 9 建议全修)**:[[2026-09-25-ui-modules-manifest]](宿主侧门B:layout.json `modules` 声明清单,四槽词表之外卡可自带 UI 模块,宿主按单装载注入 `tavern.mods`——「卡声明、宿主执行」家法第四次贯彻)+ [[2026-09-25-gal-domain-refactor]](卡侧五胶囊:仓库/书签/演出机/舞台/组装,四动词协议封闭,规则全下沉 view 纯函数)。骨架评审结论:两案行号考据罕见零漂移;三处「按文档字面施工会撞墙」级(泵载荷三路径签名闭合/jsdom blob 面对冲/revoke 零既有覆盖)全修。
+- **施工四批各设全绿门**(:e4e6215 宿主 manifest——解析校验/装载循环/mount face 注入+spec 四例;:48d55e0 规则下沉——view.mjs 七族纯函数+`galgame-rules.unit.spec` 18 例锁规格;:0ef4354 四胶囊成体——feed/ptr/para/stage+layout 开 modules;:e2bf737 index 重建——642→139 行组装发牌)。
+- **施工病灶一例(红 3/16 后探针量证)**:仓库 emit 以已递增水位重算 fresh 旗标(落定拍 `5 > 5` 恒 false)——①落定校准/②新玩家行 waiting 两分支全哑火;修为调用方以 bump 前局部真值传入。这是「同值两算」族病在单摄取体内的最后一次显形——旧时代它住在两条摄取路里,现在只有一个住处、一条探针即可定罪。
+- **行为零 diff 验证**:16 例 client spec 断言**零改动**全绿(v10.1 两起事故的钉原样保活;rig 唯一改进口=直导四件注入 tavern.mods)+18 例规则钉+宿主 manifest 四例,全套 449 绿 + `pnpm build` 双面。两处件随偏差(live 桥直达演出机/stage.warm 显式入口)与行数对账(para 311 超预算 230 的改判理由)如实入 build 文档 §8。
+- **纪律回收**:v10.x 事故编年由 index 头注迁往 build 文档;design §3/§5 回写真话(段读位已落盘、live 桥已在);die 双胞胎(backlogRows/backlogHTML)删除。待批 6:工作区同步+真机 CDP 五场景。
+
+## 2026-09-25 芙宁娜分域重构真机收口批 6:主链路 E2E 满分 + 批 6 环境面三课
+
+- **批 6 交账(真机 CDP,mock LLM 确定性环境)**:存量 4 个芙宁娜工作区照 v10.1 家法同步(与库 diff 先行确认恰好只差本批六件,零漂移);宿主 `pnpm restart --bg --no-open` 取新枚(装配 ✓,fengyue 标记 11 处——重启窗口期的 EADDRINUSE 畸形实例与 14:34 前的旧 ✗ 日志勿误读);mock 起法三坑记录:`--success-text-file` 是一行一条池(整段回复须 `--success-text`);前缀赋值 `VAR=… cmd "$VAR"` 在赋值前展开成空串(先 export 再调);宿主重启不配 `--no-open` 会弹真浏览器。
+- **主链路满分**:e2e-gal-reader 五场景全绿——落定进 reading 段1/4 → 点读到段2+存位 `r=1`+历史恰截 2 行(防剧透闭环)→ 真·切卡往返恢复段2 → 再点进段3。链路本身同时是门B真机证明(卡活着=宿主 manifest 装载四胶囊接线成功,装配身份 ✗ 时期不可能通过)。
+- **e2e-landing 一红,红因三度改判后定罪(如实)**:①初判「dnd5e 卡皮选择器漂移」—错;②二判「ga666a_send 卡皮类」—错(`ga666a_send` 是 client.js 构建产物的 CSS module 哈希,非卡皮);③终判:**E2E 自身天生缺口**——`converse` 时序是「先 waitSettled 再 fill」(e2e-landing.mjs:84-86),首等时草稿空 → 发送键 `disabled={draft.trim()===''}`(chat-view.tsx:996)恒 disabled,playwright 判 hidden → 480s 超时。会话 A(无 UI 卡)同形态成立,与域重构/卡皮零关;e2e-gal-reader 通过恰因其先 fill 再等形态。记案待修(rot 顺序对调即可),本批零产品代码改动。
+- **用户真机自测**:域重构落地后用户实测「没啥毛病」(2026-09-25,原话);期间代码零改动(HEAD 对账 b568b6d 不变),环境面三项(settings.yaml 改指 mock 后已还原/宿主两次重启取新枚/E2E 自建工作区 2 个)如实交代。
+- **环境复原**:settings.yaml 已还原(备份 settings.yaml.bak-e2e-mock 保留);mock LLM 进程随会话管理;E2E 自建会话(9c6da70b 等)与空工作区留存,要清跑 `pnpm cleanup`。dnd5e systemPrompt 一行措辞改动保留为用户手笔,未提交。

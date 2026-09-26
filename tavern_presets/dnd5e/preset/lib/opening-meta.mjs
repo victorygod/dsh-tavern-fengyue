@@ -44,17 +44,22 @@ export const SKILL_EN_KEY = {
   performance: 'performance', persuasion: 'persuasion', religion: 'religion',
   'sleight of hand': 'sleight_of_hand', stealth: 'stealth', survival: 'survival',
 }
+export const ALL_SKILL_KEYS = [...new Set(Object.values(SKILL_EN_KEY))]
 const WORD_NUM = { one: 1, two: 2, three: 3, four: 4 }
 
-/** class md 的 *Proficiencies* 行 → { skills: 键数组, count, anySkill }。行缺席/形状坏 → null(调用方 fail-loud)。 */
+/** class md 的 *Proficiencies* 行 → { skills, count, anySkill }。anySkill=true=全 18 任选(吟游诗人)。
+ *  行缺席/形状坏 → null(调用方 fail-loud)。 */
 export function parseSkillChoices(profLine) {
   if (typeof profLine !== 'string') return null
-  const m = /(?:Choose|choose) (any )?(one|two|three|four)(?: skills)? from ([A-Za-z, '’ and ]+)/.exec(profLine)
+  const m = /(?:Choose|choose) (any )?(one|two|three|four)(?: skills)?(?: from ([A-Za-z '’ and ,]+))?/.exec(profLine)
   if (!m) return null
-  const names = m[3].split(/,\s*|\s+and\s+/i).map(s => s.trim().toLowerCase()).filter(Boolean)
-  const skills = names.map(n => SKILL_EN_KEY[n]).filter(Boolean)
-  if (!skills.length) return null
-  return { skills, count: WORD_NUM[m[2].toLowerCase()] ?? 2, anySkill: Boolean(m[1]) }
+  const anySkill = Boolean(m[1])
+  const count = WORD_NUM[m[2].toLowerCase()] ?? 2
+  const skills = anySkill
+    ? []
+    : String(m[3] ?? '').split(/,\s*(?:and\s+)?|\s+and\s+/i).map(s => s.trim().toLowerCase()).filter(Boolean).map(n => SKILL_EN_KEY[n]).filter(Boolean)
+  if (!anySkill && !skills.length) return null
+  return { skills: anySkill ? ALL_SKILL_KEYS : skills, count, anySkill }
 }
 
 /** L1 特征回充时机表(名=语料 class 表 Features 列的 EN 原文;池类才标时机,其他 |— 不造伪池)。 */

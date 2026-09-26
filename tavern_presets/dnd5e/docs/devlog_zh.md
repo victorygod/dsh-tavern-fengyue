@@ -588,3 +588,38 @@
 - **头像 138% 内裁层**(av-clip)与 **#vtip 悬停浮签**(runtime 全局单件,0.1s 统一延迟,title 全量退役)。
 - **测试**(307→339 绿):view 结构钉/acts 对话框行为钉(jsdom)/runtime vtip 钉/jsdom 各一;`dnd5e-ui-data-candidates.spec` 真脚本+临时树(cwd 与 preset 兄弟——部署同构);`dnd5e-grow.browser.spec` playwright 无头 Chrome(--allow-file-access-from-files)全链:呼吸→居中(几何断言)→token 不透明→±分点→双通道保存(fixture 机械层真改 player)→泵拍回落→vtip 0.1s→截图留证 `packages/ui/tests/__artifacts__/grow-dialog.png`(对照原型逐点相符)。**browser 层当场抓出并修掉两枚真 bug**:shellDlg 缺 open 类(真浏览器永不可见)、dlg 居中测量时序(入场动画盖 translate→改 CSS translate 自适应)。
 - 遗留:front_commit 侧三检(环位资格)未落——候选列表已从源头约束,直改存量攥写防线上仍靠 prompt;L4 语料列/准备制长休句未动(asi-pending L 批次照旧)。
+- **追记(同日)**:开局 roll 全面重做——opening-meta.mjs 单源(SRD 技能白名单/主属性序/L1 子职标记/戏法与首环数/12 职起装),opening_data 桥下发 meta(技能白名单现场解析 *Proficiencies* 行+子职清单+法术池),opening_commit 镜像校验(技能越白名单 fail-loud/施法者出生即满/子职落/训练面出生/特征回充按表非池|—/中文描述与 backstory 缝合),roll 改耦合链(性别→种族→同族名→职业→主属性序吃标准数组→技能按白名单→L1 子职→施法成套);创角表单(bridge 下发)跟改:技能格按职业重建/选数动态/子职 select/施法成套只读预览+重掷;7 条集成钉(dnd5e-opening.spec)——356 全绿。
+
+## 2026-09-25 · 目标结算咽喉化——attack/cast 查无目标不再静默涂默认值
+
+事故:哥布林乙射梅西雅,回执 `vs AC 10` 误中(该骰 12)——实况 AC 17(鳞甲14+敏1+盾2)。根因:梅西雅存 `characters/player.json`(真名在 name 字段),attack 目标退化查找手写 `existsSync('characters/梅西雅.json')` 落空 → AC 留初始默认 10 静默流入结算;而攻击者侧 readChar 走的 findCharFile 有 name 兜底扫描——同名两条路,一条有兜底一条没有。同病三处:attack 目标、cast 攻击型(连角色档退化都没有,法术打玩家恒 10)、cast 豁免型(静默 saveBonus 0)。
+
+- **core.mjs 咽喉**:新增 combatRow(敌行∪友行)/deriveAC(AC 律单源)/resolveTarget/resolveSave——失败一律返回 null,失败策略归调用方 err。ui_data 内联 AC 副本同步收拢调 deriveAC,「同律」从注释承诺变代码事实(顺带中文名甲从此走 equipmentFM 桥,旧裸路径读读不到回落 10+敏)。
+- **attack**:19 行手写目标解析块→1 行 resolveTarget;查无且未传 ac→`!查无目标 AC:<名>` 报错;新 schema 参数 `ac`=转写逃生舱(即兴无档/剧情态与档不符如弃盾);回执 AC 行带来源(`敌行`/`友行`/`characters/player.json`/`转写`),LLM 转写值与档读值一眼可分。
+- **cast**:攻击型分支补上角色档退化(原 combatFoe 单路);豁免型换 resolveSave,查无→报错不涂 0。
+- **设计裁定**(用户讨论定案):持久玩家资产=档读(反作弊锚+确定性:桥对则永远对,LLM 抄写每骰一赌,抗性列表必翻车),DM 即兴资产=转写且留痕——这条线现状本就成立,只是目标侧的桥断了;静默默认值与「拒绝分支空吞错」同罪,就此绝迹于目标解析路径。
+- 测试:`packages/engine/tests/dnd5e-tools-target.spec` 8 钉(事故锚 name 兜底/敌行回归/查无报错/ac 逃生舱有档+无档双形态/cast 攻击型+豁免型/ui_data 同 17),全套 37 files/457 tests 绿。工作区快照四文件(core/attack/cast/ui_data)已同步,真机四验全过:repro→`vs AC 17(characters/player.json)`、玩家打哥布林→`vs AC 15(敌行)` 回归、查无→报错退出、panel `derived.ac:17`。
+
+## 2026-09-25(npc-list-v4) 附近 NPC 三态名单 v4——state 节复活,注入与前端人际三区同源
+- **用户定案,推翻 2026-09-21 v3「零名单」案**:前端要求展示 同伴/中立/敌对 三区且与 postPrompt 注入集**完全一致**;用户拍板:①杂兵也进入(上榜必有档——与硬性要求 7「参战全员建档」同向,v2「无名杂兵住敌行」旧陈述作废);②行式 `- 名 | 态`;③**名单漏更时同伴不加 role 兜底**(漏=漏,与 v2 盲区共存亡);④敌对在右栏、同伴+中立在左栏。复活 state.md「## 附近 NPC」节为唯一在场真源,敌对=持久态(战毕未死者不回落中立——v3 时代「敌意消退即回落」的语义边界就此消解)。
+- **一处算法两处消费**(v2 死因=注入器无视名单+三处同伴判据打架,质量锁就是不再让判据分家):`lib/core.mjs` 新 presence()——解析节行式「名|态」,行在档缺/坏 → j=null(注入示警「勿采信」+前端占位卡,裂缝可见不静默);get_npc_state.mjs 重写为消费真源(三标签注入全 JSON,快照点名算法退役,.chat.snapshot.jsonl 不再读);ui_data op=panel——hud-left=player+同伴+中立、hud-right=敌对+环境+任务,敌卡 HP/先攻 **敌行优先**(战斗回合机械快照压档案值,无敌行=持久敌对未接战纯档案口径),`_missing` 占位;full op 同步三池。
+- **rev 扩容**:hud-left=player+characters 聚合+**state.md**(名单一行之差必须触发重画);hud-right=state.md+characters(敌卡 join 档案)。
+- **view/acts/css 三区**:matesHtml 拆 personCard+zoneHtml(同伴/中立左区、敌对右区置顶,空区整隐);敌对=暖红调+先攻 chip ◆N;缺档占位卡不可点(data-tip 尾代应补建);acts.book 改按 ctx.panel 取切片(右池 foes 在 hud-right 响应里),缺档卡不开册。
+- **提示词**:maintenancePrompt 新增 3.d 名单维护流(新在场者上行+建档含杂兵/离场删行/态迁移改标/入队离队**行与 role 双写**防分家/死敌删行删档);3.a 建档句与新硬性 7(参战者全登记敌对行;战毕死敌删档**并删行**)同步;systemPrompt 注入语义句改名单口径。
+- **种子/文档**:setup/state.md 增「## 附近 NPC」节(-(无) 占位);ui_zh.md 敌怪区条款修订(2026-09-20「不设」案推翻,敌对区=名单第三态投影非战斗面板,战斗呈现仍归 DM 叙事)+数据流三池版;prompt-principles #13 重写(记明代价=尾代每回合维护);panel-data_zh.md:13/65、design_zh:139 数据全景同步;get_roster 头注释。
+- **一致性锁**:`dnd5e-presence.spec.ts`(engine 侧新增)——同 fixture 分别跑真 get_npc_state 与真 ui_data 两面板,断言**人名集+三分类逐一相等**(注入与前端镜像的机器锚,防 v2「注释与实现相悖」重演); smoked fixture 实测:左=老铁(同伴)+掌柜/幽灵客(中立,后者缺档占位)、右=石牙(敌对,敌行 HP 7/9 压档案)、注入同名同序,全对上。
+- **代价记档**:尾代每回合多一项名单维护(v3 的零维护红利放弃);名单漏更=漏注入漏上屏(用户明断接受);存量工作区 state.md 无该节 → 迁移需尾代首回合补建行(卡库种子只影响新装卡)。
+- **追记(09-26)**:用户令「敌人面板在任务列表下方」——右栏区域序改为 环境→任务→敌对(敌对区由置顶改沉底);view rightPanel 顺序调换,zones spec 断言翻转(敌对 zone 晚于 quests 容器),ui_zh 措辞同步。
+
+## 2026-09-26 · 一期直写工具体系落地——九件工具当拍写盘+敌行瘦身+尾代转审计员
+
+设计正本=panel-consistency_zh.md(§9 逐件终稿+五条通用律);本日按其施工,attack/cast 归并行线未动。
+
+- **core.mjs 机械层收拢**:pbOf 单公式(两端 clamp 1–30,修旧 pb 的 0.25 虚低+CR21+ 封顶双错)/XP_BY_CR 查表(key=level 含小数档,xp 不落档=派生不存)/classRow 序数词单源(修 gain_exp 特征行恒空——SRD 表是 | 1st |,旧纯数字正则永不匹配)/stripEmptyArrays+saveChar 写盘 helper/presenceAdd+combatWrite 两个 md 行操作/**敌行瘦身**(行只记 名|path|状态,HP/AC 一律走档;resolveTarget 扩展回传 file/j/growth,resolveSave 弃 row.path 分支全走档)。
+- **九件工具**:check(save:true 豁免熟练/dc 缺省=对抗/damage 自带专注入口/modifier 兼骰式)、damage(世界伤害掷骰,target 必填,抗免走档,0HP 受击自动 death_fail+1)、heal 新件(非法术治疗:钳上限/0HP 苏醒双清/生命骰逐枚)、**hp_change** 新件(无骰直改 amount|full;永不作修正器——用户命名)、initiative(物化战斗节;临时单位转写通道废除,未建档报错逼 spawn)、death(计数读档落盘,删 success/fail 参数,v8.1 反转)、spawn_npc 新件(角色创建器:全参 LLM 亲自输入/完备律/同名拒/from 镜像校验锚/count 天干/presence 行/path 溯源)、gain_money·gain_exp(双面解封+context+落盘行;gain_exp 扩 who 名单+foes 战果通道——档读 level 查表求和均分,DM 零算术)。回执统一:落盘行(对象 字段 旧→新 [文件])+梗概+铁则;err 结构化自纠。
+- **联动**:ui_data 敌卡 join 档案(行不落数值,档坏缺席保真)+pb→pbOf;模板补 vulnerabilities/death 计数/level 双语义注记;种子战斗节注释改瘦语义。
+- **提示词重训**:systemPrompt(九件清单+「先调工具再落笔」+来源路由律入纪律+亲手算白名单退役价格合计/经验均分+铺场 spawn 即备账+中途增援例外废+AC10 陈旧句清+对抗/群体入判断清单);maintenancePrompt 转审计员(**落盘行=核对不重放**/三方对账双报警/建档改调 spawn_npc/战毕清场四件/终态不回写)。
+- **验证**:dnd5e-phase1.spec 14 钉(spawn 完备律·镜像·count/三件套·0HP 分叉·受击落败/death 读写/initiative 物化·报错/foes 结算/check save·对抗·专注/pbOf 边界 level21→+7)+dnd5e-tools-target 瘦身适配+dnd5e-presence 语义翻转(敌卡=档案值)——**全套 40 files/479 tests 绿**;pbOf 公式对 FM 334 只逐只对账零偏差;临时 rig 全链冒烟(spawn→initiative→damage→check→heal→hp_change→death→gain_exp→gain_money)通过。
+- 遗留:P0 E2E(regenerate/stop 真机实证)待宿主执行;attack/cast 彼线合流后接内联治疗/自动伤害分支(来源路由律硬约束);工作区无活跃 dnd5e 实例,下次开局自然带出(快照不传导,卡库为源)。
+
+**追记(同日·attack/cast 收尾,用户令归本线)**:attack 终版落地(§9 终稿+off_hand 后手布尔+吞零修复+即兴无档新裁定:写盘需要档,ac 转写仅限有档目标的剧情态覆盖,即兴必须先 spawn——旧测试「酒馆老板」锚改报错);cast 终版落地(彼线四裁定+路由律内联第五六分支:治疗型 restore:true+dice 钳上限苏醒双清/自动型 dice 逐目标独立掷——法术来源一切生命变动归 cast 禁接龙)。**实施抓真 bug 一枚**:自施法(治疗自己)时 cast 结尾位表/专注写盘用开头陈旧快照整档回写,把治疗刚写的 hp 拍回 0(clobber)——修复=结尾写盘前重读实盘;新增三钉(attack 落盘+0HP/cast 位耗+专注 RAW 覆写/治疗内联+自动型)。**全套 40 files/482 tests 绿**。一期 11 件至此全部代码落地;遗留仅 P0 E2E(regenerate/stop 真机)。

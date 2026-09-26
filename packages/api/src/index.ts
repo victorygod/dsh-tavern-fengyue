@@ -299,7 +299,7 @@ export class TavernApi extends TypertRemoteService {
     void signal
     return await wrap(async () => {
       const loaded = await this.ctx.tavernService.load(request.sessionId, request.name)
-      return { sessionId: loaded.sessionId, draft: loaded.draft }
+      return { sessionId: loaded.sessionId, draft: loaded.draft, anchorSeq: loaded.anchorSeq }
     }, 'tavern/save-failed')
   }
 
@@ -329,7 +329,7 @@ export class TavernApi extends TypertRemoteService {
   @Remote
   async reset(request: TavernSessionRequest, signal: AbortSignal): Promise<TavernRebindValue> {
     void signal
-    return await wrap(async () => ({ sessionId: await this.ctx.tavernService.reset(request.sessionId), draft: '' }))
+    return await wrap(async () => ({ sessionId: await this.ctx.tavernService.reset(request.sessionId), draft: '', anchorSeq: null }))
   }
 
   /** @param request - session identity. @param signal – cancels the call. */

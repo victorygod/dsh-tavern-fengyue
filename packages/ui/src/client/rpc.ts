@@ -52,8 +52,8 @@ export interface TavernRpc {
   ): Promise<{ ok: true }>
   saves(request: { sessionId: string }, signal?: AbortSignal): Promise<{ saves: TavernSaveWire[] }>
   save(request: { sessionId: string; name: string; draft: string }, signal?: AbortSignal): Promise<{ ok: true }>
-  load(request: { sessionId: string; name: string }, signal?: AbortSignal): Promise<{ sessionId: string; draft: string }>
-  reset(request: { sessionId: string }, signal?: AbortSignal): Promise<{ sessionId: string; draft: string }>
+  load(request: { sessionId: string; name: string }, signal?: AbortSignal): Promise<{ sessionId: string; draft: string; anchorSeq: number | null }>
+  reset(request: { sessionId: string }, signal?: AbortSignal): Promise<{ sessionId: string; draft: string; anchorSeq: number | null }>
   retryPoint(request: { sessionId: string }, signal?: AbortSignal): Promise<{ sessionId: string; text: string }>
   commitImport(
     request: { sessionId: string; title: string; files: readonly { path: string; content: string }[] },

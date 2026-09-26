@@ -5,7 +5,6 @@
 // ⑤vtip 0.1s ⑥头像 138% 裁层 ⑦截图人工比对原型 docs/hud-proto-grow.html。
 // Chrome 缺席环境整体跳过(静默 skip,不假绿——skip 明 writing Reasons)。
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
-import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -224,8 +223,8 @@ describe.runIf(hasChrome)('dnd5e 成长流浏览器层(playwright 无头 Chrome)
     await openBook()
     expect(await page.$$eval('.book.open [data-act="grow"]', els => els.length)).toBe(0)
     const knownRow = await page.$$eval('.book.open .bk-sp-row', els => els.map(e => e.textContent!.trim()).find(t => t.startsWith('已知'))!)
-    expect(knownRow).toContain('Shield')
-    expect(knownRow).toContain('Web')
+    expect(knownRow).toContain('护盾术')   // Shield——值中文化(2026-09-27):已知行显示中文译名
+    expect(knownRow).toContain('蛛网术')   // Web
   })
 
   it('vtip:0.1s 口径——60ms 不出,160ms 中文出,移开收', async () => {
@@ -243,8 +242,9 @@ describe.runIf(hasChrome)('dnd5e 成长流浏览器层(playwright 无头 Chrome)
 
   it('留证截图:册+学习框(人工对照原型 docs/hud-proto-grow.html)', { timeout: 25000 }, async () => {
     await openBook()
-    // 全清后重录待办态:直接改窗内 player(模拟下一档)
-    await page.evaluate(() => { window.__player.pending = ['LV8·ASI 点选'] })
+    // 全清后重录待办态:直接改窗内 player(模拟下一档)。v10 零轮询:机械层变更不再
+    // 有 2s 整拍兜底——fixture 里 kick 一拍等价真实宿主的"文件写→事件→kick"。
+    await page.evaluate(() => { window.__player.pending = ['LV8·ASI 点选']; window.__handle?.kick?.() })
     await expect.poll(() => page.locator('.h-card .stc.pending').count(), { timeout: 8000 }).toBe(1)
     await page.click('.book.open .bk-x')   // 旧册是开册快照——泵不重绘浮层,收掉重开才有呼吸 cap
     await openBook()

@@ -132,7 +132,8 @@ initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（L
 前置: 解析 who(默认玩家)→读面板;修正值=stat/skill 引用解析(属性调整值+PB(熟练)+PB(专精)+
       statuses.effect 中 attr 匹配项) 或 modifier 直值;两者皆缺→报错。
 判定/豁免: dc 必填;d20(按 mode 取高/低)+mod ≥ dc → 成败;回执含分解。
-攻击链:   target 必填→combat.enemies 行(ac/hp/path)或 character 派生 AC;
+攻击链:   target 必填→敌/友行(ac/path)或角色档(name 兜底,AC 律=core.deriveAC 单源)——
+          查无且未传 ac→报错(2026-09-25 咽喉化:斩静默默 10);ac 直值=转写逃生舱(回执标来源);
           weapon(默认持位)→equipment frontmatter(伤害骰/类型/灵巧/射程);
           攻击属性=灵巧?max(str,dex):近战 str/远程 dex;prof=weapon_prof 命中类别;
           d20(mode)→nat20 必中+暴击/nat1 必失;
@@ -143,7 +144,8 @@ initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（L
           ritual→跳位检(回执注明+10min);位检: slots_lN-budget_offset ≥1→否则报错(附余量);
           专注冲突: 该法术 concentration && caster.concentrating→报错(选单:弃旧/改施);
           施法 DC=8+PB+施法属性调整值;attack_type→走攻击链(dice=frontmatter,升环 DM 显式覆盖);
-          save→逐 target: d20+目标豁免加值(怪:属性调整+save_prof 命中则 PB;PC 同理) vs DC,
+          save→逐 target: d20+目标豁免加值(怪:属性调整+save_prof 命中则 PB;PC 同理;皆走
+          resolveSave 咽喉,查无报错不涂 0) vs DC,
           half_on_save→成功半伤↓;逐目标建议新 HP;建议余量=slots_lN-1。
 先攻:     combatants 逐名→dex(PC/同伴面板;怪=lorebook frontmatter dex)→d20+dex 排序;
           同值标⟦同刻⟧组(DM 裁内部次序);side: role∈{pc,companion}=友,否则敌。

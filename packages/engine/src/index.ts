@@ -34,6 +34,7 @@ import type { CommandId } from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-shell'
 import type { TavernImportFile, TavernLibraryCard, TavernSave, TavernSessionState, TavernTreeEntry } from './types.ts'
 import type { ScriptRenderFailure } from './prompting.ts'
+import { resolveSessionForDirectory, wireFileEvents, type WireInjectCtx } from './file-events.ts'
 import { runHookPhase, type HookEvent } from './hooks.ts'
 import { textOfBlocks, writeChatSnapshot, writeTailSnapshot } from './chat-snapshot.ts'
 import {
@@ -323,6 +324,15 @@ export class TavernRuntime extends Service {
     noticeCompatRecord(ctx.logger)
     syncShippedPresets()
     this.restoreBindings()
+    // 文件事件通道(2026-09-25,docs/notes/feature/2026-09-25-file-events-channel.zh.md):
+    // fs.watch 递归盯 workspace 全树,去抖聚帧后经宿主 webserver SSE(/tavern/events)推给
+    // 前端。ctx.inject 动态域——缺 connection/webServer 的组合(全部测试/非 web 宿主)整个沉睡。
+    wireFileEvents({
+      ctx: this.ctx as unknown as WireInjectCtx,
+      baseDir: () => this.workspaceBase,
+      resolveSession: dirName => this.sessionDirOf(dirName),
+      logger: this.ctx.logger,
+    })
     // 尾代理透流改道：子会话的 assistant 流帧只进子会话的 follow，浏览器永远
     // 跟的是父会话流——不转道，数据维护行只能等落定后取数。见 transposeTailStream。
     this.ctx.on('agent/assistant-stream', ({ agent, frame }: { agent: Agent; frame: AssistantStreamFrame }) => {
@@ -356,6 +366,17 @@ export class TavernRuntime extends Service {
   /** Absolute workspace base (config value resolved against the process cwd). */
   get workspaceBase(): string {
     return isAbsolute(this.cfg.workspaceBase) ? this.cfg.workspaceBase : resolve(this.cfg.workspaceBase)
+  }
+
+  /** 工作区目录名 → sessionId(文件事件通道的帧组解析):盘上 `.tavern-session`
+   *  marker 权威,内存绑定表兜底;未知(孤儿/删除中)=null——事件只是信号,
+   *  未知会话的帧到前端按 resync 语义兜住。emit 时刻解析(去抖窗收敛后再查)。 */
+  private sessionDirOf(dirName: string): string | null {
+    return resolveSessionForDirectory(join(this.workspaceBase, dirName), {
+      readMarker: readPersistedMarker,
+      sessionFile: SESSION_ID_FILE,
+      bound: this.workspaces,
+    })
   }
 
   /**
@@ -1065,7 +1086,7 @@ export class TavernRuntime extends Service {
    *   when the save carries no fork boundary) and the stamp's composer draft
    *   for the client to restore into the input box (empty when unstamped).
    */
-  async load(sessionId: SessionId, name: string): Promise<{ sessionId: SessionId; draft: string }> {
+  async load(sessionId: SessionId, name: string): Promise<{ sessionId: SessionId; draft: string; anchorSeq: number | null }> {
     const root = this.root(sessionId)
     const stamp = readSaveStamp(root, name)
     // 换绑围栏(2026-09-24):收束链在跑时绝不换 runtime——帧链的钩子/尾代理
@@ -1113,7 +1134,7 @@ export class TavernRuntime extends Service {
       this.postStash.delete(sessionId)
       this.postStash.delete(freshId)
       this.workspaces.delete(sessionId)
-      return { sessionId: freshId, draft: stamp?.draft ?? '' }
+      return { sessionId: freshId, draft: stamp?.draft ?? '', anchorSeq: null }
     }
     const { sessionId: freshId } = await this.ctx.sessionController.fork({
       sessionId: stamp.sessionId,
@@ -1154,7 +1175,7 @@ export class TavernRuntime extends Service {
     this.postStash.delete(sessionId)
     this.postStash.delete(freshId)
     this.workspaces.delete(sessionId)
-    return { sessionId: freshId, draft: stamp.draft ?? '' }
+    return { sessionId: freshId, draft: stamp.draft ?? '', anchorSeq: stamp.seq }
   }
 
   /**

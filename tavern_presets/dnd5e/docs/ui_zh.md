@@ -22,7 +22,8 @@
   - **昼夜变底**：面板底色随时段四档渐变（拂晓橙/白天青/黄昏赤/深夜蓝靛），夜档加星点闪烁。
 - **任务手风琴**（亮羊皮纸卡，沿 v7）：主线金边/支线；点击展开=行文本直读；行首 ✓→完成划线降透明。
 - **总开关**（右下按钮）：toggle 滑出左右全部悬浮件（translate+opacity，0.3s spring）。
-- 敌怪区**不设**（2026-09-20 定案：战斗呈现归 DM 叙事；战斗数据仅供同伴栈滤除在场敌怪）。
+- 敌对区设右栏底、任务列表下方（**v4 修订 2026-09-25，推翻 2026-09-20「敌怪区不设」案**；用户令:敌人在任务列表下方——区域序=环境→任务→敌对。敌对卡上屏=「附近 NPC」三态名单的第三态投影，不是战斗面板——战斗机械账仍归 DM 叙事与战斗节；敌卡 HP/先攻 join 敌行）。空则整区隐。
+- 人际三区（v4）：左栏=主角+**同伴**+**中立**（「## 附近 NPC」名单的 mates/neutrals 池）；右栏=环境+任务+**敌对**（foes 池）沉底。名单=注入与前端同源真身（core.presence），缺档行出占位卡（勿采信）。
 
 ### 模块二：宽幅数据册（点任意角色卡翻开；取代 v7 三 tab 弹卡）
 
@@ -44,7 +45,7 @@
 
 ## 面板↔前端对应（数据格式为准）
 
-**方向律（沿 v7）**：前端基于面板存储 schema 展示；`ui_data.mjs`=唯一读通道（op:rev/full/avatars），出口=runtime 原样投影（player/companions/state/combat 四区）+`derived` 派生区。规则计算归泵，展示映射归前端。
+**方向律（v10 2026-09-25 结账改；v4 人际三区同日）**：前端基于面板存储 schema 展示；`ui_data.mjs`=唯一读通道（op:panel 携 rev 参数——同值回裸 ack **无 data**/candidates/avatars;**op:rev 心跳已退役**:从未接线,由「文件事件答何时+rev 参数答是否」取代,见 docs/notes/feature/2026-09-25-file-events-channel.zh.md），出口=runtime 原样投影（hud-left: player/companions/neutrals;hud-right: state/foes——人际三池=`core.presence()` 解析 state.md「## 附近 NPC」名单元）+`derived` 派生区。规则计算归泵，展示映射归前端。rev:left=player+characters 聚合+state.md;right=state.md+characters 聚合。
 
 | 数据格式字段 | 泵 derived | HUD/册子部件 | 展示规则 |
 |---|---|---|---|
@@ -86,20 +87,20 @@
 ## 前端准则清单（R1~R6 沿 v7 全数保留）
 
 - **R1 通道唯一**：runScript('ui_data.mjs'),无第二读面;无本地持久缓存（avatar 图片缓存=会话内存,可接受）。
-- **R2 局部重绘（硬要求）**：节级三段粒度不变（player/mates/state rev 心跳→节变拉节重绘）;节点级 DOM diff 禁止。
+- **R2 局部重绘（硬要求,v10 结账）**：节级三段粒度不变（player/mates/state）;「rev 心跳→节变拉节重绘」已由「文件事件(何时)+op:panel rev 参数短路(是否)」取代——泵零轮询化见 preset/ui/runtime.mjs v10;节点级 DOM diff 禁止。
 - **R3 数据格式为准**：消费字段=存储 schema（character.tpl.json v9.2 含 gender）;前端展示映射不做规则计算（AC/PB/skills/DC/被动/位表=derived）。
 - **R4 监听委托**：事件绑三根一次;册开态跨重绘按 data-ctx 重锚定+tab/滚动位态不迁移;面板收展存 store。
 - **R5 失败保旧**：runScript 失败保留上次数据,下拍自愈;页签隐藏降频。
 - **R6 正文圣域**：悬浮角件不占流;输入框零改动;总开关收展。
 
-## 数据流与实时渲染架构（沿 v7 rev/full 两级协议,粒度节级）
+## 数据流与实时渲染架构（v10:事件驱动 + rev 参数短路——v7 rev/full 两级心跳协议就此退役）
 
-节清单微调：`player`（player.json）/`mates`（characters/ 聚合）/`state`（state.md——含 玩家所在/主线/时间）。`combat` 无 HUD 件仅滤除用。lorebook 不监视（静态 join）。lorebook join（AC/武器/DC）全在 derived。
+节清单（v4 三区版）：`player`（player.json）/`mates`+`neutrals`+`foes`（三池——state.md「## 附近 NPC」名单元,characters/ 聚合供 rev）/`state`（state.md——含 玩家所在/主线/时间/战斗）。`combat` 解析只为敌卡 join（敌行 HP/先攻压档案值）。lorebook 不监视（静态 join）。lorebook join（AC/武器/DC）全在 derived。
 
 ## 避坑存档（沿 v7 全部有效 + v8 增补）
 
 1. CSS Modules 哈希类 opening 容器四类名全查;2. 容器晚于 mount→轮询;3. runScript v2 参数=JSON 单串;
-4. mount 即 applyVisibility+300ms 轮询;5. 总开关管三根;6. z-index 分层正文<HUD(20/30)<册(60/300)<opening;7. 悬浮件避宿主顶栏;
+4. mount 即 applyVisibility+300ms 轮询（**v10 退役**:opening face 订阅+容器 MutationObserver）;5. 总开关管三根;6. z-index 分层正文<HUD(20/30)<册(60/300)<opening;7. 悬浮件避宿主顶栏;
 8. **册 innerHTML 重渲染必重挂渐隐/箭头 chrome**（innerHTML 会清掉）——openBook 内统一重挂;
 9. **册/弹层滚动不靠微型滚动条**——隐藏之,可滚=渐隐+箭头;
 10. **avatarSvg 输入键归一**：存储 race 可能带连字符（'half-elf'）,norm 后再进生成器/图片键;
@@ -108,7 +109,7 @@
 
 ## 施工序列
 
-1. ui_data.mjs：rev/full 沿用+derived 增补（dc/atk/passive）+state 玩家所在层级拆解+op:avatars
+1. ui_data.mjs：op:panel 全量沿用（可带 rev 短路）+derived 增补（dc/atk/passive）+state 玩家所在层级拆解+op:avatars;op:rev 已退役
 2. HUD 角件（身份化主卡+同伴卡+环境面板+任务手风琴）
 3. 宽幅数据册（雷达/增益/施法/装备/小传+滚动提示+秘行纪律）
 4. gender 三处（tpl/opening.html/opening_commit.mjs）+opening 头像预览桥

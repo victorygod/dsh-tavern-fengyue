@@ -292,6 +292,12 @@ try {
 2. Procmon 定句柄持有者：Filter = `Path` contains `runtime`（及 `BeginsWith .tavern-runtime-retired`），Operation = RenameFile / CreateFile；复现一次载入失败，看 rename 失败瞬间持句柄的进程名——`node.exe` = 泵子进程实锤；`OneDrive.exe` / `MsMpEng.exe`（Defender）/ `SearchProtocolHost.exe` = 外部假说成立。
 3. 廉价旁证：把卡窗口切后台（`doc.hidden` → 芙宁娜照跑、dnd5e 降 10s）观察 dnd5e 失败率是否随降频下降。
 
+### POSIX 基线与可模拟性（2026-09-25 已跑）
+
+- **本机模拟不出决定性那一格**：判定矩阵的关键——CWD 钉住目录时 rename 报 SHARING_VIOLATION 还是 ACCESS_DENIED——是 NT 内核语义，只有真 Windows 能答。开发机（macOS 14.6）上无任何虚拟化件（docker/UTM/Parallels/VirtualBox/Wine/QEMU 全缺）；且即便有 Wine 也做不了证：它把 ntdll 重实现于宿主 POSIX FS 之上，CWD 并不是钉目录的内核句柄——「Wine 下 RENAME OK」只能证伪 Wine 自己，假阴性无意义；Docker-on-mac 是 Linux 容器，POSIX 语义同 macOS 对照组。仓库沙箱网络对 raw.githubusercontent/jsdelivr 不可达（webFetch 空内容、curl 超时），libuv `win/error.c` 的 errno 映射一手源未取得——~75% 置信度维持，此环仍待实验 A 定夺。
+- **实验 A 脚本调试完毕**（`/tmp/pin-test-run/pin-test.mjs`，与上文原文逐字一致）：macOS 结果 `RENAME OK`——POSIX 下 CWD 不阻塞 rename，对照组成立、脚本本身可跑无坑；Windows 上同一脚本即见分晓。
+- **毒泵压力基线**（`/tmp/pin-test-run/pin-churn.mjs`，1:1 复刻 loadSave 四步序列：清扫→让位→重建→退役）：泵密度 100ms/拍、子进程寿命 250ms（**占空比 100%，毒于芙宁娜 9 倍**）连做 20 轮——**20/20 全过**。换位编排逻辑在逻辑层无竞态；Windows 上若失败，残余解释收敛到「内核共享语义」单变量。与 09-24 loader-composition macOS <1s 干净通过的结论相互印证。
+
 ### 判定矩阵与去向
 
 | 实验结果 | 结论 | 后续 |

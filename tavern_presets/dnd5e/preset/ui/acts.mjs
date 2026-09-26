@@ -14,11 +14,14 @@ export function book(ctx) {
   const existing = document.querySelector('.book.open')
   if (existing !== null && existing.dataset['target'] === target) { existing.remove(); anchorEl = null; return }
   existing?.remove()
-  ctx.runScript('ui_data.mjs', JSON.stringify({ op: 'panel', name: 'hud-left' })).then(text => {
+  // v4(2026-09-25):按卡所属面板取切片——左池(companions/neutrals)与右池(foes)分住两个面板响应,取点击源头的那份。
+  ctx.runScript('ui_data.mjs', JSON.stringify({ op: 'panel', name: ctx.panel })).then(text => {
     const slice = JSON.parse(text)
-    const key = target === 'player' ? 'player' : '_file'
-    const c = key === 'player' ? slice.data.player : (slice.data.companions ?? []).find(x => x._file === target)
-    if (!c) return
+    const pools = target === 'player'
+      ? [slice?.data?.player]
+      : [slice?.data?.player, ...(slice?.data?.companions ?? []), ...(slice?.data?.neutrals ?? []), ...(slice?.data?.foes ?? [])]
+    const c = pools.find(x => x && (target === 'player' || x._file === target))
+    if (!c || c._missing) return
     const html = ctx.views?.bookHtml?.(c, ctx.avatars) ?? ''
     if (html === '') return
     document.querySelector('.book.open')?.remove()
@@ -144,7 +147,7 @@ function renderGrow() {
   const rows = list.map(c2 => {
     const picked = Grow.spells.includes(c2.name)
     const capped = Grow.spells.length >= 2 && !picked
-    return `<button class="gp-row ${picked ? 'sel' : ''} ${capped ? 'cap' : ''}" data-act="growPick" data-spell="${esc(c2.name)}"><span class="nm">${esc(c2.name)}</span>${c2.ritual ? '<span class="rt">仪式</span>' : ''}<span class="lv2">${c2.level}环</span><span class="pk">${picked ? '✓' : '＋'}</span></button>`
+    return `<button class="gp-row ${picked ? 'sel' : ''} ${capped ? 'cap' : ''}" data-act="growPick" data-spell="${esc(c2.name)}"><span class="nm">${esc(c2.name_cn ?? c2.name)}</span>${c2.ritual ? '<span class="rt">仪式</span>' : ''}<span class="lv2">${c2.level}环</span><span class="pk">${picked ? '✓' : '＋'}</span></button>`
   }).join('')
   shellDlg(`
     <div class="g-title">学新法术 · 本档恰 2 个<span class="tag">须为可施环阶</span>${tiers > 1 ? `<span class="tag">已共 ${tiers} 档</span>` : ''}</div>

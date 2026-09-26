@@ -14,12 +14,15 @@
  * `@import`, no absolute-protocol `url()`), `chat.css` selectors are prefixed
  * to `.tavern-stage`, and layout.json is clamped to the known vocabulary —
  * bad input degrades to the default look with a console note, never breaking
- * the page.
+ * the page. Declared UI modules (`layout.json#modules`, manifest 2026-09-25)
+ * load per-name as blob modules and ride the mount face as
+ * `tavern.mods.<name>` — the card declares, the host loads.
  * @module dsh-tavern-fengyue-ui/card-ui
  */
 
 import type { TavernRpc } from './rpc.ts'
 import { scopeCssRules } from './scope-css.ts'
+import type { FilesHint } from './file-events.ts'
 
 /** A host default cell a card may claim — render-suppress it or dock into its own layout. */
 export type SuppressCell = 'opening' | 'composer'
@@ -36,6 +39,8 @@ export interface CardLayout {
   readonly suppress: readonly SuppressCell[]
   /** Host default cells to STILL render, but positioned by the card into its own layout (dock). Composer only today. */
   readonly dock: readonly SuppressCell[]
+  /** Extra card UI modules declared by name (`preset/ui/<name>.mjs`) — loaded per-name and injected to the mount face as `tavern.mods.<name>` (manifest 2026-09-25). */
+  readonly modules: readonly string[]
 }
 
 export interface CardLayoutPanel {
@@ -83,6 +88,90 @@ export interface AssistantLiveFace {
   subscribeReasoning?(listener: (reasoning: string) => void): () => void
 }
 
+/** * The workspace file-change face: the host signals that files under THIS
+ * session's workspace changed, so the card can run its rev-gated fetch right
+ * now instead of waiting for the next timer tick. Pure addition — cards that
+ * never subscribe are untouched. The event is a *hint*, never a payload: the
+ * listener's correct move is always "trigger the existing fetch, let the rev
+ * gate judge" (empty `paths` = a pure resync hint; content is never parsed).
+ */
+export interface TavernFilesFace {
+  /** Notified on every push; returns the unsubscribe. */
+  subscribe(listener: (hint: FilesHint) => void): () => void
+}
+
+/** The composer-dock read face (G3, 2026-09-25): the card-registered dock slot
+ *  element (null = render the composer at its default in-flow position).
+ *  Change-notified; cleared on registration rollback and on handle dispose —
+ *  the composer falls back to the host's own position by structure, never by
+ *  card-side undo code. */
+export interface ComposerDockFace {
+  readonly slot: Element | null
+  /** Notified on every slot change; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void
+}
+
+/**
+ * The dock-slot vault (G3, 2026-09-25): a card declaring `dock:["composer"]`
+ * registers its slot element via the `dockComposer` mount face; the host moves
+ * its own composer subtree into that slot via a React portal. The card only
+ * declares geometry (a `data-dock-slot` element) and never touches the host
+ * element — positioning, stacking and reclamation become ordinary facts of the
+ * host tree (the G2'-era inline-style leak is removed at the ownership level,
+ * not by cleanup discipline).
+ *
+ * Standalone factory so the contract is directly unit-testable (same small-part
+ * style as the style guards); `loadCardUi` wires one per pack load.
+ *
+ * Fail-visible discipline (client-rpc-no-silent-catch 家族): calling without a
+ * declared dock, or with a non-element, warns and no-ops — never a silent
+ * no-dock state. Re-registration with a different slot replaces (warn) so a
+ * card rebuilding its DOM lands deterministically.
+ */
+export function createComposerDockVault(dock: readonly SuppressCell[]): {
+  /** Register the card's dock slot; returns the deregister function. */
+  dockComposer(slot: Element): () => void
+  /** Host-side read face handed to the app view. */
+  composerDock: ComposerDockFace
+  /** Dispose-time wipe: null the slot and drop listeners. */
+  clear(): void
+} {
+  let slot: Element | null = null
+  const listeners = new Set<() => void>()
+  const notify = (): void => { for (const listener of [...listeners]) listener() }
+  return {
+    dockComposer(next): () => void {
+      if (!dock.includes('composer')) {
+        console.warn('[tavern] card ui: dockComposer called but layout.json has no dock:["composer"] — request refused (fail-visible)')
+        return () => {}
+      }
+      if (!(next instanceof Element)) {
+        console.warn('[tavern] card ui: dockComposer called with a non-element slot — request refused (fail-visible)')
+        return () => {}
+      }
+      if (slot !== null && slot !== next) {
+        console.warn('[tavern] card ui: dockComposer slot replaced (previous registration dropped)')
+      }
+      slot = next
+      notify()
+      return () => {
+        if (slot === next) { slot = null; notify() }
+      }
+    },
+    composerDock: {
+      get slot(): Element | null { return slot },
+      subscribe(listener: () => void): () => void {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    },
+    clear(): void {
+      slot = null
+      listeners.clear()
+    },
+  }
+}
+
 /** The mounted card UI: layout facts, the guarded card theme, plus the disposer. */
 export interface CardUiHandle {
   readonly layout: CardLayout
@@ -92,16 +181,25 @@ export interface CardUiHandle {
   readonly opening: CardOpeningFace
   /** The live assistant stream face mounted through `tavern.assistantLive`. */
   readonly assistantLive: AssistantLiveFace
+  /** The workspace file-change face mounted through `tavern.files`. */
+  readonly files: TavernFilesFace
   /** Authoritative opening-surface truth; TavernChatView pushes it on every change. */
   setOpeningActive(active: boolean): void
   /** Push the chat view's accumulated live assistant text to the card's stream subscribers. */
   feedAssistantLive(text: string): void
   /** Push the chat view's accumulated live reasoning text to the card's stream subscribers. */
   feedLiveReasoning(reasoning: string): void
+  /** Push a workspace file-change hint to the card's files subscribers. */
+  feedFileEvents(hint: FilesHint): void
+  /** The composer-dock read face (G3): the card's registered slot element, or null. */
+  readonly composerDock: ComposerDockFace
   dispose(): void
 }
 
 const SLOTS = new Set(['top', 'bottom', 'left', 'right', 'overlay'])
+/** Declared module names colliding with the four fixed slots would inject the
+ *  same module through two doors — the whole declaration is rejected instead. */
+const RESERVED_MODULE_NAMES = new Set(['index', 'view', 'acts', 'runtime'])
 const CHAT_STYLE_ID = 'tavern-card-chat'
 const UI_STYLE_ID = 'tavern-card-ui'
 
@@ -144,7 +242,7 @@ async function resolveAssetUrls(rpc: TavernRpc, sessionId: string, css: string, 
 /** Clamp layout.json to the known vocabulary; any bad shape degrades to the default. */
 /* oxlint-enable @stylistic/max-len, typescript/no-unnecessary-type-conversion, typescript/no-unnecessary-condition */
 function parseLayout(raw: string | null): CardLayout {
-  const fallback: CardLayout = { html: true, panels: [], suppress: [], dock: [] }
+  const fallback: CardLayout = { html: true, panels: [], suppress: [], dock: [], modules: [] }
   if (raw === null) return fallback
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
@@ -201,7 +299,21 @@ function parseLayout(raw: string | null): CardLayout {
         dock.push(cell)
       }
     }
-    return { ...(windowLast === undefined ? {} : { windowLast }), html, panels, suppress, dock }
+    // modules(可选):卡自家 UI 模块清单,按名装载(preset/ui/<名>.mjs)注入 tavern.mods。
+    // 与 suppress/dock 同一刑事政策——任一非法成员整单拒回默认:拼错比静默通过好。
+    const modules: string[] = []
+    if (parsed['modules'] !== undefined) {
+      if (!Array.isArray(parsed['modules'])) throw new Error('modules list')
+      if ((parsed['modules'] as unknown[]).length > 8) throw new Error('modules count > 8')
+      for (const entry of parsed['modules'] as unknown[]) {
+        if (typeof entry !== 'string' || !/^[a-z][a-z0-9-]*$/.test(entry) || RESERVED_MODULE_NAMES.has(entry)) {
+          throw new Error(`module name "${String(entry)}"`)
+        }
+        if (modules.includes(entry)) throw new Error(`duplicate module "${entry}"`)
+        modules.push(entry)
+      }
+    }
+    return { ...(windowLast === undefined ? {} : { windowLast }), html, panels, suppress, dock, modules }
   } catch (error) {
     console.warn('[tavern] card ui: layout.json rejected —', error instanceof Error ? error.message : String(error))
     return fallback
@@ -278,6 +390,9 @@ export async function loadCardUi(
   setStyleElement(UI_STYLE_ID, guardCss(uiCssRaw ?? '', 'ui.css'))
 
   const layout = parseLayout(layoutRaw)
+  // 停靠槽 vault(G3):卡注册槽元素,宿主 portal 搬运自己的 composer 子树
+  // ——「卡供槽、宿主搬运」;dispose 清空即结构性回落,不再有卡侧回收纪律。
+  const dockVault = createComposerDockVault(layout.dock)
   const urls: Array<{ url: string }> = []
   const importModule = async <T>(code: string | null, label: string): Promise<T | null> => {
     if (code === null || code.trim() === '') return null
@@ -294,6 +409,21 @@ export async function loadCardUi(
   const views = await importModule<Record<string, (data: unknown, extra: { avatars: Readonly<Record<string, string>>; ui: Readonly<Record<string, unknown>> }) => string>>(viewCode, 'view.mjs')
   const acts = await importModule<Record<string, (ctx: unknown, event: Event) => void>>(actsCode, 'acts.mjs')
   const runtime = await importModule<{ mountPanels?: (deps: Record<string, unknown>) => { dispose(): void } }>(runtimeCode, 'runtime.mjs')
+  // 模块清单装载(manifest 2026-09-25):声明 → 按单逐名装载 → mount face `tavern.mods`。
+  // 逐名 fail-visible:读不到/空白 = 响亮 + 缺该键,单名缺席不拖死整卡——模块缺席是卡
+  // 组装层的编译错,卡侧守卫留痕停摆对应域;宿主不替卡猜可否继续。读侧响亮是本循环
+  // 新纪律:既有 importModule 对 null/空白静默返回,缺席不能没人喊。
+  const mods: Record<string, Record<string, unknown>> = {}
+  for (const name of layout.modules) {
+    const path = `preset/ui/${name}.mjs`
+    const code = await tryReadText(rpc, sessionId, path)
+    if (code === null || code.trim() === '') {
+      console.warn(`[tavern] card ui: declared module "${path}" unreadable or empty — mods key "${name}" absent (fail-visible)`)
+      continue
+    }
+    const mod = await importModule<Record<string, unknown>>(code, `module ${name}`)
+    if (mod !== null) mods[name] = mod
+  }
 
   // The opening-surface truth cell: the chat view pushes `setOpeningActive`
   // (it alone knows 清空/转写), the card reads `active`/`subscribe`.
@@ -341,6 +471,18 @@ export async function loadCardUi(
     liveReasoning = reasoning
     for (const listener of [...reasoningListeners]) listener(reasoning)
   }
+  // 文件变更面(2026-09-25 通道批):纯事件——时间戳不入快照、diff 不必;TavernApp 的
+  // 单例订阅(sessionId 过滤后)喂进 face,卡按行:触发即可,选择立即拉取、rev 门裁决。
+  const fileListeners = new Set<(hint: FilesHint) => void>()
+  const files: TavernFilesFace = {
+    subscribe(listener: (hint: FilesHint) => void): () => void {
+      fileListeners.add(listener)
+      return () => { fileListeners.delete(listener) }
+    },
+  }
+  const feedFileEvents = (hint: FilesHint): void => {
+    for (const listener of [...fileListeners]) listener(hint)
+  }
 
   let unmount: (() => void) | undefined
   if (indexCode !== null && indexCode.trim() !== '') {
@@ -370,12 +512,22 @@ export async function loadCardUi(
         // 流式通道:宿主聊天视图把 live assistant 瞬态文本推进来,卡按行切分即时渲染。
         // 旧卡不缺省 subscribe 即不受影响(纯加法)。
         assistantLive,
+        // 文件变更信号:宿主单例(已按本会话过滤)把"工作区文件动了"推进来,卡
+        // 收到即触发自己既有的 rev 门拉取(2026-09-25 通道批;纯加法,不订阅零影响)。
+        files,
+        // 停靠面(G3,2026-09-25):声明 dock:["composer"] 的卡注册槽元素,宿主
+        // 把自己的 composer 子树 portal 进去——卡零接触宿主 DOM。未声明即调用
+        // = fail-visible 拒绝(console 响亮留痕),绝不静默。
+        dockComposer: dockVault.dockComposer,
         readAsset: (path: string) =>
           rpc.readAsset({ sessionId, path }).then(value => value.dataUrl).catch(() => undefined),
         layout,
         views,
         acts,
         runtime,
+        // 声明装载的自家模块(manifest 2026-09-25):按名取用、组装发牌;
+        // 未声明 = 空对象,旧卡零影响。
+        mods,
       })
       if (typeof returned === 'function') unmount = returned
     } catch (error) {
@@ -387,13 +539,18 @@ export async function loadCardUi(
     themeCss: guardedTheme,
     opening,
     assistantLive,
+    files,
+    composerDock: dockVault.composerDock,
     setOpeningActive,    feedAssistantLive,
     feedLiveReasoning,
+    feedFileEvents,
     dispose(): void {
       try { unmount?.() } catch (error) { console.warn('[tavern] card ui: unmount failed —', error) }
       openingListeners.clear()
       liveListeners.clear()
       reasoningListeners.clear()
+      fileListeners.clear()
+      dockVault.clear()
       setStyleElement(CHAT_STYLE_ID, null)
       setStyleElement(UI_STYLE_ID, null)
       for (const entry of urls) URL.revokeObjectURL(entry.url)

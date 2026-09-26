@@ -55,9 +55,9 @@ describe('ui_data op=candidates(真实脚本)', () => {
     const out = runOp(rt, { op: 'candidates' })
     expect(out.ok).toBe(true)
     expect(out.candidates).toEqual([
-      { name: 'Burning Hands', level: 1, ritual: false },
-      { name: 'Shield', level: 1, ritual: false },
-      { name: 'Web', level: 2, ritual: false },
+      { name: 'Burning Hands', name_cn: '燃烧之手', level: 1, ritual: false },
+      { name: 'Shield', name_cn: '护盾术', level: 1, ritual: false },
+      { name: 'Web', name_cn: '蛛网术', level: 2, ritual: false },
     ])
     rmSync(dirname(rt), { recursive: true, force: true })
   })
@@ -89,6 +89,32 @@ describe('ui_data op=panel spellSplit(戏法/环术拆行)', () => {
     const out = runOp(rt, { op: 'panel', name: 'hud-left' })
     const split = (out.data as { player: { spellSplit: { cantrips: string[]; known: string[] } } }).player.spellSplit
     expect(split).toEqual({ cantrips: [], known: ['火球术'] })
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+})
+
+describe('ui_data op=panel rev 参数短路(2026-09-25 拉式差量)', () => {
+  it('同 rev → 裸 ack {changed:false} 且无 data;rev 变/缺席 → 全量', () => {
+    const { cwd: rt } = rig(WIZ, { 'fire-bolt': spell('Fire Bolt', 0, ['Wizard']) })
+    const first = runOp(rt, { op: 'panel', name: 'hud-left' })
+    expect(first.ok).toBe(true)
+    expect(first.changed).toBeUndefined()        // 无 rev 参数 → 照旧全量
+    expect((first.data as { player: unknown }).player).toBeTruthy()
+
+    const same = runOp(rt, { op: 'panel', name: 'hud-left', rev: first.rev })
+    expect(same.ok).toBe(true)
+    expect(same.changed).toBe(false)             // 同值 → 裸 ack
+    expect(same.rev).toBe(first.rev)
+    expect(same.data).toBeUndefined()            // 无 data:拉式差量省的是传输
+
+    const stale = runOp(rt, { op: 'panel', name: 'hud-left', rev: 'stale:0:0' })
+    expect(stale.changed).toBeUndefined()
+    expect((stale.data as { player: unknown }).player).toBeTruthy()
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+  it('op=rev 已退役(心跳结账):显式报错退出,而非静默回退', () => {
+    const { cwd: rt } = rig(WIZ, {})
+    expect(() => runOp(rt, { op: 'rev' })).toThrow(/op=rev 已退役/)
     rmSync(dirname(rt), { recursive: true, force: true })
   })
 })

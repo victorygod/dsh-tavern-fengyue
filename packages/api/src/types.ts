@@ -12,6 +12,11 @@ export interface TavernRebindValue {
   readonly sessionId: SessionId
   /** The stamp's composer draft at save time; the client restores it into the input box. Empty when unstamped. */
   readonly draft: string
+  /** The load's fork-cut seq（存档刻）— the fresh session's replay stops at this
+   *  boundary, so its tail IS the save point. `null` for 清空/无边界载入 (empty
+   *  history). The landing contract (2026-09-25) carries it as the engine-side
+   *  attestation of the save-point landing. */
+  readonly anchorSeq: number | null
 }
 
 /** One tavern workspace row for the sidebar. */

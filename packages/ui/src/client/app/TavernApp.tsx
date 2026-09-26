@@ -19,6 +19,7 @@
  * trustworthy resolution point.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type MutableRefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -32,13 +33,17 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { loadCardUi, type CardUiHandle } from '../card-ui.ts'
 import { applyTheme, clearTheme, readThemeChoice, THEME_CHOICES, writeThemeChoice, type ThemeChoice } from '../themes.ts'
 import { clearPendingSession, readPendingSession, setPendingSession } from '../pending-session.ts'
+import { subscribeFileEvents } from '../file-events.ts'
 import css from './App.module.css'
 import {
   ChatComposer, ChatLines, MISSING_CREDENTIAL, TranscriptErrorRow, TranscriptPulse, capResultText, reasoningOf, textBlocksOf,
   TAIL_UNAVAILABLE, type TailRunDetail, type TailStep,
-  useBottomPinnedScroll, useProjectionValue, useSessionSurface,
+  useProjectionValue, useSessionSurface,
   type ChatLine, type ConversationFace, type TurnError,
 } from '../chat-view.tsx'
+import { decideLanding, type LandingCause, type LandingPlan } from '../landing.ts'
+import { captureAnchor, createReaderAnchorStore, findAnchorRow } from '../reader-anchor.ts'
+import { useTranscriptScroller } from '../transcript-scroll.ts'
 import { TavernView, type TavernViewProps } from '../TavernView.tsx'
 import { tavernRpc, type TavernRpc, type TavernSaveWire, type TavernWorkspaceWire } from '../rpc.ts'
 import { stripInstructions } from '../wrap-markers.ts'
@@ -251,6 +256,10 @@ function TavernAppBody(props: AppFaces): ReactNode {
   const composerDraftRef = useRef<string>('')
   // 一次性换绑交接：目标会话 id + 要恢复进输入框的草稿（载入存档时来自存档戳）。
   const restoreDraftRef = useRef<{ sessionId: string; text: string } | undefined>(undefined)
+  // 一次性着陆交接（2026-09-25 着陆合约）：换绑 cause + 载入 fork 切刻——着陆
+  // 仲裁的 cause 通道；TavernChatView 按会话进场时消费一次即清空。无交接 =
+  // 自然进场（boot / 侧栏点行 / 切回），按 exit-return 口径仲裁。
+  const rebindCauseRef = useRef<{ sessionId: string; cause: LandingCause; anchorSeq: number | null } | undefined>(undefined)
   const onComposerDraftChange = useCallback((text: string): void => { composerDraftRef.current = text }, [])
   // 侧栏收起态：localStorage 持久（同 lastLines 的直存模式）。收起止于 width 0，
   // toggle 常驻聊天头部（两种状态都在），收起态另有 ＋ 保住新会话入口；
@@ -443,9 +452,14 @@ function TavernAppBody(props: AppFaces): ReactNode {
    * current one — a boundary-less save) bumps the reset signal so the chat
    * view's session effect re-runs and still consumes the handoff.
    */
-  const handleSessionSwitch = useCallback((freshId: string, cause: 'load' | 'edit' | 'retry', draft?: string): void => {
+  const handleSessionSwitch = useCallback((freshId: string, cause: 'load' | 'edit' | 'retry', draft?: string, anchorSeq?: number | null): void => {
     const fresh = freshId as unknown as SessionId
     restoreDraftRef.current = { sessionId: freshId, text: draft ?? '' }
+    rebindCauseRef.current = {
+      sessionId: freshId,
+      cause: cause === 'load' ? 'load' : cause === 'edit' ? 'edit-start' : 'retry',
+      anchorSeq: anchorSeq ?? null,
+    }
     if (fresh === current) setResetSignal(signal => signal + 1)
     remember(fresh)
     clearPendingSession()  // 载入/重试/保存并开始＝游戏意图落地，选卡追踪终止
@@ -558,6 +572,7 @@ function TavernAppBody(props: AppFaces): ReactNode {
       // and `runtime/` re-seeds server-side. The old session stays archived.
       void rpc.reset({ sessionId: clearedId }).then((value) => {
         const freshId = value.sessionId as unknown as SessionId
+        rebindCauseRef.current = { sessionId: freshId, cause: 'clear', anchorSeq: null }
         forgetLastLine(clearedId)
         remember(freshId)
         clearPendingSession()  // 清空＝游戏意图落地（不经 handleSessionSwitch，需自清）
@@ -708,6 +723,7 @@ function TavernAppBody(props: AppFaces): ReactNode {
             escDialogOpen={escDialogOpen} onEscCloseDialog={closeDialogs} onEscOpenLoadPage={openLoadPage}
             onSessionSwitch={handleSessionSwitch}
             onDraftChange={onComposerDraftChange} restoreDraftRef={restoreDraftRef}
+            rebindCauseRef={rebindCauseRef}
             t={t}
             checkKey={checkKey}
             onNeedKey={openKeyDialog}
@@ -898,6 +914,8 @@ function TavernChatView(props: {
   onDraftChange: (text: string) => void
   /** One-shot rebind handoff: target session id plus the composer text to restore. */
   restoreDraftRef: MutableRefObject<{ sessionId: string; text: string } | undefined>
+  /** One-shot landing handoff: the rebind cause plus the load's fork-cut seq (着陆合约 2026-09-25). */
+  rebindCauseRef: MutableRefObject<{ sessionId: string; cause: LandingCause; anchorSeq: number | null } | undefined>
 }): ReactNode {
   const { rpc, sessions, sessionId, t } = props
   const binding = sessions.binding(sessionId)
@@ -917,6 +935,13 @@ function TavernChatView(props: {
   const [texting, setTexting] = useState(false)
   /** The in-flight submission's abort handle: the stop button kills the wrap render and the admission round-trip. */
   const promptAbort = useRef<AbortController | undefined>(undefined)
+  // 着陆合约的视图侧三件套（2026-09-25）：转写滚动容器 ref、本页锚存层
+  // （localStorage 兜重启）、未决着陆计划（gate 与一次性应用均以它在场为准）。
+  const transcriptRef = useRef<HTMLDivElement | null>(null)
+  const anchorMemory = useMemo(() => createReaderAnchorStore(), [])
+  const pendingLanding = useRef<{ plan: LandingPlan; tries: number } | undefined>(undefined)
+  // 图片漂移复贴令牌：玩家接管（发送/新着陆/换会话）即作废——复贴永不与人对卷。
+  const restoreTokenRef = useRef<symbol | undefined>(undefined)
   // 清空后的开场回跳：前端清空转写并显示开场页；下一次发送恢复正常历史视图。
   const [cleared, setCleared] = useState(false)
   const [coverAsset, setCoverAsset] = useState<string | undefined>(undefined)
@@ -948,7 +973,83 @@ function TavernChatView(props: {
     const text = restore !== undefined && restore.sessionId === sessionId ? restore.text : ''
     setDraft(text)
     props.onDraftChange(text)
-  }, [sessionId, props.resetSignal])
+    // 着陆仲裁（2026-09-25 着陆合约）：进场 cause（一次性交接，消费即清）+ 锚存层
+    // 读数 → 恰好一条着陆计划。计划未决的 commit 由 gate 压住 glue（boot 恢复链
+    // 是两段式 commit：先重放、后恢复）。
+    const rebind = props.rebindCauseRef.current
+    if (rebind !== undefined && rebind.sessionId === sessionId) props.rebindCauseRef.current = undefined
+    const cause = rebind !== undefined && rebind.sessionId === sessionId ? rebind.cause : 'exit-return'
+    restoreTokenRef.current = undefined
+    pendingLanding.current = {
+      plan: decideLanding(cause, {
+        stored: anchorMemory.read(sessionId),
+        loadAnchorSeq: rebind !== undefined && rebind.sessionId === sessionId ? rebind.anchorSeq : null,
+        // hasContent 只读当次渲染快照（lines 不入依赖），仅为调用点可读。
+        hasContent: lines.length > 0,
+      }),
+      tries: 0,
+    }
+  }, [sessionId, props.resetSignal, anchorMemory, props.rebindCauseRef])
+  // 尾随的滚动栈：scroller 的影响顺序（glue effect）必须排在着陆计划添置之后，
+  // 计划未决的首个 commit 才被 gate 压住。
+  const [following, setFollowing] = useState(true)
+  const scroller = useTranscriptScroller(transcriptRef, {
+    onFollowChange: setFollowing,
+    // 着陆计划未决的 commit 不许 glue 抢写视口（boot 恢复链的两段式 commit）。
+    gate: () => pendingLanding.current !== undefined,
+  })
+  // 离场捕获（第 2 层写入口）：清理段必须跑在 layout 阶段——先于新会话的
+  // 重放与 glue（passive），否则几何已被下一会话污染。此时 DOM 仍带着旧行，
+  // 读出的就是离开那一刻的阅读位置；发送链路显式 capture(null) 清锚。
+  useLayoutEffect(() => {
+    const leaving = sessionId
+    return () => {
+      restoreTokenRef.current = undefined
+      anchorMemory.capture(leaving, captureAnchor(transcriptRef.current))
+    }
+  }, [sessionId, anchorMemory])
+  // 着陆应用：lines 定案的 commit 里一次性执行（跟随 / 锚恢复 / 兜底跟随）。
+  // 锚行缺席（重放未完 / 窗口截断）时最多等三个 commit，随后按跟随落底。
+  useLayoutEffect(() => {
+    const pending = pendingLanding.current
+    if (pending === undefined) return
+    pending.tries += 1
+    const anchorSeq = pending.plan.anchorSeq
+    const row = pending.plan.follow || anchorSeq === null
+      ? null
+      : findAnchorRow(transcriptRef.current, anchorSeq)
+    // 锚行缺席先留计划等下个 commit（两段式恢复：先重放、后恢复），三跳后兜底跟随。
+    if (pending.plan.follow || row === null || anchorSeq === null) {
+      if (pending.plan.follow || pending.tries >= 3) {
+        pendingLanding.current = undefined
+        scroller.follow()
+      }
+      return
+    }
+    {
+      const plan = pending.plan
+      pendingLanding.current = undefined
+      scroller.land(row, plan.offsetPx)
+      // 晚到的图片会把锚行上方内容撑高（一次性 land 的已知漂移源）：所有
+      // 转写图 decode 定案后按同一 offset 复贴一次。会话已离开 / 玩家已接管
+      // （发送清锚、新着陆、回底灯）只要 token 不在场即放弃。
+      const el = transcriptRef.current
+      const images = Array.from(el?.querySelectorAll('img') ?? [])
+      if (images.length === 0) return
+      const token = Symbol()
+      restoreTokenRef.current = token
+      const recorrect = (): void => {
+        if (restoreTokenRef.current !== token || scroller.isFollowing()) return
+        const fresh = findAnchorRow(transcriptRef.current, anchorSeq)
+        if (fresh !== null) scroller.land(fresh, plan.offsetPx)
+        restoreTokenRef.current = undefined
+      }
+      const imagesDecoded = Promise.all(images.map(img =>
+        typeof img.decode === 'function' ? img.decode().catch(() => undefined) : Promise.resolve(),
+      ))
+      void Promise.race([imagesDecoded, new Promise(resolve => { setTimeout(resolve, 3000) })]).then(recorrect)
+    }
+  }, [lines, sessionId, scroller])
   useEffect(() => {
     if (props.cardMeta.cover === '') { setCoverAsset(undefined); return }
     void rpc.readAsset({ sessionId, path: props.cardMeta.cover }).then(
@@ -1005,12 +1106,28 @@ function TavernChatView(props: {
       setCardUi(null)
     }
   }, [rpc, sessionId])
+  // 文件事件喂数(2026-09-25 通道批):单例已按本会话过滤,换绑自动换键重订阅;
+  // hint 经 cardUiRef 房式推给 face(与加载时序无关)。信号只是"去拉一次"的暗示,
+  // 卡侧 rev 门裁决一切;jsdom/无 EventSource 时订阅 no-op(轮询兜底恒在)。
+  useEffect(() => subscribeFileEvents(sessionId, hint => { cardUiRef.current?.feedFileEvents(hint) }), [sessionId])
   // 上报本绑定卡的主题 css（唯一上报口）：Body 持有它执笔 #tavern-theme sheet——
   // 聊天视图是条件挂载的，sheet 必须在 library/设置模态也常开；卸载即上报清空。
   useEffect(() => {
     props.onCardTheme(cardUi?.themeCss ?? null)
     return () => { props.onCardTheme(null) }
   }, [cardUi, props.onCardTheme])
+  // 卡停靠槽（G3，2026-09-25）：卡经 dockComposer face 注册的几何。有槽 =
+  // composer 经 portal 挂进卡面板（同一 React 子树换挂载点，草稿/IME/模型座
+  // 全保留），无槽 = transcript 下方流内常位。回落由 card-ui 清空槽态（注册
+  // 解停 / handle dispose）结构性驱动——不存在「卡忘了还原」这个状态空间
+  // （2026-09-25 换绑内联样式泄漏立案的根因拆除）。
+  const [dockSlot, setDockSlot] = useState<Element | null>(null)
+  useEffect(() => {
+    const dock = cardUi?.composerDock
+    if (dock === undefined) { setDockSlot(null); return }
+    setDockSlot(dock.slot)
+    return dock.subscribe(() => { setDockSlot(dock.slot) })
+  }, [cardUi])
   const layout = cardUi?.layout
   const windowLast = layout?.windowLast
   const visibleLines = windowLast === undefined ? lines : lines.slice(Math.max(0, lines.length - windowLast - extraShown))
@@ -1103,6 +1220,8 @@ function TavernChatView(props: {
         const data = event.data ?? {}
         {/* jscpd:ignore-end */}
         const time = typeof event.time === 'number' ? event.time : undefined
+        // 行的阅读锚身份（着陆合约 2026-09-25）：durable 事件的 seq；瞬态无锚不参与。
+        const seq = typeof event.seq === 'number' ? event.seq : undefined
         const textAt = (key: string): string => {
           const value = data[key]
           if (typeof value === 'string') return value
@@ -1138,16 +1257,16 @@ function TavernChatView(props: {
           const rawBlocks = textBlocksOf(data['message'])
           const body = stripInstructions(rawBlocks.length > 0 ? rawBlocks : textBlocksOf(data['content'])).join('')
           if (body !== '') {
-            out.push({ kind: 'user', text: body, time, args: undefined, live: false })
+            out.push({ kind: 'user', text: body, time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) })
             props.rememberLastLine(sessionId, body)
           }
         } else if (event.type === 'assistant/message') {
           // 思考折叠行：本回合 durable stream 里的 reasoning-chunks 聚合为
           // 一行灰色摘要（可展开）；reasoning 内容块不再漏进叙事。
           const reasoning = reasoningOf(data)
-          if (reasoning.trim() !== '') out.push({ kind: 'think', text: reasoning, time, args: undefined, live: false })
+          if (reasoning.trim() !== '') out.push({ kind: 'think', text: reasoning, time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) })
           const body = textAt('node') || textAt('message')
-          if (body !== '') { out.push({ kind: 'narrative', text: body, time, args: undefined, live: false }); sawOutput = true }
+          if (body !== '') { out.push({ kind: 'narrative', text: body, time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) }); sawOutput = true }
         } else if (event.type === 'tool/call') {
           const call = (data['root'] ?? data['call'] ?? data) as { name?: unknown; arguments?: unknown; callId?: unknown }
           if (typeof call.name === 'string') {
@@ -1155,6 +1274,7 @@ function TavernChatView(props: {
               kind: 'tool', text: call.name, time,
               args: typeof call.arguments === 'string' ? call.arguments : undefined,
               ...(typeof call.callId === 'string' ? { callId: call.callId } : {}),
+              ...(seq === undefined ? {} : { seq }),
               live: false,
             })
           }
@@ -1179,7 +1299,7 @@ function TavernChatView(props: {
           // hint would live only until the next replay).
           const tail = data as { mode?: unknown; label?: unknown; childId?: unknown }
           if (tail.mode === 'one-shot' && tail.label === 'tavern-tail' && typeof tail.childId === 'string') {
-            out.push({ kind: 'tail', text: tail.childId, time, args: undefined, live: false })
+            out.push({ kind: 'tail', text: tail.childId, time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) })
           }
         } else if (event.type === 'command/done') {
           // 尾代理落定信号：引擎对每个回合边界 commit 恰一条 command/done
@@ -1218,6 +1338,7 @@ function TavernChatView(props: {
               text: reason.error?.code === MISSING_CREDENTIAL ? t('chat.errorKey') : reason.error?.message ?? '',
               time,
               args: undefined,
+              ...(seq === undefined ? {} : { seq }),
               live: false,
             })
           }
@@ -1226,7 +1347,7 @@ function TavernChatView(props: {
           if (reason?.kind === 'aborted') {
             // A stopped turn keeps its partial narrative; the label
             // says why the reply just ends without a completion row.
-            out.push({ kind: 'stopped', text: '', time, args: undefined, live: false })
+            out.push({ kind: 'stopped', text: '', time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) })
           }
         }
       }
@@ -1267,8 +1388,6 @@ function TavernChatView(props: {
     void rpc.opening({ sessionId }).then((value) => { setOpening(value.html) }, () => { setOpening(null) })
   }, [rpc, sessionId])
   // 底部钉屏：靠近底部时纲要更新持续跟随，打开/刷新必落到最新一行（chat-view 共享钩子）。
-  const transcriptRef = useRef<HTMLDivElement | null>(null)
-  useBottomPinnedScroll(transcriptRef)
   // Tail-run details (durable child logs), fetched once per session
   // open; rows without a detail degrade to a neutral line.
   const [tailDetail, setTailDetail] = useState<Record<string, TailRunDetail>>({})
@@ -1412,6 +1531,12 @@ function TavernChatView(props: {
   const send = (): void => {
     const text = draft.trim()
     if (text === '' || binding === undefined) return
+    // 发送即新意图（着陆合约 2026-09-25）：待恢复的锚就地作废——恢复与发送的
+    // 竞态由此消失——并立即接回跟随（时序开始的地方落底）。
+    anchorMemory.capture(sessionId, null)
+    pendingLanding.current = undefined
+    restoreTokenRef.current = undefined
+    scroller.follow()
     // 尾代理闸门：运行期间不排新消息，输入不受影响（design_zh.md）——
     // 但按钮不锁死：它此刻是停止键（见下方按钮渲染）。
     if (props.tailRunning) return
@@ -1546,19 +1671,37 @@ function TavernChatView(props: {
         </div>
         {panels('right')}
       </div>
+      {/* 回到底部灯（着陆合约 2026-09-25）：不跟随且转写有内容时浮现。挂在
+          .cardStage（position:absolute 的锚）而非滚动容器里——灯不随内容滚动。 */}
+      {!following && lines.length > 0 && (
+        <button
+          type="button"
+          className={css.toTail}
+          aria-label={t('chat.toTail')} title={t('chat.toTail')}
+          onClick={() => { scroller.follow() }}
+        >↓ {t('chat.toTail')}</button>
+      )}
       {panels('bottom')}
       {panels('overlay')}
       {/* jscpd:ignore-start -- the composer call sites pair with the writer
       column's on purpose: the props encode each view's own admission and
       stop semantics (engine wrap RPC vs standard session face). */}
-      <ChatComposer
-        directory={props.directory}
-        usage={usage} pressure={pressure} breakdown={breakdown} sessionStats={sessionStats}
-        draft={draft} onDraft={updateDraft}
-        onSend={send} stoppable={running || pending || props.tailRunning} onStop={stop}
-        placeholder={t('composer.placeholder')}
-        t={t}
-      />
+      {(() => {
+        const composer: ReactNode = (
+          <ChatComposer
+            directory={props.directory}
+            usage={usage} pressure={pressure} breakdown={breakdown} sessionStats={sessionStats}
+            draft={draft} onDraft={updateDraft}
+            onSend={send} stoppable={running || pending || props.tailRunning} onStop={stop}
+            placeholder={t('composer.placeholder')}
+            t={t}
+          />
+        )
+        // G3 停靠（2026-09-25）：卡经 face 注册槽 → portal 进卡面板；同一个
+        // React 子树换挂载点（草稿/IME/焦点/模型座全保留），回落 = 槽态清空，
+        // 不是「还原」——composer 从未离开宿主树，卡对它零写入。
+        return dockSlot === null ? composer : createPortal(composer, dockSlot)
+      })()}
       {/* jscpd:ignore-end */}
     </div>
   )

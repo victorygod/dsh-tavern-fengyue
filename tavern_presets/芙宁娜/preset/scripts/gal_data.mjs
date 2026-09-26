@@ -20,7 +20,7 @@ const strip = (t) => String(t ?? '').replace(/<!--[\s\S]*?-->/g, '').trim()
 
 // ── 快照:最近的 player 行与 assistant 行 + 全量历史(backlog 防剧透原料) ──
 const stripD = t => String(t ?? '').replace(/<!--[\s\S]*?-->/g, '').trim()
-let lastUser = null, lastAssistant = null, history = []
+let lastUser = null, lastAssistant = null, history = [], session = null
 try {
   const rows = readFileSync('.chat.snapshot.jsonl', 'utf8').trim().split('\n').map(l => JSON.parse(l))
   for (const r of rows) {
@@ -29,6 +29,9 @@ try {
   }
   lastUser = rows.filter(r => r.kind === 'user').at(-1) ?? null
   lastAssistant = rows.filter(r => r.kind === 'assistant').at(-1) ?? null
+  // head 行(首行 {type:'head',sessionId}) = 会话身份——卡的「段读位」按它持久化
+  // (galgame 读位 2026-09-25 批;缺席 → null,卡侧退化为不持久)。
+  session = rows.find(r => r.type === 'head')?.sessionId ?? null
 } catch {}
 
 // ── 当前 CG(cg.json 缺席=manifest 默认)与层切片 ──
@@ -44,6 +47,7 @@ process.stdout.write(JSON.stringify({
   rev,
   assetKeys,
   data: {
+    session,
     lastUser: lastUser ? { seq: lastUser.seq, text: strip(lastUser.plain) } : null,
     // orig = 保留注释原样(text 为去注释展示用);段级 CG 判定必须从 orig 取
 lastAssistant: lastAssistant ? { seq: lastAssistant.seq, text: strip(lastAssistant.orig), orig: lastAssistant.orig } : null,

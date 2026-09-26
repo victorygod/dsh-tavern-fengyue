@@ -1,6 +1,9 @@
 # 文件变更通知通道:fs.watch → SSE → mount face `files`(纯加法信号通道)
 
-状态:设计定稿 | 日期:2026-09-25 | 关联:[[2026-09-24-tavern-opening-surface-contract]]、[[2026-09-22-furina-galgame-card]]、[[2026-09-25-cards-zero-poll-migration]](第二阶段:逐卡拆迁定时器,零轮询)、`docs/cards/card-presentation.zh.md`、`docs/notes/devlog.zh.md`(2026-09-20 轮询治理)
+状态:**已实施**(2026-09-25 通宵批,真机冒烟通过) | 日期:2026-09-25 | 关联:[[2026-09-24-tavern-opening-surface-contract]]、[[2026-09-22-furina-galgame-card]]、[[2026-09-25-cards-zero-poll-migration]](第二阶段:逐卡拆迁定时器,零轮询)、`docs/cards/card-presentation.zh.md`、`docs/notes/devlog.zh.md`(2026-09-20 轮询治理)
+
+> **落地记录(2026-09-25)**:七笔提交——`1cb80a1` engine 模块(13 测)/`a4ca574` 接线(loader-composition 零改动活体回归)/`d8fd475` ui 单例(7 测)/`149aeb2` card-ui files face/`08be87a`+`509d1d5`+`2487181` 三卡消费。
+> **真机冒烟(dev host 3081,--no-open)**:`text/event-stream` 头/`connected`+hello 帧/member写盘→files 帧 ~300ms(sessionId 反查带 `.tavern-session` 真身)/15s `: ka` 保活;无 cookie→401、POST→405(requestRejection 自担鉴权逐字生效)。全套 404 测试绿(截至此批 385+)。
 
 > **落地裁定 1(2026-09-25,用户拍板)**:监听层用 **Node 内置 `fs.watch(recursive)`**,不引入第三方包(chokidar/@parcel/watcher)。engines 已钉死 `node ^22.19.0 || >=24`,递归 watch 三平台(macOS/Windows/Linux)原生可用;平台语义差异由"信号型通道"设计吸收(见 §0)。
 >

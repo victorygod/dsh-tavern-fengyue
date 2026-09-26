@@ -83,8 +83,8 @@ v2 每 2s 重绘一层 HTML,而状态机需要"打字机进度/段落指针/点�
 
 ## 5. 明确不做
 
-- 不长持久化段落进度(换绑重读,ADV 习惯);
-- 不重做 token 级直播流(快照 durable 粒度,打字机承担"流式"观感——design §5 声明);
+- ~~不长持久化段落进度(换绑重读,ADV 习惯)~~——**2026-09-25 已推翻并实施**(段读位按会话持久,design §3 已回写真话),此条留档为编年;
+- ~~不重做 token 级直播流(快照 durable 粒度,打字机承担「流式」观感)~~——**2026-09-25 已推翻并实施**(宿主 assistantLive face live 桥,design §5 已回写真话),此条留档为编年;
 - 不动 v2 声明形态本身(dnd5e 卡仍在用);芙宁娜只是**改用 v1 直控**,面板运行时 vendoring 路线不变。
 
 ## 6. 输入框视觉定形 + 停靠改造 review（2026-09-24）
@@ -104,3 +104,23 @@ v2 每 2s 重绘一层 HTML,而状态机需要"打字机进度/段落指针/点�
 4. **发送按钮 stop 态**:stoppable 时宿主换停止图标;大按钮竖排文字后图标态要能居中适配。
 
 **建议实施顺序**:先做最小版(去 usage/环形、textarea 全高、发送放大、两态高度复用),模型座暂留原位避 popover 风险;逐项 CDP 截图对原型核对后再动 model-seat。
+
+## 7. 停靠三迁(G3,2026-09-25)
+
+量尺停靠(G2')整体退役,换**宿主 portal**(G3):§2 的「JS 量尺 fixed」与 §6 的全部盒形/层序手术随之作废。新契约:卡只在 `.gg-dialog` 内声明 `<div class="gg-dock-slot" data-dock-slot="composer">`,mount 时 `tavern.dockComposer(slot)` 一次注册(host 把 composer 原件 portal 进槽);显隐=槽 display(由 `.gg-input`/`.gg-backlog-open` 类驱动 CSS);卡 ui.css 皮肤全部收 `.tavern-panel-galgame .gg-dock-slot` 作用域——`body.gal-ui` 全局段删除。动机与事故史(本次换绑泄漏+G2' 五连修+写卡列串台):`docs/notes/feature/2026-09-25-composer-dock-g3-portal.zh.md`。§6 风险 1(高度耦合)随槽内 flex 自然解决;风险 3(popover 锚)不变。
+## 8. 分域重构 v11:六文件五胶囊(2026-09-25 落地)
+
+设计定案与对抗评审:`docs/notes/feature/2026-09-25-gal-domain-refactor.zh.md`(3 严重 9 建议全修);
+宿主侧前置:`docs/notes/feature/2026-09-25-ui-modules-manifest.zh.md`(layout.json `modules` 声明清单,宿主按单装载注入 `tavern.mods`)。施工四批各设全绿门(manifest→规则下沉锁规格→四胶囊成体→index 重建),全套 449 例绿、16 例行为锚断言零改动。
+
+迁居表:19 键公共袋子 → 书签(ptr·唯一可变正本)/队列·剧本(演出机+view)/水位·rev·键自愈(仓库)/双缓冲·CG·资产(舞台);双摄取通道(poll/bootPoll,v10.1 两起键源事故的病灶)→ 仓库 boot/delta 同一摄取、fresh 旗标以 bump 前局部真值交货;`savePointer` 三域各调 → 书签唯一持久化点;防剧透口径、三分支决策、live 合流、指针包、backlog 渲染全部下沉 view.mjs 纯函数(`galgame-rules.unit.spec` 18 例锁规格);死代码 `backlogRows/backlogHTML`(seq 水位语义,零调用)删除。
+
+各文件实测行数:index 139(组装发牌)/feed 85/ptr 36/para 311/stage 75/view 168;合计 814(旧形态 715)。预算自首:para 实测 311、超案估 ~230(承接函数 census ≈225 + 视件区 思考/开场白/开合 ≈60 + 工厂壳)——不回炉的理由:知识全部外置(规则无一留在本体,爆炸半径达标),行数来自 DOM 视件密度;与 642 行时代的区别是每行职责有主。
+
+与案的两处施工偏差(件随语义):① live 桥直达演出机(不经仓库)——队列是演出瞬态、合流是 view 纯规则,「摄取一通道」的真实疆域=泵(拉取);案 §2.2 因由 live 一行的通道改记「组装→演出机直呼」。② `stage.warm()` 追加显式入口——boot 原序里 `ensureCgLayers` 一直在,件化后单独成面。
+
+### v10.x 事故编年归档(原 index.js 头注,2026-09-25 v11 拆迁时迁此,不删)
+
+- **v10(2026-09-25 零轮询)**:900ms 数据钟退役——工作区一动(tavern.files 事件)即拉 gal_data,rev 同值短路照旧;waiting 120s 兜底从 poll 体内迁出为一次性看门狗;bootPoll 加上界+失败上屏(曾无限静默自旋);容器等待自旋改 MutationObserver。
+- **v10.1(2026-09-25 段读位键源修复)**:sid 先前只在「有 assistant 行」的 boot 分支取得——新会话首挂(开场期/空)整页无键,点读存位被守卫静默吞光,刷新/切卡后即「n 段全已读直落 input」;键源提升到 boot 分支梯外,poll 加键自愈(快照晚于 boot 出生的会话由首条落盘拍接棒)。同批第二键:boot 漏设 asstText——防剧透截断腿失效,恢复读位后未读半截在历史里整行全文剧透,已补齐 ingest。
+- **v10.2(2026-09-25 停靠 G3)**:量尺三件套(dockComposer/undockComposer/onResize)退役——卡只声明 gg-dock-slot(带 data-dock-slot 钩子),宿主经 dockComposer face 把自己的 composer 原件 portal 进槽(同一 React 子树换挂载点,草稿/IME/模型座全保留);卡从此零接触宿主 DOM。

@@ -310,6 +310,25 @@
   gap: 16px;
 }
 
+/* 回到底部灯（着陆合约 2026-09-25）：读者离底返场后浮现的接回跟随按钮。 */
+.toTail {
+  position: absolute;
+  right: 28px;
+  bottom: 128px;
+  z-index: 34;
+  padding: 7px 14px;
+  border: 1px solid var(--t-border);
+  border-radius: 999px;
+  background: var(--t-surface-card);
+  color: var(--t-fg);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s, background 0.15s;
+}
+.toTail:hover { border-color: var(--t-gold-dim); }
+
 /* 开场页全出血铺满聊天视口（含 padding 区 — 卡作者的整幅画布）。
    absolute 锚在 .transcript 上、走出 .col 的 760px 消息流栅格：开场画布要吃满
    整个聊天面板（早年的负边距出血只抵掉 padding，宽屏下仍困在居中列里）。

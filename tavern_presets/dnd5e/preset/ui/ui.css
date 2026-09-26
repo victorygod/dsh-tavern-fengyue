@@ -131,6 +131,14 @@
 .m-card.dying .m-nm { color: #ff9d8d; }
 .m-card.dying .m-hp .fl { background: #7c1f1c; animation: hb 1.6s infinite; }
 
+/* ═══ 人际三区 v4（2026-09-25）:中立沿用同伴形;敌对=暖红调+先攻 chip;缺档占位非可点 ═══ */
+.mates.foes .m-zone { color: #e8a79b; opacity: .8; }
+.mates.foes .m-card { border-color: rgba(201,75,62,.5); background: linear-gradient(180deg, var(--bg1), #3a1f18); }
+.mates.foes .m-card.missing, .m-card.missing { cursor: default; opacity: .72; }
+.m-card.missing:hover { transform: none; box-shadow: 0 3px 12px rgba(20,10,0,.38); }
+.m-warn { font: 700 9px var(--sans); color: var(--debuff); border: 1px solid rgba(176,73,63,.45); border-radius: 99px; padding: 1px 6px; white-space: nowrap; }
+.m-init { font: 800 9.5px var(--sans); color: #e8c560; letter-spacing: .04em; white-space: nowrap; margin-left: auto; }
+
 /* ═══ 右侧环境面板（层级地点+钟盘+天气/地形+昼夜变底）═══ */
 .env { width: 100%; position: relative; }
 .wcard { position: relative; overflow: hidden; border: 1px solid rgba(201,162,75,.4); border-right: 3px solid var(--gold);
