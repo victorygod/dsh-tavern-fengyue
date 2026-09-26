@@ -21,6 +21,11 @@ export function mount(tavern) {
         actModule: tavern.acts ?? null,
       })
       add(() => panelsHandle.dispose())
+      // 文件事件(2026-09-25 通道批 + 零轮询):工作区一动 → kick 立即拉一拍——泵的
+      // 主时钟从定时器换成事件;在途合并由 runtime 管,可连发。rev 门照旧裁决重绘。
+      // 旧宿主无 face = 无订阅,泵自然退化为纯 gesture 驱动(纯加法语义)。
+      const unsubFiles = tavern.files?.subscribe?.(() => { panelsHandle?.kick?.() })
+      if (typeof unsubFiles === 'function') add(unsubFiles)
     }
   }
 
@@ -85,14 +90,26 @@ export function mount(tavern) {
   window.addEventListener('message', onMessage)
   add(() => window.removeEventListener('message', onMessage))
 
-  // ── opening 在场 → 总开关条隐身(面板容器由 runtime 的 hideDuringOpening 管) ──
-  const openingSel = '[class*="openingFrame"],[class*="openingFull"],[class*="openingWrap"],[class*="openingLive"]'
-  const applyVisibility = () => {
-    tools.style.display = document.querySelector(openingSel) !== null ? 'none' : ''
+  // ── opening 在场 → 总开关条隐身(2026-09-25 opening face 迁移:300ms visPoll 退役;
+  //     面板容器的 hideDuringOpening 回显原来蹭每拍 applyVisibility——零轮询后无拍可蹭,
+  //     翻转即 kick 一拍补评)。旧宿主无 opening face → 退回 DOM 探测轮询(容错态)。──
+  if (typeof tavern.opening?.subscribe === 'function' && 'active' in tavern.opening) {
+    const applyToolsVisibility = () => {
+      tools.style.display = tavern.opening?.active === true ? 'none' : ''
+      panelsHandle?.kick?.()
+    }
+    const unsubOpening = tavern.opening.subscribe(applyToolsVisibility)
+    if (typeof unsubOpening === 'function') add(unsubOpening)
+    applyToolsVisibility()
+  } else {
+    const openingSel = '[class*="openingFrame"],[class*="openingFull"],[class*="openingWrap"],[class*="openingLive"]'
+    const applyVisibility = () => {
+      tools.style.display = document.querySelector(openingSel) !== null ? 'none' : ''
+    }
+    applyVisibility()
+    const visPoll = setInterval(applyVisibility, 300)
+    add(() => clearInterval(visPoll))
   }
-  applyVisibility()
-  const visPoll = setInterval(applyVisibility, 300)
-  add(() => clearInterval(visPoll))
 
   return () => { for (const fn of [...stops].reverse()) { try { fn() } catch {} } }
 }

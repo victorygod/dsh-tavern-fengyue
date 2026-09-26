@@ -7,7 +7,7 @@
   "role": "{{role}}",
   "class": "{{class}}",
   "subclass": null,
-  "level": {{level}},
+  "level": {{level}},   // 单键统一律(2026-09-26):一键双语义——成长者=等级,怪=CR(0.25 小数原样);pb/XP 由 pbOf/XP 查表派生
   "exp": {{exp}},
   "race": "{{race}}",
   "gender": "{{gender}}",
@@ -39,6 +39,9 @@
   "tool_prof": {{tool_prof}},
   "languages": {{languages}},
   "resist": [],
+  "vulnerabilities": [],   // 2026-09-26 补:attack/damage 读易伤,此前模板缺键(有易伤的怪静默丢规则)
+  "death_success": 0,      // 2026-09-26 反转 v8.1:濒死计数回档(death 工具读写;缺席=0/0)
+  "death_fail": 0,
   "immune": [],
   "caster_attr": null,
   "spells_known": [],

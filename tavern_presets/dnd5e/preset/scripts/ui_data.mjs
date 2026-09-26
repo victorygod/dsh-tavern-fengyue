@@ -1,8 +1,11 @@
 // ui_data — HUD/手簿唯一数据泵(前端 runScript 调用;cwd=runtime)。
-// op=rev → 节级 rev 心跳;op=full → 全量投影+derived。契约:docs/ui_zh.md 数据流架构。
+// v10(2026-09-25 零轮询):op=panel 携带已知 rev——participant stat 同值回裸 ack
+// {ok,rev,changed:false}(无 data),变了才全量投影(拉式差量);op=rev 心跳
+// 心跳协议就此退役(从未接线,由 rev 参数短路取代,少一跳)。契约:docs/ui_zh.md 数据流架构。
 import { statSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { mod, pb, readFM, parseCombat, XP_THRESHOLDS } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { mod, pbOf, readFM, parseCombat, deriveAC, XP_THRESHOLDS, presence } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { spellCn } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 const a = globalThis.argv?.[0] ? JSON.parse(globalThis.argv[0]) : (globalThis.argv ?? {})
 const op = a.op ?? 'full'
 
@@ -26,15 +29,13 @@ if (op === 'avatars') {  // 头像素材槽：preset/ui/avatars/<race>-<gender>.
 }
 
 if (op === 'rev') {
-  const rev = {
-    player: secStat('characters/player.json'),
-    mates: agg('characters', f => f !== 'player.json'),
-    state: secStat('state.md'),  // 战斗节随 state.md 一并监视（combat.json 已废——2026-09-20 定案战斗入 state.md）
-  }
-  console.log(JSON.stringify({ ok: true, rev })); process.exit(0)
+  // 2026-09-25 结账:心跳 op 从未接线(ui_zh.md 列了硬要求但 v9 泵每拍全量调用)——由
+  // op=panel 的 rev 参数短路取代(事件已答"何时",本 op 的"是否"只剩静默一问,少一跳)。
+  console.error('ui_data: op=rev 已退役——改用 op=panel + args.rev(拉式差量,2026-09-25)'); process.exit(1)
 }
 
-// ── full ──
+// ── 拉式差量(2026-09-25 零轮询):面板 rev 公式唯一出处;op=panel 先按此静默短路,
+//    同值回裸 ack 直接退——下面的全量急加载(player/companions/combat/state)全不发生。──
 function readJ(p) { try { return JSON.parse(readFileSync(p, 'utf8')) } catch { return null } }
 function agg(dir, filter) {
   let mx = 0, n = 0, b = 0
@@ -43,19 +44,32 @@ function agg(dir, filter) {
   } } catch {}
   return `${mx}:${n}:${b}`
 }
+const panelRevOf = (name) =>
+  // v4(2026-09-25):人际三池在 state.md「## 附近 NPC」名单元——左栏(同伴/中立)rev 必须挂 state.md,
+  // 否则名单一行之差左栏纹丝不动。右栏=敌对卡+环境:敌卡 join 档案,故 characters 也进右栏。
+  name === 'hud-left' ? `${secStat('characters/player.json')}:${agg('characters', f => f !== 'player.json')}:${secStat('state.md')}`
+  : name === 'hud-right' ? `${secStat('state.md')}:${agg('characters')}`
+  : null
+if (op === 'panel' && typeof a.rev === 'string' && a.rev !== '') {
+  const rev = panelRevOf(a.name)
+  if (rev !== null && rev === a.rev) { await emit({ ok: true, rev, changed: false }); process.exit(0) }
+}
+
+// ── full ──
 const player = readJ('characters/player.json')
-const companions = []
-try { for (const f of readdirSync('characters').filter(f => f.endsWith('.json')).sort()) {
-  if (f === 'player.json') continue
-  const j = readJ(`characters/${f}`); if (j) { j._file = f; companions.push(j) }
-} } catch {}
 // 战斗＝state.md「## 战斗」节（combat.json 已废——2026-09-20 定案,解析归 core.parseCombat,语法见 core.mjs）
 const combat = parseCombat()
-// 先攻 join + 具名敌挂 character 档（HUD ctx 全卡）
+// 先攻 join + 具名敌挂 character 档（HUD ctx 全卡）——敌行瘦身后 HP/AC 一律从档 join(行只记身份/path/状态)
 for (const e of combat?.enemies ?? []) {
   const hit = (combat.order ?? []).find(o => o.who === e.name || o.who.includes(e.name) || String(e.name).includes(o.who))
   if (hit) e.init = hit.init
   e.character = existsSync(`characters/${e.name}.json`) ? `${e.name}.json` : null
+  if (e.character) {
+    try {
+      const ej = JSON.parse(readFileSync(`characters/${e.character}`, 'utf8'))
+      e.hp = ej.hp ?? null; e.hp_max = ej.hp_max ?? null; e.ac = ej.ac ?? deriveAC(ej)
+    } catch { e.hp = e.hp_max = e.ac = null }  // 档坏 → 缺席保真(???),不涂默认
+  }
 }
 let state = { time: '', place: '', main: [], side: [], changes: [], party: [] }
 try {
@@ -78,7 +92,7 @@ try {
     place: locKV['地点'] ?? legacyPlace ?? '',
     terrain: locKV['地形'] ?? null, weather: locKV['天气'] ?? null,
     hierarchy: hier,
-    main: grab('主线'), side: grab('支线'), recent: grab('近期人物'), party: grab('队伍'), changes: grab('上回合变化'),
+    main: grab('主线'), side: grab('支线'), party: grab('队伍'), changes: grab('上回合变化'),
   }
 } catch {}
 // 全施法者位表（1-20 级 × 1-9 环槽位）——死规则，SRD 语料无此表（class 文件仅 Class Specific），
@@ -104,12 +118,9 @@ const norm = (s) => String(s ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')
 function derive(c) {
   if (!c) return null
   // 缺席保真:AC/被动察觉依赖 dex/wis——键缺席输出 null(战斗面懒生成的 NPC 按 ??? 呈现),不再涂基准值。
-  // 甲语义(语料 frontmatter 如实):ac_dex_bonus:true=加敏(light/medium,可带 ac_dex_cap);键缺席=重甲定值,
-  // 不依赖 dex——2026-09-22 巡检修正:原逻辑无条件 base+dexM,重甲 AC 虚高 dexM 点。
-  const dexM = c.dex == null ? null : Math.floor((c.dex - 10) / 2)
-  let ac = dexM == null ? null : 10 + dexM
-  if (c.armor) { try { const raw = readFileSync(`dnd5e-srd-lorebook/equipment/${c.armor}.md`, 'utf8'); const m = /ac_base:\s*(\d+)/.exec(raw); if (m) { if (/ac_dex_bonus:\s*true/.test(raw)) { const cap = /ac_dex_cap:\s*(\d+)/.exec(raw)?.[1]; ac = dexM == null ? null : +m[1] + (cap === undefined ? dexM : Math.min(dexM, +cap)) } else ac = +m[1] } } catch {} }
-  if (ac != null && (c.shield === true || c.shield === 'true')) ac += 2
+  // AC 律单源(2026-09-25 收拢 core.deriveAC——原内联副本与 attack 各持一份「同律」注释,分叉即 bug 温床;
+  // 顺带中文名甲从此走 equipmentFM 桥,旧裸路径读读不到时回落 10+敏)。
+  const ac = deriveAC(c)
   // 以面板字段判施法者——不预设 class 名单（面板填什么值就用什么值）；v9.1 resources 已并入 features，池条随删
   const isCaster = c.caster_attr != null && c.caster_attr !== '' && c.slots_l1 != null
   const bar = isCaster ? 'slots' : 'hd'
@@ -125,7 +136,7 @@ function derive(c) {
   }
   // 熟练面（规则计算归泵）：PB + 属性调整；熟练/专业按面板集合判定，键名大小写/空格归一
   const level = Math.min(Math.max(Number(c.level ?? 1), 1), 20)
-  const PB = pb(level)
+  const PB = pbOf(level)  // 单键统一律:level 双语义(成长者=等级/怪=CR),pbOf 两端 clamp
   const profSet = new Set((Array.isArray(c.skill_prof) ? c.skill_prof : []).map(norm))
   const expSet = new Set((Array.isArray(c.expertise) ? c.expertise : []).map(norm))
   const skills = Object.entries(SKILL_ATTRS).map(([key, attr]) => {
@@ -177,6 +188,26 @@ function splitSpells(c) {
   }
   return { cantrips, known: leveled }
 }
+
+// ── 人际三池投影(v4,2026-09-25):presence()=state.md「附近 NPC」三态名单,注入与前端同源镜像 ──
+// 缺档行 → {_missing:true} 占位(前端占位卡;注入侧同判「勿采信」)。敌卡 HP/先攻敌行优先
+// (战斗回合的机械快照),无敌行(持久敌对未接战)纯档案口径。
+const sel = presence()
+const avKey = c => {
+  const gk = c.gender === 'female' ? 'female' : c.gender === 'male' ? 'male' : 'unknown'
+  return `${norm(c.race ?? '').replace(/_/g, '-')}-${gk}`
+}
+const withSpells = c => c ? { ...c, spellSplit: splitSpells(c) } : null
+const projMate = r => r.j === null
+  ? { name: r.name, _file: r.file, _missing: true }
+  : withSpells({ ...r.j, _file: r.file, derived: derive(r.j) })
+const projFoe = r => {
+  if (r.j === null) return { name: r.name, _file: r.file, _missing: true }
+  const row = (combat?.enemies ?? []).find(e => e.name === r.name)
+  const eff = row && row.hp != null ? { ...r.j, hp: row.hp, hp_max: row.hp_max ?? r.j.hp_max } : r.j
+  const init = row && row.init != null ? { init: row.init } : {}
+  return withSpells({ ...eff, ...init, _file: r.file, derived: derive(eff) })
+}
 if (op === 'candidates') {  // 学新法术候选:本职业表 ∩ 环位≤当前可施 ∩ 未收录 ∩ 非戏法（SRD「Learning Spells」限制）
   const c = player
   const isCaster = c && c.caster_attr != null && c.slots_l1 != null
@@ -193,7 +224,7 @@ if (op === 'candidates') {  // 学新法术候选:本职业表 ∩ 环位≤当�
       const classes = Array.isArray(fm.classes) ? fm.classes.map(norm) : []
       if (!classes.includes(cls)) continue
       if (known.has(norm(fm.name)) || known.has(norm(f.replace(/\.md$/, '')))) continue
-      candidates.push({ name: String(fm.name), level: Number(fm.level), ritual: fm.ritual === true })
+      candidates.push({ name: String(fm.name), name_cn: spellCn(String(fm.name)), level: Number(fm.level), ritual: fm.ritual === true })
     } } catch (e) { console.error("CAND-DBG", e && e.message) }
     candidates.sort((a, b) => a.level - b.level || a.name.localeCompare(b.name))
   }
@@ -201,25 +232,28 @@ if (op === 'candidates') {  // 学新法术候选:本职业表 ∩ 环位≤当�
 }
 
 // ── panel(layout v2 宿主泵):按面板给切片,rev=各自真身文件的 mtime:size 摘要 ──
+// 左=hero+同伴+中立,右=敌对+环境+任务(v4 三态分区)。
 if (op === 'panel') {
-  const enemyNames = new Set((combat?.enemies ?? []).map(e => e.name))
-  const mates = companions.filter(c => !enemyNames.has(c.name))
-  const avKey = c => {
-    const gk = c.gender === 'female' ? 'female' : c.gender === 'male' ? 'male' : 'unknown'
-    return `${norm(c.race ?? '').replace(/_/g, '-')}-${gk}`
-  }
-  const withSpells = c => c ? { ...c, spellSplit: splitSpells(c) } : null
   if (a.name === 'hud-left') {
     await emit({
       ok: true,
-      rev: `${secStat('characters/player.json')}:${agg('characters', f => f !== 'player.json')}`,
-      data: { player: withSpells(player ? { ...player, derived: derive(player) } : null), companions: mates.map(c => withSpells({ ...c, derived: derive(c) })) },
-      avatarKeys: [player, ...mates].filter(Boolean).map(avKey),
+      rev: panelRevOf('hud-left'),
+      data: {
+        player: withSpells(player ? { ...player, derived: derive(player) } : null),
+        companions: sel.mates.map(projMate),
+        neutrals: sel.neutrals.map(projMate),
+      },
+      avatarKeys: [player, ...sel.mates.map(r => r.j), ...sel.neutrals.map(r => r.j)].filter(Boolean).map(avKey),
     })
     process.exit(0)
   }
   if (a.name === 'hud-right') {
-    await emit({ ok: true, rev: secStat('state.md'), data: { state } })
+    await emit({
+      ok: true,
+      rev: panelRevOf('hud-right'),
+      data: { state, foes: sel.foes.map(projFoe) },
+      avatarKeys: sel.foes.map(r => r.j).filter(Boolean).map(avKey),
+    })
     process.exit(0)
   }
   await emit({ ok: false, error: `未定义面板 ${a.name ?? ''}` }); process.exit(1)
@@ -228,8 +262,9 @@ if (op === 'panel') {
 console.log(JSON.stringify({
   ok: player !== null, rev: secStat('characters/player.json'),
   player: player ? { ...player, derived: derive(player) } : null,
-  companions: companions.map(c => ({ ...c, derived: derive(c) })),
+  companions: sel.mates.map(projMate),
+  neutrals: sel.neutrals.map(projMate),
+  foes: sel.foes.map(projFoe),
   combat,
   state,
-  derived: { companions: {} },
 }))

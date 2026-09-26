@@ -40,7 +40,7 @@ export interface TavernViewProps {
    * (`load`), 编辑卡「保存并开始」(`edit`), or 重试 (`retry`). `draft` rides a
    * load: the save stamp's composer text to restore into the input box.
    */
-  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string) => void) | undefined
+  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string, anchorSeq?: number | null) => void) | undefined
   /** Initial workspace page — the settings modal opens straight to saves via 加载. */
   initialTab?: WorkspaceTab | undefined
 }
@@ -672,7 +672,7 @@ function ImportPreviewPanel(
 function DraftPanel(base: PanelBase & {
   // The editing source card (`null` = a from-scratch draft) and the rebind host.
   editMode?: string | null | undefined
-  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string) => void) | undefined
+  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string, anchorSeq?: number | null) => void) | undefined
   sessions: ISessions
   models: ModelDirectoryResolver | undefined
   conversation: ConversationFace
@@ -837,7 +837,7 @@ function WorkspacePanel(props: {
   dialogStarted: boolean
   /** The modal opens straight into one page: 设置 → files, 加载 → saves. */
   initialTab?: WorkspaceTab | undefined
-  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string) => void) | undefined
+  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string, anchorSeq?: number | null) => void) | undefined
   /** Library card being edited in place (编辑卡); shows the 仅保存/保存并开始 pair. */
   editing?: string | null | undefined
   /** Leave the edit back to the library WITHOUT saving (cancelEdit 恢复原卡). */
@@ -1663,7 +1663,7 @@ function SavesPanel(props: {
   rpc: TavernRpc
   sessionId: string
   t: TranslateNS<typeof NS>
-  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string) => void) | undefined
+  onSessionSwitch?: ((sessionId: string, cause: 'load' | 'edit' | 'retry', draft?: string, anchorSeq?: number | null) => void) | undefined
 }): ReactNode {
   const { rpc, sessionId, t } = props
   const dialogs = useDialogs()
@@ -1682,7 +1682,7 @@ function SavesPanel(props: {
     setLoadingSave(name)
     setLoadError(null)
     void rpc.load({ sessionId, name }).then((value) => {
-      props.onSessionSwitch?.(value.sessionId, 'load', value.draft)
+      props.onSessionSwitch?.(value.sessionId, 'load', value.draft, value.anchorSeq)
       reload()
     }, (error: unknown) => {
       console.warn('[tavern] rpc failed', error)

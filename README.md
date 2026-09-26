@@ -38,6 +38,7 @@ SillyTavern raises the learning curve for both players and card authors — play
 - **Workspace as memory** — `runtime/` IS an llm-wiki: a standing root index + detail archives fetched on demand; no vector DB, no RAG, no plugin black boxes — retrieval, long-term memory, and skills all live as scripts and local files.
 - **Built-in card authoring agent** — player interaction stays at "pick a card + chat"; the author's learning cost shifts to the AI, which writes the scripts and config; this two-way convergence forces the concept system to stay lean.
 - **Tools and local files first** — modern agent architecture's external memory + tool-calling pattern; not bespoke frameworks.
+- **Embrace tool calls; push mechanical logic into tools** — fixed rules (dice rolls, pathfinding, table lookups, state machines) are encapsulated in `preset/tools/` and run by script instead of being reproduced by the model in prose. Two wins: it strips "computing by the rules" — reasoning the LLM should never carry — out of the model, saving tokens while removing the instability of mechanical logic reproduced by generation; and the model reads the live objective results a tool returns every turn, so with script injection the narrative always has a dynamic objective reference instead of being improvised.
 
 **Breaking the traditional impossible triangle.** "Rich functionality / low comprehension cost / token cost" are at odds in the traditional ST framework. This project collapses every concept into the system framework itself, and all three improve at once:
 

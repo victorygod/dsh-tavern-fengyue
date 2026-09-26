@@ -3,6 +3,7 @@
   "html": true,
   "suppress": ["opening"],
   "dock": ["composer"],
+  "modules": ["feed", "ptr", "para", "stage"],
   "panels": [
     { "name": "galgame", "slot": "overlay" }
   ]

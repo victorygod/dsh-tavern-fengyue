@@ -215,6 +215,8 @@ let META = null
 // ── 表单构建 ──
 const $ = id => document.getElementById(id)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const norm = s => String(s ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')
+const cn = (map, key) => { const k = norm(key); return (map && map[k] != null) ? map[k] : String(key ?? '') }
 const fill = (sel, list, ph) => { sel.innerHTML = (ph ? `<option value="">${ph}</option>` : '') + list.map(([v, n]) => `<option value="${v}">${n}</option>`).join('') }
 fill($('race'), RACES, '种族')
 fill($('cls'), CLASSES, '职业')
@@ -269,7 +271,7 @@ function rebuildClass() {
   const subAt = META?.subclassLevel?.[cls] ?? META?.SUBCLASS_LEVEL?.[cls] ?? 99
   const subs = curSpec.subclasses
   $('subcard').style.display = subAt === 1 && subs.length ? '' : 'none'
-  $('subclass').innerHTML = `<option value="">子职业（自动 roll 可改）</option>` + subs.map(s => `<option>${esc(s)}</option>`).join('')
+  $('subclass').innerHTML = `<option value="">子职业（自动 roll 可改）</option>` + subs.map(s => `<option value="${esc(s)}">${esc(cn(META?.subclassCN, s))}</option>`).join('')
   // 施法卡:L1 有施法者现身(casters 名单)
   $('spellcard').style.display = curSpec.spellCaster ? '' : 'none'
   rerollSpells()
@@ -291,11 +293,12 @@ function rerollSpells() {
 }
 function renderSp() {
   const el = $('sp-preview')
+  const sp = n => cn(META?.spellCN, n)
   if (!rolledSpells.cantrips.length && !rolledSpells.spells.length && !rolledSpells.prepared.length) { el.textContent = '（重掷前无成套——或将不由本页定型）'; return }
   el.innerHTML =
-    `戏法：${esc(rolledSpells.cantrips.join(' · ') || '—')}<br>` +
-    (rolledSpells.spells.length ? `法术：${esc(rolledSpells.spells.join(' · '))}<br>` : '') +
-    (rolledSpells.prepared.length ? `已备：${esc(rolledSpells.prepared.join(' · '))}<br>` : '')
+    `戏法：${esc(rolledSpells.cantrips.map(sp).join(' · ') || '—')}<br>` +
+    (rolledSpells.spells.length ? `法术：${esc(rolledSpells.spells.map(sp).join(' · '))}<br>` : '') +
+    (rolledSpells.prepared.length ? `已备：${esc(rolledSpells.prepared.map(sp).join(' · '))}<br>` : '')
 }
 $('sp-reroll').onclick = rerollSpells
 $('cls').addEventListener('change', rebuildClass)

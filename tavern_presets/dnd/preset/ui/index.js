@@ -86,38 +86,49 @@ export function mount(tavern) {
   }
   window.addEventListener('message', onMessage)
 
-  // 开场期隐身:宿主按 layout 无条件渲染面板容器与 index.js,但开场设定页不该被手簿挤占。
-  // opening iframe 的类是 CSS Modules 哈希名(token 保留在拼写里),必须模糊匹配 [class*="openingFrame"],
-  // 字面 .openingFrame 永不命中。轻量轮询(500ms)跟随开场页的出现与退场。
-  // 同一拍还管两件让位:①composer/用量行是舞台级横贯元素,面板在场时左移避让(chat.css .codex-shift);
-  // ②转写容器挂 opening-live——开场页的宿主样式链里父列高度 auto,100% 塌掉只剩 60vh 兜底,
-  //   flex 纵栏让唯一子列撑满转写视口,开场页才真正覆盖到 input 顶(几何见 chat.css)。
-  const visPoll = setInterval(() => {
+  // ── 开场期隐身三联(v10 2026-09-25 零轮询:表面迁移 opening face,500ms visPoll 退役)。
+  // 同拍仍管两件让位:①composer/用量行在面板在场时左移避让(chat.css .codex-shift);
+  // ②转写容器挂 opening-live(几何见 chat.css)。旧宿主无 opening face → 回退
+  // DOM 模糊类探测轮询(容错态,只此一条退路)。──
+  const surfaceTurn = (openingLive) => {
     const host = document.querySelector('.tavern-panel-codex')
-    if (host === null) return
-    const openingLive = document.querySelector('[class*="openingFrame"]') !== null
-    host.style.display = openingLive ? 'none' : ''
+    if (host !== null) host.style.display = openingLive ? 'none' : ''
     const composer = document.querySelector('.tavern-composer')
     if (composer !== null) composer.classList.toggle('codex-shift', !openingLive)
     const transcript = document.querySelector('.tavern-transcript')
     if (transcript !== null) transcript.classList.toggle('opening-live', openingLive)
-  }, 500)
+  }
+  // v10 订阅收集面:mount 生命周期内的一切退订统一收口。
+  const withdraws = []
+  if (typeof tavern.opening?.subscribe === 'function' && 'active' in tavern.opening) {
+    const unsubscribe = tavern.opening.subscribe(() => { surfaceTurn(tavern.opening?.active === true) })
+    if (typeof unsubscribe === 'function') withdraws.push(unsubscribe)
+    surfaceTurn(tavern.opening.active === true)
+  } else {
+    const visPoll = setInterval(() => { surfaceTurn(document.querySelector('[class*="openingFrame"]') !== null) }, 500)
+    surfaceTurn(document.querySelector('[class*="openingFrame"]') !== null)
+    withdraws.push(() => clearInterval(visPoll))
+  }
 
-  // 面板容器由宿主按 layout.json 渲染,mount 可能跑在容器出现之前:轮询等它落地。
+  // 面板容器由宿主按 layout.json 渲染,mount 可能跑在容器出现之前。
+  // v10:200ms 有界自旋改 MutationObserver(纯 DOM 事件,无迟漏无需上界)。
   let stop
-  let tries = 0
-  const poll = setInterval(() => {
-    tries += 1
-    if (tries > 50) { clearInterval(poll); console.warn('[codex] 面板容器未出现(layout.json 声明与宿主渲染不一致?)'); return }
-    const host = document.querySelector('.tavern-panel-codex')
-    if (host !== null) {
-      clearInterval(poll)
-      try { stop = start(tavern, host) } catch (error) { console.warn('[codex] 启动失败 —', error instanceof Error ? error.message : String(error)) }
-    }
-  }, 200)
+  const launch = (host) => {
+    try { stop = start(tavern, host) } catch (error) { console.warn('[codex] 启动失败 —', error instanceof Error ? error.message : String(error)) }
+  }
+  const host0 = document.querySelector('.tavern-panel-codex')
+  if (host0 !== null) {
+    launch(host0)
+  } else {
+    const observer = new MutationObserver(() => {
+      const found = document.querySelector('.tavern-panel-codex')
+      if (found !== null) { observer.disconnect(); launch(found) }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    withdraws.push(() => observer.disconnect())
+  }
   return () => {
-    clearInterval(poll)
-    clearInterval(visPoll)
+    for (const off of withdraws.splice(0)) { try { off() } catch { /* 收尾不放大 */ } }
     window.removeEventListener('message', onMessage)
     if (stop !== undefined) stop()
   }
@@ -152,9 +163,14 @@ function start(tavern, host) {
     for (const el of host.querySelectorAll('.codex-tab')) el.classList.toggle('on', el.dataset.tab === tab)
     body.innerHTML = data?.ok ? render(data, tab) : '<div class="codex-empty">世界尚未开始——开局后这里会记录一切。</div>'
   }
+  // v10(2026-09-25 零轮询):全文本门——此卡脚本无 rev 协议,比对整份应答文本,
+  // 同值连 paint 都省(曾无门每 2.5s 无条件 innerHTML 重绘,三卡里最浪费的一处)。
+  let lastText = null
   const refresh = async () => {
     try {
       const text = await tavern.runScript('ui_data.mjs')
+      if (text === lastText) return
+      lastText = text
       const parsed = JSON.parse(text)
       if (parsed?.ok === true) data = parsed
     } catch { /* 保留上一次数据,失败不打扰 */ }
@@ -164,9 +180,14 @@ function start(tavern, host) {
     el.addEventListener('click', () => { tab = el.dataset.tab; paint() })
   }
   paint()
-  const timer = setInterval(() => { void refresh() }, 2500)
+  // v10 零轮询:2.5s 定时钟退役 → 工作区一动(tavern.files 事件)即拉;旧宿主无
+  // face = 无订阅,退化为纯手势(翻页签/开局)驱动(纯加法语义)。
+  const unsubFiles = tavern.files?.subscribe?.(() => { void refresh() })
   void refresh()
-  const stop = () => { clearInterval(timer); style.remove(); host.innerHTML = ''; delete host.__codexStop }
+  const stop = () => {
+    if (typeof unsubFiles === 'function') unsubFiles()
+    style.remove(); host.innerHTML = ''; delete host.__codexStop
+  }
   host.__codexStop = stop
   return stop
 }

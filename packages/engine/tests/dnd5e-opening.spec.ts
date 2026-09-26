@@ -3,7 +3,7 @@
 // 技能白名单+选数校验、施法者出生即满(RAW L1)、warlock 归施法族、L1 子职、训练面出生、
 // 特征回充时机按表(非池 |—)、中文 description/回执透明(rolled)。
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readdirSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,7 +16,8 @@ const LORE = join(SETUP, 'setup', 'dnd5e-srd-lorebook')   // 语料真身在 pre
 const OPENINGS = join(SETUP, 'setup', 'openings.json')
 
 /** 临时运行树:cwd=runtime(与 preset/ 同层——脚本相对引用 ../preset/lib;语料取真身)。 */
-function rig(opts: { spells?: Record<string, string> } = {}) {
+function rig(spellsOrOpts: Record<string, unknown> | { spells?: Record<string, string> } = {}) {
+  // 兼容两种调用:直接给 spells 映射(本文件惯例)或 { spells } 选项对象
   const base = mkdtempSync(join(tmpdir(), 'dnd5e-opening-'))
   const cwd = join(base, 'runtime')
   mkdirSync(join(cwd, 'dnd5e-srd-lorebook', 'classes'), { recursive: true })
@@ -29,7 +30,8 @@ function rig(opts: { spells?: Record<string, string> } = {}) {
   cpSync(join(LORE, 'races', 'human.md'), join(cwd, 'dnd5e-srd-lorebook', 'races', 'human.md'))
   writeFileSync(join(cwd, 'dnd5e-srd-lorebook', 'races', 'tiefling.md'),
     '---\nname: Tiefling\nspeed: 30\ndarkvision: 60\nlanguages:\n  - Common\n  - Infernal\nresist:\n  - Fire\n---\n\nx')
-  for (const [slug, fm] of Object.entries(opts.spells ?? {})) writeFileSync(join(cwd, 'dnd5e-srd-lorebook', 'spells', `${slug}.md`), fm)
+  const spells = (spellsOrOpts as { spells?: Record<string, string> })?.spells ?? (spellsOrOpts as Record<string, string>)
+  for (const [slug, fm] of Object.entries(spells)) writeFileSync(join(cwd, 'dnd5e-srd-lorebook', 'spells', `${slug}.md`), fm)
   return { cwd, base }
 }
 
@@ -40,6 +42,12 @@ const SPELLS = {
   'detect-magic': '---\nname: Detect Magic\nlevel: 1\nritual: true\nclasses:\n  - Cleric\n  - Druid\n  - Wizard\n---\n\nx',
   'cure-wounds': '---\nname: Cure Wounds\nlevel: 1\nclasses:\n  - Bard\n  - Cleric\n  - Druid\n---\n\nx',
   'bless': '---\nname: Bless\nlevel: 1\nclasses:\n  - Cleric\n  - Paladin\n---\n\nx',
+  'thunderwave': '---\nname: Thunderwave\nlevel: 1\nclasses:\n  - Bard\n  - Druid\n  - Sorcerer\n  - Wizard\n---\n\nx',
+  'burning-hands': '---\nname: Burning Hands\nlevel: 1\nclasses:\n  - Sorcerer\n  - Wizard\n---\n\nx',
+  'grease': '---\nname: Grease\nlevel: 1\nclasses:\n  - Wizard\n---\n\nx',
+  'silent-image': '---\nname: Silent Image\nlevel: 1\nclasses:\n  - Sorcerer\n  - Wizard\n---\n\nx',
+  'illusory-script': '---\nname: Illusory Script\nlevel: 1\nritual: true\nclasses:\n  - Bard\n  - Warlock\n  - Wizard\n---\n\nx',
+  'unseen-servant': '---\nname: Unseen Servant\nlevel: 1\nritual: true\nclasses:\n  - Bard\n  - Warlock\n  - Wizard\n---\n\nx',
   'fire-bolt': '---\nname: Fire Bolt\nlevel: 0\nclasses:\n  - Sorcerer\n  - Wizard\n---\n\nx',
   'light': '---\nname: Light\nlevel: 0\nclasses:\n  - Bard\n  - Cleric\n  - Sorcerer\n  - Wizard\n---\n\nx',
   'prestidigitation': '---\nname: Prestidigitation\nlevel: 0\nclasses:\n  - Bard\n  - Sorcerer\n  - Warlock\n  - Wizard\n---\n\nx',
@@ -57,9 +65,8 @@ function run(cwd: string, script: 'opening_data.mjs' | 'opening_commit.mjs', arg
   const out = r.stdout.trim()
   const json = out.split('\n').filter(l => l.startsWith('{')).pop() ?? '{}'
   let parsed: Res = {}
-  try { parsed = JSON.parse(json) } catch { /* 解析失败把 stderr 冒出 */ }
-  if (r.status !== 0 || parsed.ok === false && 'error' in parsed === false)
-    throw new Error(`${script} exit ${r.status}: ${(r.stderr || r.stdout).slice(0, 400)}`)
+  try { parsed = JSON.parse(json) } catch { /* stdout 无 JSON=真 crash,stderr 冒出 */ }
+  if (!('ok' in parsed)) throw new Error(`${script} exit ${r.status}: ${(r.stderr || r.stdout).slice(0, 800)}`)
   return parsed
 }
 
@@ -79,9 +86,9 @@ describe('opening_data · meta 整包下发(单源语料解析)', () => {
     expect(meta.classes.cleric).toEqual({ skills: ['history', 'insight', 'medicine', 'persuasion', 'religion'], count: 2, anySkill: false, subclasses: ['Life'] })
     expect(meta.classes.bard.anySkill).toBe(true)
     expect(meta.classes.wizard.skills).toEqual(['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'])
-    expect(meta.casters).toContain('warlock')
+    expect(meta.CASTERS).toContain('warlock')
     expect(meta.pools.cantrips.wizard).toEqual(expect.arrayContaining(['Fire Bolt', 'Light', 'Prestidigitation']))
-    expect(meta.pools.lv1.warlock).toEqual(['Hex'])
+    expect(meta.pools.lv1.warlock).toEqual(expect.arrayContaining(['Hex', 'Illusory Script', 'Unseen Servant']))
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
 })
@@ -99,7 +106,7 @@ describe('opening_commit · 施法者出生即满(RAW L1)', () => {
     for (const c of panel.spells_known) expect(fmOf(c)).not.toContain('level: 0')   // 进书=首环,戏法不混
     expect(panel.features.join('|')).toContain('Arcane Recovery|每日')                // 时机按表,非池 |—
     expect(panel.features.join('|')).toContain('Spellcasting: Wizard|—')
-    expect(panel.armor_prof).toEqual([])                                             // 法师无甲熟练(键裁剪剥除)
+    expect(panel.armor_prof).toBeUndefined()                                         // 法师无甲熟练——空数组整族被键裁剪剥除
     expect(panel.weapon_prof).toContain('匕首')
     expect(panel.description).toContain('人类 法师')
     expect(panel.biography[0]).toContain('学者出身')
@@ -149,7 +156,7 @@ describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)'
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.caster_attr).toBe('cha')
     expect(panel.slots_l1).toBe(1)
-    expect(panel.spells_known as string[]).toEqual(['Hex'])   // 语料里 warlock 首环只有 Hex(2 槽但池不满额=有多少给多少)
+    expect(panel.spells_known as string[]).toHaveLength(2)   //RAW L1=2 已知(池含 Hex/Unseen Servant)
     expect(panel.features.join('|')).toContain('Otherworldly Patron|—')
     rmSync(dirname(cwd), { recursive: true, force: true })
   })

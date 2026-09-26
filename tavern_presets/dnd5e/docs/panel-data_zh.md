@@ -10,7 +10,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 |---|---|---|---|---|
 | 人物 | `characters/player.json`（固定名）/ `<名>.json` | JSON | roll/trade/ui_data/尾代/前端 | 机件（六维/hp/熟练/施法位/资源池/装备引用/钱包）+ 叙事（persona/biography 行数组） |
 | 战斗 | `state.md`「## 战斗」节（combat.json 已废 2026-09-20） | md 行 | roll/尾代/前端/attack·cast 工具 | `- 回合：N`/`- 先攻：名:值 > …`/`- 敌行：名 | HP 现值/上限 | AC n | path:… | 状态`/`- 友行：` 同语法——解析归 core.parseCombat |
-| 世界 | `state.md` | md | 尾代/泵/DM | frontmatter time_* + 六节（篇章/主线/支线/伏笔/所在/时间）+ 队伍 + 近期人物 |
+| 世界 | `state.md` | md | 尾代/泵/DM | frontmatter time_* + 六节（篇章/主线/支线/伏笔/所在/时间）+ 队伍 + 附近 NPC（三态名单,v4）+ 战斗节 |
 | 规则 | `dnd5e-srd-lorebook/` | md | runtimeRead/工具 join（书本 UI 已删） | 静态只读（1164 篇） |
 
 ## 二 · 可变中间变量（值的四种居所）
@@ -62,7 +62,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 面 | 覆盖 | 归宿/定案 |
 |---|---|---|
 | **A 生存成长**（peer 统一） | 等级线/体质线/防护线/熟练线/施法线/资产线 | 全员同 schema 同规则链；**键能力裁剪律**：『没有什么能力，就没有相关字段』，对所有角色（玩家同律）——能力族见下 |
-| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 五件 / biography / 活状态（statuses·exhaustion·concentrating） / 位置 | **biography 双职能：出生段=背景，运行时追加行=记忆**——不设 memory 键（避免双真值）；位置不落盘（state.md 附近名单路由）；**秘密=biography 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
+| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 五件 / biography / 活状态（statuses·exhaustion·concentrating） / 位置 | **biography 双职能：出生段=背景，运行时追加行=记忆**——不设 memory 键（避免双真值）；位置不落盘（state.md「## 附近 NPC」三态名单路由,v4——在场与敌友态皆以行为准）；**秘密=biography 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
 | **C 交互**（工具链已跨 who） | gear/weapons/三币/languages/技能对抗/施法对冲 | 无新增键 |
 
 **键能力裁剪律（2026-09-19 定案，取代两档制；对所有角色含玩家）**——字段存在性跟随能力：无某能力/机制参与 → 对应键族**整族不出生**（不留 0/空壳）：
@@ -93,7 +93,8 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
         → gain_exp/gain_money(级联) + runtimeEdit 直接编辑(old_str→new_str;write-guard 由工具内置——.json 落盘前整档 parse,坏则拒写)
         → statuses 按单位递减 / 新实体建档 / combat 维护 / round 推进(正文宣告驱动)
 
-  泵: rev 四节心跳 → 前端节级重绘
+  泵(v10 2026-09-25): 文件事件(何时) + op:panel rev 参数短路(是否,同值回裸 ack) → 前端节级重绘
+        ——v7「rev 四节心跳」协议已退役(从未接线,详见 docs/notes/feature/2026-09-25-file-events-channel.zh.md)
 回合 N+1: 注入已是新值
 ```
 

@@ -62,6 +62,9 @@ export interface ChatLine {
   args: string | undefined
   /** Still streaming (live reasoning deltas); the summary follows the newest line. */
   live: boolean
+  /** The source event's durable seq — the reading-anchor identity（着陆合约 2026-09-25）.
+   *  Live rows carry none. */
+  seq?: number
   /** tool rows: the durable call id — pairs the tool/result into the row body (internal). */
   callId?: string
   /** tool rows: the paired durable result text (bounded). */
@@ -171,12 +174,17 @@ export function FlowRow(props: {
   live?: boolean | undefined
   /** The stable tavern-* hook this row exposes to card CSS. */
   hook?: string | undefined
+  /** Durable seq for the reading-anchor lookup. */
+  seq?: number | undefined
 }): ReactNode {
   const [open, setOpen] = useState(false)
   const expandable = props.body !== undefined && props.body !== ''
   const live = props.live === true
   return (
-    <div className={`${css.flowRow} ${open ? css.open : ''} ${expandable ? css.expandable : ''} ${live ? css.running : ''} ${props.hook ?? ''}`}>
+    <div
+      className={`${css.flowRow} ${open ? css.open : ''} ${expandable ? css.expandable : ''} ${live ? css.running : ''} ${props.hook ?? ''}`}
+      data-seq={props.seq === undefined ? undefined : String(props.seq)}
+    >
       <div
         className={css.rowline}
         onClick={() => { if (expandable) setOpen(value => !value) }}
@@ -204,13 +212,14 @@ export function FlowRow(props: {
  * @param props - the locale seat, the full or streaming reasoning text, and whether this row is the live tail.
  * @returns the reasoning disclosure row.
  */
-function ThinkRow(props: { t: TranslateNS<typeof NS>; text: string; live: boolean }): ReactNode {
+function ThinkRow(props: { t: TranslateNS<typeof NS>; text: string; live: boolean; seq?: number | undefined }): ReactNode {
   const [open, setOpen] = useState(false)
   const expandable = props.text !== ''
   return (
     <div
       className={`${css.flowRow} tavern-thinking`}
       data-state={props.live ? 'running' : 'ok'}
+      data-seq={props.seq === undefined ? undefined : String(props.seq)}
     >
       <DisclosureRow
         className={css.thinkRow}
@@ -469,6 +478,8 @@ function TailFlowRow(props: {
   steps: readonly TailStep[] | undefined
   reply: string | undefined
   running: boolean
+  /** Durable seq for the reading-anchor lookup. */
+  seq?: number | undefined
 }): ReactNode {
   // Body not fetched yet: one fetch per missing row's detail cache.
   useEffect(() => {
@@ -523,6 +534,7 @@ function TailFlowRow(props: {
     <div
       className={`${css.flowRow} tavern-thinking`}
       data-state={props.running ? 'running' : 'ok'}
+      data-seq={props.seq === undefined ? undefined : String(props.seq)}
     >
       <DisclosureRow
         className={css.thinkRow}
@@ -638,7 +650,11 @@ export function ChatLines(props: {
           /* jscpd:ignore-start -- the user and narrative foot rows pair by
              contract (one row: timestamp + actions); the wrappers diverge. */
           return (
-            <div key={index} className={`${css.msgUser} tavern-message tavern-message-user`}>
+            <div
+              key={index}
+              className={`${css.msgUser} tavern-message tavern-message-user`}
+              data-seq={line.seq === undefined ? undefined : String(line.seq)}
+            >
               <div className={`${css.bubbleUser} tavern-bubble`}>
                 <RichBody text={line.text} rich={props.rich === true} />
               </div>
@@ -654,7 +670,11 @@ export function ChatLines(props: {
         }
         if (line.kind === 'narrative') {
           return (
-            <div key={index} className={css.msgGroup}>
+            <div
+              key={index}
+              className={css.msgGroup}
+              data-seq={line.seq === undefined ? undefined : String(line.seq)}
+            >
               <div className={`${css.narrative} tavern-message tavern-message-assistant`}>
                 <RichBody text={line.text} rich={props.rich === true} />
               </div>
@@ -668,6 +688,9 @@ export function ChatLines(props: {
           )
         }
         if (line.kind === 'think') {
+          // 思考折叠行不承载 data-seq：同一 assistant 事件的思考行与叙事行同 seq，
+          // 两个同 seq 行会让锚捕获与锚查找各认一行（真机 ±32px 漂移定罪处）。
+          // 阅读位置由叙事/用户/工具行携带；思考行落在其旁，锚定叙事行等价。
           return <ThinkRow key={index} t={props.t} text={line.text} live={line.live} />
         }
         if (line.kind === 'tail') {
@@ -680,21 +703,26 @@ export function ChatLines(props: {
               detail={props.tailDetail(line.text)} load={props.loadTailDetails}
               steps={line.steps} reply={line.reply}
               running={index === lastTailIndex}
+              seq={line.seq}
             />
           )
         }
         if (line.kind === 'stopped') {
-          return <FlowRow key={index} label={props.t('chat.stoppedRow')} summary={props.t('chat.stoppedSummary')} />
+          return <FlowRow key={index} label={props.t('chat.stoppedRow')} summary={props.t('chat.stoppedSummary')} seq={line.seq} />
         }
         if (line.kind === 'error') {
           return (
-            <div key={index} className={css.errMsg}>
+            <div
+              key={index}
+              className={css.errMsg}
+              data-seq={line.seq === undefined ? undefined : String(line.seq)}
+            >
               {line.text}
               {stamp !== undefined && <span className={css.stamp}>{stamp}</span>}
             </div>
           )
         }
-        return <FlowRow key={index} label={line.text} mono summary="" body={toolRowBody(line.args, line.result)} monoBody hook='tavern-tool' />
+        return <FlowRow key={index} label={line.text} mono summary="" body={toolRowBody(line.args, line.result)} monoBody hook='tavern-tool' seq={line.seq} />
       })}
     </>
   )

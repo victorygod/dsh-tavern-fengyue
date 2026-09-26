@@ -60,6 +60,7 @@ export type TavernKey =
   | 'chat.tailUnavailable' | 'chat.tailRunning'
   | 'chat.stop' | 'chat.tailStopped' | 'chat.stoppedRow' | 'chat.stoppedSummary'
   | 'chat.retry' | 'chat.copy' | 'chat.copied'
+  | 'chat.toTail'
   | 'toast.saved' | 'toast.keySaved' | 'toast.cleared' | 'toast.editStarted'
   | 'toast.scriptFailed' | 'toast.retried'
 
@@ -239,6 +240,7 @@ export const zh: Record<TavernKey, string> = {
   'chat.stoppedRow': '回合已停止',
   'chat.stoppedSummary': '被玩家终止 · 已生成的部分保留',
   'chat.retry': '重新生成回复',
+  'chat.toTail': '回到底部',
   'chat.copy': '复制',
   'chat.copied': '已复制',
   'toast.retried': '已重新生成',
@@ -420,6 +422,7 @@ export const en: Record<TavernKey, string> = {
   'chat.stoppedRow': 'Turn stopped',
   'chat.stoppedSummary': 'stopped by the player · the partial reply is kept',
   'chat.retry': 'Regenerate the reply',
+  'chat.toTail': 'Back to the latest',
   'chat.copy': 'Copy',
   'chat.copied': 'Copied',
   'toast.retried': 'Regenerated',

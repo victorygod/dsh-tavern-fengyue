@@ -1,5 +1,8 @@
 // view.mjs — 芙宁娜 galgame 纯函数件(无 DOM 无状态,node 直测;经 tavern.views 注入)。
-// 职责:指令剥离、分段、backlog 渲染——对话框状态机本体在 index.js(v1 直控)。
+// 职责:指令剥离、分段、剧本学(makeScript)、书签规则(三分支恢复/指针包/防剧透口径)、
+// live 合流、backlog 渲染——对话框状态机本体在 index.js(v1 直控)。
+// 分域规则语义均自现役 index.js 逐条显性化(2026-09-25 域重构批),规格钉在
+// packages/ui/tests/galgame-rules.unit.spec.ts:先锁规格,后搬家。
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
@@ -53,20 +56,96 @@ export function lineEndsOf(text) {
   return out
 }
 
-/** 快照行 → backlog 行模型:{role:'user'|'assistant', text}(assistant 剥指令)。 */
-export function backlogRows(rows) {
-  return (rows ?? []).map(r => ({
-    role: r.kind === 'user' ? 'user' : 'assistant',
-    text: r.kind === 'user' ? String(r.plain ?? '') : stripDirectives(r.orig),
-    seq: r.seq ?? 0,
-  })).filter(r => r.text !== '')
+/* 死账清点:v10 时期的 backlogRows/backlogHTML(seq 水位截断语义)2026-09-25 域重构批删除——
+   生前全仓零调用,且与活版(行偏移截断)语义两轨;现行渲染见 renderHistoryHTML。 */
+
+/* ── 分域规则(2026-09-25 域重构批):以下七族自现役 index.js 显性化提取,
+   语义与现行为逐条一致;galgame-rules.unit.spec 即规格。 ── */
+
+/** 剧本快照(不可变值):最近一条 assistant(orig 优先——段级 CG 判定依赖行内注释)
+ *  + 快照历史 → {paras 对话队列, raw 剥指令原文, lineEnds 防剧透行偏移, history}。
+ *  空/缺席回复 → 空剧本(paras=[], raw=''——输入态/开场判据);新旧轮回=换整个对象。 */
+export function makeScript(lastAssistant, history) {
+  const text = lastAssistant?.orig ?? lastAssistant?.text ?? ''
+  const raw = stripDirectives(text)
+  return {
+    paras: splitParagraphs(text).map(t => ({ role: 'assistant', text: t.text, cg: t.cg ?? null })),
+    raw,
+    lineEnds: lineEndsOf(raw),
+    history: history ?? [],
+  }
 }
 
-/** backlog 防剧透渲染:row 传当前轮(最后一条 assistant)时,只画到 readUpTo(含,-1=尚未读)。 */
-export function backlogHTML(rows, currentSeq, readUpToSeq) {
+/** 防剧透口径(backlog 行唯一出处):历史行原样;当前轮(书签水位命中的 assistant 行)
+ *  截到已读段——按原文行偏移 slice 保留换行,刷新前后一致。r 超界时 clamp 到末段
+ *  (点完全部段=全文显示,末段不丢)。 */
+export function visibleHistory(script, bookmark) {
+  return (script.history ?? []).map(row => {
+    if (row.role === 'assistant' && row.seq === bookmark.asstSeq && script.raw !== '') {
+      const readEnd = (script.lineEnds ?? [])[Math.min(bookmark.r, (script.lineEnds ?? []).length - 1)]
+      return { role: 'assistant', text: script.raw.slice(0, readEnd === undefined ? script.raw.length : readEnd) }
+    }
+    return row
+  })
+}
+
+/** 读位恢复三分支(boot 契约,行为与现役一致):
+ *  resume = 同回合有存位且非 input 态 → 回到读到的那段(r 对段数 clamp);
+ *  replay = 缺席期已有新回复(水位前进) → 从队头重新演绎(未读);
+ *  input  = 无存位/坏存位/存位已是 input 态/水位倒退 → 直落输入态(r=末段,旧契约)。 */
+export function decideRestore(saved, asstSeq, parasLen) {
+  const hasSaved = saved != null && Number.isInteger(saved.r)
+  const last = parasLen - 1
+  if (!hasSaved) return { plan: 'input', r: last }
+  const savedSeq = Number.isInteger(saved.asstSeq) ? saved.asstSeq : null
+  if (savedSeq === asstSeq && saved.mode !== 'input') {
+    return { plan: 'resume', r: Math.min(Math.max(saved.r, 0), last) }
+  }
+  if (savedSeq !== null && asstSeq > savedSeq) return { plan: 'replay', r: 0 }
+  return { plan: 'input', r: last }
+}
+
+/** live 合流:宿主累计流式文本 → {paras 追加新完整段后, liveTail 活性尾行}。
+ *  基线=剧本既有段数(boot/落定建好的完整行数);新到完整行逐条 append(parseLine
+ *  去注释取文+行内 cg 注释贴段),空文本与纯注释行跳过;未遇 \n 的活性尾单独交出。
+ *  不判 CG 时机——入队不切、段展示时切是演出机的职责。 */
+export function mergeLive(script, liveText) {
+  const s = String(liveText ?? '')
+  const parts = s.split('\n')
+  const lastComplete = s.endsWith('\n') ? parts.length : parts.length - 1
+  const paras = [...(script.paras ?? [])]
+  for (let i = paras.length; i < lastComplete; i++) {
+    const parsed = parseLine(parts[i] ?? '')
+    if (parsed.text !== '' && !parsed.text.startsWith('<!--')) {
+      paras.push({ role: 'assistant', text: parsed.text, cg: parsed.cg ?? null })
+    }
+  }
+  const liveTail = lastComplete < parts.length ? parseLine(parts[lastComplete] ?? '').text : ''
+  return { paras, liveTail }
+}
+
+/** 指针包打包(单键 LRU ≤16,与宿主 reader-anchor 同口径):新条目删后加=最近用者
+ *  殿后;超容量丢最旧(头)。条目形状 {r, paras, asstSeq, mode, ts}。 */
+export function packPointers(store, sid, entry) {
+  const all = { ...(store ?? {}) }
+  const key = `s:${sid}`
+  delete all[key]
+  all[key] = { r: entry.r, paras: entry.paras, asstSeq: entry.asstSeq, mode: entry.mode, ts: entry.ts }
+  return Object.fromEntries(Object.entries(all).slice(-16))
+}
+
+/** 指针包读取:坏 JSON/非对象值 → 空包(退化「不持久」,行为零伤)。 */
+export function readPointersPack(raw) {
+  try {
+    const value = JSON.parse(raw ?? '{}')
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  } catch { return {} }
+}
+
+/** backlog 渲染:行模型(visibleHistory 口径)→ HTML。user/assistant 类名与名字牌;
+ *  正文一律转义(.text 必为字符串——paras 整对象直传必染 [object Object],2026-09-24 量证)。 */
+export function renderHistoryHTML(rows) {
   return (rows ?? []).map(row => {
-    const isCurrent = row.seq === currentSeq
-    if (isCurrent && row.seq > readUpToSeq && readUpToSeq >= 0) return ''   // 未读段不剧透
     const cls = row.role === 'user' ? 'u' : 'a'
     return `<div class="bl-row ${cls}"><div class="bl-name">${row.role === 'user' ? '你' : '芙宁娜'}</div><div class="bl-text">${esc(row.text)}</div></div>`
   }).join('')

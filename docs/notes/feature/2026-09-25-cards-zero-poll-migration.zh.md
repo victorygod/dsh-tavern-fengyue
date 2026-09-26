@@ -1,6 +1,8 @@
 # 卡前端零轮询迁移:三源驱动(每卡前后对比)
 
-状态:设计定稿(自审修订版) | 日期:2026-09-25 | 关联:[[2026-09-25-file-events-channel]](通道批,先读其图解)、[[2026-09-24-tavern-opening-surface-contract]]
+状态:**已实施**(2026-09-25 通宵批:三卡全迁,停机方式见 §8) | 日期:2026-09-25 | 关联:[[2026-09-25-file-events-channel]](通道批,先读其图解)、[[2026-09-24-tavern-opening-surface-contract]]
+
+> **落地记录(2026-09-25)**:dnd5e `08be87a`(泵零轮询化:删重臂/降频整段,kick 串行合并,MutationObserver 容器,op:panel rev 短路+脚本惰性化,opening 迁移,acts refresh 即 kick)/芙宁娜 `509d1d5`(删 900ms 钟,看门狗迁出一次化,bootBoot 上界+上屏,自旋三清)/dnd `2487181`(删 2.5s 钟+全文本门,表面迁移,容器观察)。**寻访=back0、芙宁娜=纯手势/事件、dnd=纯手势/事件**;所有时序锚例按「断而不删改写」迁移为事件驱动断言。
 
 > **目标(2026-09-25,用户)**:基础设施已备好(通道批),"完全杜绝轮询";让每张卡的数据交互更简洁、优雅、可靠,前端压力显著下降。
 >
@@ -92,14 +94,28 @@ v9 归一(view/acts/runtime 同 dnd5e)列为可选大改,不推荐:独立遗产�
 
 **到期重估条款**:若 tavern wire 冻结解除,`@Remote({mode:'stream'})` 骑 WS mux(免费鉴权、免新路由)应回头收编本 SSE 路由——当时因冻结+客户端产物不可再生而落选;帧类型注册表保持封闭(hello/files/watch[,tail]),消费方必须容忍未知帧。
 
-## 5. 自审修订记录(相对初稿)
+## 5. 测试锚定现状(改前盘点,2026-09-25 实查)
+
+| 改动点 | 今日锚 | 判定 |
+|---|---|---|
+| dnd5e 泵 | `dnd5e-panel-runtime.client.spec.ts` 6 例**直导卡资产**;3 例焊死 2s 重臂时序契约(2000ms 计数/跨拍 `--off` 不复活/opening 散场回显) | **强**——删泵后 3 例必断(即检测器);同步迁移为 kick 驱动 + 加立拉/在途合并/无叠臂三例 |
+| dnd5e `op:panel` rev 短路/惰性化 | `dnd5e-ui-data-candidates.spec.ts` 引擎侧**真实 spawn 脚本+生产同构临时树**,op:panel 已跑 | **强**——现例护惰性化;rev 短路加两例(旧 rev→`changed:false`;变/缺→全量) |
+| card-ui files face | opening 面订阅纪律(:129-157)+mount 布线钉 = 现成模板 | 复刻模板;**勘误入账**:assistantLive face 与整页级 tavern-app spec 此前被误报存在,实查均无——files face 以 opening 为唯一模板基准 |
+| TavernApp 喂数 effect | 无 | 单例 spec(帧→订户)与 face spec(喂→卡)两端夹住;三行粘胶不建整页 harness |
+| **芙宁娜全部改动** | **零**(全库无引用) | **真空**——galgame spec 必须先立后改 |
+| **dnd codex 改动** | **零** | 轻量 rig 直导 + 比对门例先立后改 |
+| engine 三件 | 模块无锚;loader-composition 每例均走真实构造路径(构造接线抛错=整套组合全灭) | 模块单测(通道批 §7)+ sessionIdOfDir 提为纯函数锚入 file-events spec |
+
+**两条纪律**:①零锚卡**先立锚后动刀**(芙宁娜/dnd 的 spec 落地跑绿是改码的前置任务);②dnd5e 的三根时序例**断而不删**——改写为 kick 驱动,断裂本身即"泵语义已变"的 PR 证据(直导卡资产:"逻辑搬动即测试跟随")。
+
+## 6. 自审修订记录(相对初稿)
 
 1. **容器时序缺口**:删泵后丢失 2s 免费重试,waitHost 类统一改 MutationObserver(事件化,连有界自旋也消掉);
 2. **通道去抖窗改逐事件重臂 + 1s 最大窗**(已同步修 [[2026-09-25-file-events-channel]] §3.1)——quiet 语义 + burst 长于 300ms 不再中途 flush 半写文件;
 3. **opening.subscribe 由"顺手收编"升格"必选"**——零轮询后 applyVisibility 无 tick 可蹭;
 4. **rev 短路的脚本惰性化成本如实入账**(不再是"几行")。
 
-## 6. 量化(空闲 = 无人写盘、无人点按)
+## 7. 量化(空闲 = 无人写盘、无人点按)
 
 | 卡 | 常驻 interval | 空闲网络请求 | 空闲 spawn | 重绘 |
 |---|---|---|---|---|
@@ -108,7 +124,7 @@ v9 归一(view/acts/runtime 同 dnd5e)列为可选大改,不推荐:独立遗产�
 | dnd | 3 个→**0** | ~36/分→**0** | ~0.4/秒→**0** | **每拍无条件→截住** |
 | 高峰 | 事件驱动:≤3.3 批/秒/会话,kickWanted 串行,rev 挡传输 | 同左 | 同左 | 同左 |
 
-## 7. 实施顺序(每步全绿)
+## 8. 实施顺序(每步全绿;零锚卡先立锚后动刀)
 
 1. dnd5e 样板:零轮询泵 + MutationObserver + `op:panel rev 短路`(脚本惰性化)+ opening 迁移 + engine/单例的 watch 降级帧与慢拉;
 2. 真机验证:空闲 Network 零请求、写盘→HUD 秒动、kill watcher→30s 慢拉自动接管;

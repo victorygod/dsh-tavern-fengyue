@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 const fail = (m, h) => { console.log(JSON.stringify({ ok: false, error: m, hint: h ?? '' })); process.exit(1) }
 
 const { OPENING_META, CASTERS, parseSkillChoices, CANTRIPS_L1, KNOWN_L1 } = await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
+const { SPELL_CN, SUBCLASS_CN } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 
 function readFM(rel) {
   try {
@@ -60,6 +61,6 @@ try { OPENINGS = JSON.parse(readFileSync('openings.json', 'utf8')) } catch { }
 if (!OPENINGS) { try { OPENINGS = JSON.parse(readFileSync('../preset/setup/openings.json', 'utf8')) } catch { } }
 if (!Array.isArray(OPENINGS?.scenarios)) fail('openings.json 缺 scenarios 数组（runtime/ 与 preset/setup/ 均无或损坏）')
 
-okR({ scenarios: OPENINGS.scenarios, meta: { ...OPENING_META, classes, pools, cantripsL1: CANTRIPS_L1, knownL1: KNOWN_L1 } })
+okR({ scenarios: OPENINGS.scenarios, meta: { ...OPENING_META, classes, pools, cantripsL1: CANTRIPS_L1, knownL1: KNOWN_L1, spellCN: SPELL_CN, subclassCN: SUBCLASS_CN } })
 function okR(r) { console.log(JSON.stringify({ ok: true, ...r })) }
 function CLEAN(list) { return list.map(x => String(x)).filter(Boolean) }

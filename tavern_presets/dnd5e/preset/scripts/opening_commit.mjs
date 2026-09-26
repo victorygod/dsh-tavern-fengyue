@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { pathToFileURL } from 'node:url'
 const core = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { mod } = core
-const { OPENING_META, CASTERS, SUBCLASS_LEVEL, CANTRIPS_L1, KNOWN_L1, PRIMARY, FEATURES_RECHARGE, EQUIP_BY_CLASS, CLASS_CN, RACE_CN, parseSkillChoices } =
+const { OPENING_META, CASTERS, SUBCLASS_LEVEL, CANTRIPS_L1, KNOWN_L1, PRIMARY, FEATURES_RECHARGE, EQUIP_BY_CLASS, CLASS_CN, RACE_CN, ALL_SKILL_KEYS, parseSkillChoices } =
   await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
 
 const fail = (m, h) => { console.log(JSON.stringify({ ok: false, error: m, hint: h ?? '' })); process.exit(1) }
@@ -74,11 +74,9 @@ const casterAttr = ({ wizard: 'int', cleric: 'wis', sorcerer: 'cha', druid: 'wis
 const hpMax = hitDie + conM
 
 // ── 技能校验(白名单+选数——表单已按类过滤,此处是机械层最后闸) ──
-const skillPool = parsed.anySkill
-  ? Object.values(ch.skills ?? []).length ? ch.skills : []
-  : parsed.skills
+// ★ 允许池:anySkill(吟游诗人)=全 18 任选;其余职业=语料白名单
 const chosenSkills = Array.isArray(ch.skills) ? ch.skills : []
-const allowedSkills = parsed.anySkill ? chosenSkills : skillPool
+const allowedSkills = parsed.anySkill ? ALL_SKILL_KEYS : parsed.skills
 chosenSkills.every(s => allowedSkills.includes(s)) || fail('技能熟练超出职业白名单', `本职业可选:${allowedSkills.join(', ')}`)
 chosenSkills.length === parsed.count || fail(`技能熟练须选 ${parsed.count} 项(本职业技能选数,非法数 ${chosenSkills.length})`)
 
