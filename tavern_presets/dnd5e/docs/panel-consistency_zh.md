@@ -269,7 +269,7 @@ tick(Δ:"2小时"|"1天"|"3天", food:full|half|none, water:full|half|none, forc
 
 ### 二期(新件,按需逐件上)
 
-ability/heal/apply_status/tick/trade/give_item/grow/rest;maintenancePrompt §4 随 tick 退役;铺场**两段制解除**(游戏性决策——spawn_npc 已进一期,结构闸只剩 prompt 文本,解除与否实施时拍板)。各件设计见 §4.1/§4.3–§4.5,不因分期改动。
+ability/heal/apply_status/tick/trade/give_item/grow/rest;maintenancePrompt §4 随 tick 退役;铺场**两段制解除**(游戏性决策——spawn_npc 已进一期,结构闸只剩 prompt 文本,**2026-09-28 拍板解除落地**:systemPrompt 单段制改写+initiative 描述同步,devlog 09-28)。各件设计见 §4.1/§4.3–§4.5,不因分期改动。
 
 ## 8. 风险与开放问题
 

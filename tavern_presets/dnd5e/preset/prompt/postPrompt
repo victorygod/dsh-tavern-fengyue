@@ -6,7 +6,7 @@
 【附近 NPC 面板】
 {{get_npc_state()}}
 
-【人际关系】（只有简述）
+【人物志】(characters/ 全部人物简介)
 {{get_roster()}}
 
 【世界状态】

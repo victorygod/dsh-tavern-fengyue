@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "角色创建器——为登场的新角色建立完整档案并登记在场：怪物、NPC、同伴，一切新角色必经（玩家角色由开局表单创建，不经此）。什么情况调：剧情中任何新角色登场。创建前先读卡：怪物 runtimeRead monsters/ 下的 statblock 照原文填，原创 NPC 凭你的设定填——数字要过你的脑子，战斗中是你亲自跑它。怎么填：必填 name+stance+level+ac+hp+六维；level 是统一刻度——怪物抄卡头 CR（0.25 小数原样），有职业的填等级；有什么能力填什么族（施法者必须填全 caster_attr+spells_known+slots），没有的不填；设定重的角色填 persona/biography，杂兵跳过。特殊通道：from 传 statblock 路径做镜像校验（填错报错列差异；有意改数值的变体不带 from）；count 批量（name 为基名，天干编号）。预期效果：档案+在场名单落盘，回执给落盘行与 XP/熟练加值摘要（派生，不落档）；同名已存在会报错。",
+  "description": "角色创建器——为登场的新角色建立完整档案并登记在场：怪物、NPC、同伴，一切新角色必经（玩家角色由开局表单创建，不经此）。什么情况调：剧情中任何新角色登场。创建前先读卡：怪物 runtimeRead monsters/ 下的 statblock 照原文填，原创 NPC 凭你的设定填，无设定的纯场景者照 commoner 底版填凡人数值——数字要过你的脑子，战斗中是你亲自跑它。怎么填：必填 name+stance+level+ac+hp+六维；level 是统一刻度——怪物抄卡头 CR（0.25 小数原样），有职业的填等级；有什么能力填什么族（施法者必须填全 caster_attr+spells_known+slots），没有的不填；设定重的角色填 persona/biography，杂兵跳过。特殊通道：from 传 statblock 路径做镜像校验（填错报错列差异；有意改数值的变体不带 from）；count 批量（name 为基名，天干编号）。预期效果：档案+在场名单落盘，回执给落盘行与 XP/熟练加值摘要（派生，不落档）；同名已存在会报错。",
   "agents": ["main", "tail"],
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
