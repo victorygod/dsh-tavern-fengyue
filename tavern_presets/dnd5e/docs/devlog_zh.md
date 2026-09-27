@@ -623,3 +623,19 @@
 - 遗留:P0 E2E(regenerate/stop 真机实证)待宿主执行;attack/cast 彼线合流后接内联治疗/自动伤害分支(来源路由律硬约束);工作区无活跃 dnd5e 实例,下次开局自然带出(快照不传导,卡库为源)。
 
 **追记(同日·attack/cast 收尾,用户令归本线)**:attack 终版落地(§9 终稿+off_hand 后手布尔+吞零修复+即兴无档新裁定:写盘需要档,ac 转写仅限有档目标的剧情态覆盖,即兴必须先 spawn——旧测试「酒馆老板」锚改报错);cast 终版落地(彼线四裁定+路由律内联第五六分支:治疗型 restore:true+dice 钳上限苏醒双清/自动型 dice 逐目标独立掷——法术来源一切生命变动归 cast 禁接龙)。**实施抓真 bug 一枚**:自施法(治疗自己)时 cast 结尾位表/专注写盘用开头陈旧快照整档回写,把治疗刚写的 hp 拍回 0(clobber)——修复=结尾写盘前重读实盘;新增三钉(attack 落盘+0HP/cast 位耗+专注 RAW 覆写/治疗内联+自动型)。**全套 40 files/482 tests 绿**。一期 11 件至此全部代码落地;遗留仅 P0 E2E(regenerate/stop 真机)。
+
+## 2026-09-27 · 死代码清扫批——八通道枚举审计+对抗复核,15 项落地+1 bug 顺手修
+
+全卡死代码审计:枚举八条存活通道(工具注册/prompt 占位/hooks/宿主固定名装载/卡内 runScript·data-act·view 名/库导入四形态/CSS 类产出/测试),逐项证明全空才判死;删前对抗复核(方括号动态取属性/插值拼类/宿主动态类名构造/iframe 隔离)。**方法论教训**:词边界 `\b` grep 在本环境 ugrep 下不可靠——首轮曾误判 setSeed 死,朴素模式重验抓出引擎测试播种在用(dnd5e-phase1 prelude 固定 LCG 骰流防 1/20 断言翻红)→撤案;凡下死刑必以朴素 grep+调用语法级双重确认。
+
+- **core.mjs**:删 `d20`(骰果回执须列每颗骰,rollExpr 成唯一出口)/`charFileOf`(与 readChar 重复)/`combatFoe`+`combatRow`(敌行瘦身+resolveTarget 咽喉化后的旧真相读口)/`pb`(pbOf 修双端 clamp 后注释标退役未删)。setSeed 保留(测试播种)。
+- **glossary-cn.mjs**:删 `featureNameCn`+`PAREN_CN`+`subclassCn/languageCn/weaponCn`——中文化消费全在 view 副本侧(裸串加载不能 import),服务端只接 spellCn;数据表留作译名正本。
+- **front_commit.mjs**:删 `op=prepare` 分支——「长休换准备表」UI 从未进版面定案,spells_prepared 唯一写入者=出生 roll。
+- **opening_commit.mjs**:本地 readFM/classRow/stripEmptyArrays 三副本退役改 import core(2026-09-26 收拢声明的落地);readFM 留一行容错壳(race 非法兜底 {} 不炸出生);PRIMARY 多余解构删。
+- **view.mjs**:删 `profHtml=''` 空壳(2026-09-24 版面定案 Proficiencies 迁左栏残留)。
+- **ui.css**:删 `.bk-tail`(小传提到册首 9e9f610 后 bk-tale 取代)/`.stc.dying2`×2+`@keyframes dc`(濒死表达移卡级 .dying)/`.dnd-hud--anchor-l/r`+`.panel-hidden`×2+`.hero/.mates/.right.hidden`(锚点挂载与旧可见性被 hosted+--off 取代)/`.bk-cap.g-pend.on`(grow 断链删,见下);**顺手修真 bug**:`.loc .l.up::after` content `"\\203A"` 双反斜杠转义错,字面渲染 `\203A` 六字符,应为 `"\203A"`(›)——环境面板大区/区域行箭头自出生即坏。
+- **index.js**:删总开关按钮 `data-act="panels"` 属性(行为走直绑 onclick;runtime 委托因 owner 解析失败恒放行,属性纯摆设)。
+- **ui_data.mjs**:删 v9 `op=full` 全量投影(v10 零轮询后零调用方;op 缺席/未知改 fail-visible 报错);删 state 投影 `changes/party/hierarchy` 三无消费字段(changes=DM 账走 get_changes;party 只服务长休结算;hierarchy=v8 层级迁移兼容旗)。
+- **拍板一·kind 三色补契约**:maintenancePrompt 3a statuses 行加「kind: b 增益/d 减益/i 信息金,拿不准就 i」;panel-data_zh.md 字段表补行——原型(hud-proto-v8/grow)三色+kind:'b' 样例俱全,实现期字段清单掉了 kind,展示层三色自出生从未点亮;此批把最后一环接上。
+- **拍板二·grow 高亮断链删**:acts `setUi('grow')`×3+view bookHtml 第三参+capPend open 参+.g-pend.on CSS+两 spec 断言——四环链断在生产端从不传参,功能从未上线,学习框自带标题上下文;接上需 acts 持有册子数据,复杂度/收益不配。保留 deps.stopped(宿主停旗接缝,2 行防御缝,纯加法语义)。
+- **验证**:全套 **40 files/499 tests 绿**;存量工作区同步 4/12(153334/154142/154808/160149 四个与改动前卡版本一致者 10 文件全量镜像+md5 抽查一致;其余 8 个为 09-23/早 09-27 旧版快照,强推新文件致新旧错配,跳过留档)。

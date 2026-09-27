@@ -1,5 +1,6 @@
 // front_commit — 前端决策通道(runScript 面,非 LLM 工具):玩家点选→校验→窄写→清 pending→JSON 回执。
-// op=asi(恰 2 点/上限20/CON 追溯 hp_max);op=spells(恰 2 个+存在性);op=prepare(⊆known)。
+// op=asi(恰 2 点/上限20/CON 追溯 hp_max);op=spells(恰 2 个+存在性)。
+// （op=prepare 已删 2026-09-27:「长休换准备表」UI 从未建成,唯一写 spells_prepared 者为出生 roll。）
 // 每笔成功在 .front-ops.jsonl 落一行「做了什么·产生什么效果」——{{get_player_ops()}} 注给 DM(玩家操作
 // 不进 transcript,面板只体现结果现值,行为事件由此单独到桌;tail 无权此文件,maintenancePrompt 未提)。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
@@ -55,11 +56,4 @@ if (inp.op === 'asi') {
   writeFileSync(file, JSON.stringify(j, null, 1))
   logOp(`学习新法术：${learned.join('、')}`)
   okR({ who, learned, pending: j.pending })
-} else if (inp.op === 'prepare') {
-  const known = j.spells_known ?? []
-  for (const s of (inp.payload?.prepared ?? [])) known.includes(s) || fail(`未收录:${s}(先 learn)`)
-  j.spells_prepared = inp.payload?.prepared ?? []
-  writeFileSync(file, JSON.stringify(j, null, 1))
-  logOp(`设置准备法术：${j.spells_prepared.join('、') || '（清空）'}`)
-  okR({ who, prepared: j.spells_prepared })
 } else fail('未知 op:' + inp.op)

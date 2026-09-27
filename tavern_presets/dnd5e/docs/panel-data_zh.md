@@ -29,6 +29,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | `hd_available` | **存储** player | rest 回执 → 尾代落 | rest、前端 |
 | `gp/sp/cp` | **存储** player | trade 回执 → 尾代落 | trade、前端钱袋 |
 | `pending[]`（如 ASI 待选） | **存储** player（键随成长族,裁剪律二·B） | gain_exp 级联写入 → 玩家前端点选 → 尾代清 | 前端待办旗、DM 宣告 |
+| `statuses[].kind` | **存储** 各角色 statuses | 尾代标 `b`(增益)/`d`(减益)/`i`(信息)——2026-09-27 补进转录契约（原型三色最终上线） | 前端 chips 三色 |
 | `statuses[].remaining` | **存储** player.statuses | 尾代按**其声明单位**递减（见下单位律），到 0 删行 | roll（effect 计入）、前端 chips |
 | 敌人 `hp` / 状态 | **存储** combat.enemies 行 | 尾代照正文落账；战末归档回写 character 文件 | roll（目标 AC）、前端敌卡 |
 | `round / act_index / order[]` | **存储** combat | 尾代转录（initiative 回执建序；每轮 round+1 由正文宣告驱动——B4-① 已定案） | roll、前端 |

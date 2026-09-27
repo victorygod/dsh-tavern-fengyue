@@ -36,7 +36,7 @@ export function mount(tavern) {
   tools.className = 'dnd-hud dnd-hud--tools'
   tools.innerHTML = `
     <div class="btns">
-      <button class="btn" data-act="panels" title="隐藏/开启面板"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 9v6M17 9v6" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg></button>
+      <button class="btn" title="隐藏/开启面板"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="8" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 9v6M17 9v6" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg></button>
     </div>`
   document.body.append(tools)
   const btn = tools.querySelector('.btn')

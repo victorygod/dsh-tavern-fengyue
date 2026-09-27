@@ -13,7 +13,7 @@
 3. **展示域写档**（其余一切面板变化都是文件改动）：
 
    a. **characters/*.json**（flat JSON：机件＋persona 短串＋biography 行数组，禁深嵌套）：
-   - 状态施加/到时 → statuses 行增删，remaining 按声明单位折算：轮→combat round 每轮 −1；分钟/小时/日→读旧时间、写新时间、按 Δt 折算 −1；场景→地点切换清除；instantaneous 不入 statuses；到期删行。单位混递必错。
+   - 状态施加/到时 → statuses 行增删（行带 kind：`b`=增益／`d`=减益／`i`=信息——前端芯片三色，定性拿不准就 `i`），remaining 按声明单位折算：轮→combat round 每轮 −1；分钟/小时/日→读旧时间、写新时间、按 Δt 折算 −1；场景→地点切换清除；instantaneous 不入 statuses；到期删行。单位混递必错。
    - 成长写入（仅 NPC/同伴——玩家的属性点/新法术由玩家在前端面板点选、系统直写档案，转录不得重复落，叙事提及也不算数）：六维增减；CON 增量追溯 `hp_max/hp += 等级×增量`；`spells_known` 追加（施法者查 `dnd5e-srd-lorebook/spells/<名>.md` 存在性）；同一笔写档同步移除该角色对应 pending 单条（只删那一条，其余保留——残留旧条会致下回合重复宣告）。
    - 长休结算：HP→上限、HD 回「等级÷2 向下取整(≥1)」枚、施法位回满、features 池回充清零（回充时机查 `dnd5e-srd-lorebook/classes/<职业>.md`——狂暴/吟游激励等系长休恢复，勿短休误充）、力竭 −1（须正文提及饮食）、temp_hp/专注清；细则 `dnd5e-srd-lorebook/rules/resting.md`；last_long_rest＝完成时刻记 state.md 队伍节。
 

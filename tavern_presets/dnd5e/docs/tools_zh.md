@@ -103,12 +103,12 @@ raw d20→新计数回执（读面板计数不陈旧）,封顶3;稳定/死亡建
 
 玩家点选（无对话、无 LLM 参与）→ 校验 → 窄写 `characters/<名>.json` → 清 pending → JSON 回执给前端；LLM 下一回合注入只见新值。
 
-**输入**：
+**输入**（v10 现行契约,2026-09-27 对齐——一档一保存,恰 2 点/恰 2 法术）：
 ```jsonc
-{ "op": "asi",    "who": "洛克", "payload": { "stat": "dex", "plus": 1 } }          // 对照 pending 白名单:属性/次数/上限20
-{ "op": "spells", "who": "缇娜", "payload": { "learned": ["灵性武器"], "prepared": ["灵性武器"] } } // 对照职业等级表校验
+{ "op": "asi",    "who": "洛克", "payload": { "stats": { "dex": 1, "wis": 1 } } }   // 一档恰 2 点,单属性 ≤+2,上限 20,CON 追溯 hp_max
+{ "op": "spells", "who": "缇娜", "payload": { "learned": ["灵性武器", "神导术"] } }  // 一档恰 2 个,lorebook spells/<slug> 存在性校验
 ```
-**输出**：`{ ok, panel 新值, pending 清除结果 }`；**报错**：无 pending/超上限/非法项/重复加点。
+**输出**：`{ ok, who, updated|learned, pending: 剩余待办 }`；**报错**：无 pending/合计非 2/超上限/法术不存在。
 **性质**：opening_commit t=0 出生例外的泛化——**无判断落盘道**（与尾代同属"零判断写手"二元：尾代=叙事事实,front_commit=前端机械决策）。
 
 ## 十二 · 不设工具（对照清单）
@@ -117,7 +117,7 @@ raw d20→新计数回执（读面板计数不陈旧）,封顶3;稳定/死亡建
 
 ## 十三 · 收缩史（备查）
 
-initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（LLM 查表粗算）；craft/lifestyle/loot→无二期；rolls.log→撤（回执中继+transcript 审计）；**advance/trade→status_update 原子吸收（v6）**；双面工具→无需求（agents 字段保留口）。**演化终态（v7）：主面骰算 6 + 尾面级联 2 + 前端 1 + 直接编辑。**
+initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（LLM 查表粗算）；craft/lifestyle/loot→无二期；rolls.log→撤（回执中继+transcript 审计）；**advance/trade→status_update 原子吸收（v6）**；双面工具→无需求（agents 字段保留口）。**演化终态（v7）：主面骰算 6 + 尾面级联 2 + 前端 1 + 直接编辑。** **死代码清扫批（2026-09-27）**：front_commit `op=prepare`→删（换准备表 UI 从未建成）；core `d20/charFileOf/combatFoe/combatRow/pb`→删（骰果列每颗骰归 rollExpr、目标解析咽喉 resolveTarget、pbOf 单键统一律）；glossary 死访问器×4、view `profHtml`、ui_data `op=full`+三无消费字段、ui.css anchor/panel-hidden/bk-tail/dying2 组——详见 devlog 2026-09-27 节。
 
 ## 九 · 预期逻辑与回执模板（实现设计 · 2026-09-19——照此直译成代码）
 
@@ -190,7 +190,7 @@ initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（L
 ```
 （实现注:回执数值全部由工具算好,DM 只转述;尾代照抄。）
 
-### rest 逻辑
+### rest 逻辑（已消亡——存档:休整落账归尾代直接编辑(maintenancePrompt 3.a 长休细则+短休走 heal),思路见 §九·B）
 ```
 kind 分派;targets=who 或扫描 characters/(role pc+companion);
 读 state.md frontmatter(time_day/hour)+`last_long_rest`(队伍节,缺=从未);
@@ -230,7 +230,7 @@ who 默认全队;逐人: exp+=share;查阈值表(20 行常量)→可多级连升
   ⬜ pending: LV4·ASI 点选(前端) —— DM 下回合宣告
 ```
 
-### front_commit 逻辑
+### front_commit 逻辑（2026-09-27 存档注:op=prepare 已删——「长休换准备表」UI 从未进版面定案,spells_prepared 字段仍存,唯一写入者=出生 roll;下文 asi/spells 守卫以脚本现行为准:恰 2 点/恰 2 法术一档一保存）
 ```
 op=asi:   校验 pending 含 ASI 项;payload.stats 合计 ≤2(或 plus 单值);目标属性 <20(超出→报错);
           应用 str..cha += x;若 con 变化→hp_max += level(追溯每级);清该 pending 项;回写 JSON(parse 往返)。

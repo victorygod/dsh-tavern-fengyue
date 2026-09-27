@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 const { mod, pbOf, readFM, parseCombat, deriveAC, XP_THRESHOLDS, presence } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { spellCn } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 const a = globalThis.argv?.[0] ? JSON.parse(globalThis.argv[0]) : (globalThis.argv ?? {})
-const op = a.op ?? 'full'
+const op = a.op
 
 const secStat = (p) => { try { const s = statSync(p); return `${s.mtimeMs}:${s.size}` } catch { return null } }
 // 大 payload 出闸：process.exit 会砍掉管道里未冲刷的 stdout（macOS 管道缓冲 64KB——头像整表它睡醒）。
@@ -55,7 +55,7 @@ if (op === 'panel' && typeof a.rev === 'string' && a.rev !== '') {
   if (rev !== null && rev === a.rev) { await emit({ ok: true, rev, changed: false }); process.exit(0) }
 }
 
-// ── full ──
+// ── 面板数据装配(op=panel 落到此路;op 缺席/未知 = fail-visible 报错,不再有 v9 全量投影) ──
 const player = readJ('characters/player.json')
 // 战斗＝state.md「## 战斗」节（combat.json 已废——2026-09-20 定案,解析归 core.parseCombat,语法见 core.mjs）
 const combat = parseCombat()
@@ -71,7 +71,7 @@ for (const e of combat?.enemies ?? []) {
     } catch { e.hp = e.hp_max = e.ac = null }  // 档坏 → 缺席保真(???),不涂默认
   }
 }
-let state = { time: '', place: '', main: [], side: [], changes: [], party: [] }
+let state = { time: '', place: '', main: [], side: [] }
 try {
   const md = readFileSync('state.md', 'utf8')
   const grab = (h) => { const i = md.indexOf('## ' + h); if (i < 0) return []; const j = md.indexOf('\n## ', i + 1); return (j < 0 ? md.slice(i) : md.slice(i, j)).split('\n').slice(1).filter(l => l.trim().startsWith('-')).map(l => l.replace(/^\s*-\s*/, '')) }
@@ -85,14 +85,12 @@ try {
     if (m) locKV[m[1]] = m[2].trim()
     else if (raw.trim() && legacyPlace === null) legacyPlace = raw.trim()
   }
-  const hier = !!locKV['地点'] || !!locKV['大区']
   state = {
     time_day: +(tm?.[1] ?? 1), time_hour: +(tm?.[2] ?? 18),
     region: locKV['大区'] ?? null, area: locKV['区域'] ?? null,
     place: locKV['地点'] ?? legacyPlace ?? '',
     terrain: locKV['地形'] ?? null, weather: locKV['天气'] ?? null,
-    hierarchy: hier,
-    main: grab('主线'), side: grab('支线'), party: grab('队伍'), changes: grab('上回合变化'),
+    main: grab('主线'), side: grab('支线'),
   }
 } catch {}
 // 全施法者位表（1-20 级 × 1-9 环槽位）——死规则，SRD 语料无此表（class 文件仅 Class Specific），
@@ -259,12 +257,5 @@ if (op === 'panel') {
   await emit({ ok: false, error: `未定义面板 ${a.name ?? ''}` }); process.exit(1)
 }
 
-console.log(JSON.stringify({
-  ok: player !== null, rev: secStat('characters/player.json'),
-  player: player ? { ...player, derived: derive(player) } : null,
-  companions: sel.mates.map(projMate),
-  neutrals: sel.neutrals.map(projMate),
-  foes: sel.foes.map(projFoe),
-  combat,
-  state,
-}))
+await emit({ ok: false, error: `ui_data: 未定义 op ${op ?? '(缺)'}——可用 op: avatars / panel / candidates（v9 全量投影已随零轮询退役,2026-09-27）` })
+process.exit(1)

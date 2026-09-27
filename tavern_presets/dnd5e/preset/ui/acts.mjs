@@ -80,8 +80,6 @@ export function grow(ctx) {
   Grow.open = kind
   Grow.panel = ctx.panel
   Grow.lastCtx = ctx
-  ctx.setUi('grow', { open: kind })
-  ctx.repaint()   // 呼吸标题栏 → on 态
   wireGlobal()
   if (kind === 'asi') {
     // 行内现值来自面板切片（玩家六维）;读一次缓存,保存后由 refresh 回落
@@ -182,8 +180,6 @@ export function growPick(ctx) {
 export function growClose(ctx) {
   Grow.open = null; Grow.asi = {}; Grow.spells = []
   document.querySelector('.g-dlg')?.remove()
-  ctx?.setUi('grow', { open: null })
-  ctx?.repaint()
 }
 export async function growSave(ctx) {
   const kind = ctx.actEl.dataset['kind'] ?? ''
@@ -199,8 +195,6 @@ export async function growSave(ctx) {
     if (r.ok === false) { setMsg(r.error ?? 'front_commit 拒绝'); return }
     Grow.open = null; Grow.asi = {}; Grow.spells = []; Grow.player = null   // 现值缓存作废——下次开框重取(已保存后的新值)
     document.querySelector('.g-dlg')?.remove()
-    ctx.setUi('grow', { open: null })
-    ctx.repaint()
     ctx.refresh('hud-left')   // 下一拍泵重取——待办角标/现值回落（C1 语义）
   } catch (e) { setMsg('保存失败：' + (e instanceof Error ? e.message : String(e))) }
 }

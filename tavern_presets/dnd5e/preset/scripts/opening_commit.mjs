@@ -8,8 +8,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const core = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
-const { mod } = core
-const { OPENING_META, CASTERS, SUBCLASS_LEVEL, CANTRIPS_L1, KNOWN_L1, PRIMARY, FEATURES_RECHARGE, EQUIP_BY_CLASS, CLASS_CN, RACE_CN, ALL_SKILL_KEYS, parseSkillChoices } =
+const { mod, classRow, stripEmptyArrays } = core
+// readFM 容错壳——core 版缺档/坏档会抛；出生层兜底 {}（race 非法时 speed/languages 走默认不炸）
+const readFM = (rel) => { try { return core.readFM(rel) } catch { return {} } }
+const { OPENING_META, CASTERS, SUBCLASS_LEVEL, CANTRIPS_L1, KNOWN_L1, FEATURES_RECHARGE, EQUIP_BY_CLASS, CLASS_CN, RACE_CN, ALL_SKILL_KEYS, parseSkillChoices } =
   await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
 
 const fail = (m, h) => { console.log(JSON.stringify({ ok: false, error: m, hint: h ?? '' })); process.exit(1) }
@@ -24,31 +26,7 @@ const race = (ch.race ?? 'human').toLowerCase()
 const scenarioId = inp.scenario ?? 'border-town'
 const toolsDir = 'dnd5e-srd-lorebook'
 
-// ── 查表 ──
-function readFM(rel) {
-  try {
-    const raw = readFileSync(`${toolsDir}/${rel}`, 'utf8')
-    const m = /^---\n([\s\S]*?)\n---/.exec(raw); if (!m) return {}
-    const fm = {}; let cur = null
-    for (const line of m[1].split('\n')) {
-      const li = /^  - (.*)$/.exec(line)
-      if (li && cur) { fm[cur] = [...(fm[cur] ?? []), li[1].replace(/^"|"$/g, '')]; continue }
-      const kv = /^([a-z_]+):\s*(.*)$/.exec(line)
-      if (kv) { cur = kv[1]; fm[cur] = kv[2] === '' ? [] : (kv[2] === 'true' ? true : kv[2] === 'false' ? false : (/^-?\d+(\.\d+)?$/.test(kv[2]) ? Number(kv[2]) : kv[2].replace(/^"|"$/g, ''))) }
-    }
-    return fm
-  } catch { return {} }
-}
-function classRow(cls, L) {
-  try {
-    const md = readFileSync(`${toolsDir}/classes/${cls}.md`, 'utf8')
-    // 等级列在 SRD 表里是序数词（| 1st | 2nd | 3rd …），纯数字匹配会落空 → features 整列丢。
-    // specific 列可能是嵌套 JSON（{"sneak_attack":{"dice_count":1,…}}），\{[^}]*\} 遇嵌套即断——用 [^|]* 抓整列不关心括号。
-    const re = new RegExp(`^\\|\\s*${L}(?:st|nd|rd|th)?\\s*\\|\\s*\\+(\\d+)\\s*\\|\\s*([^|]*)\\|\\s*([^|]*)\\|`, 'm')
-    const m = re.exec(md)
-    return m ? { features: m[2].trim(), specific: m[3] ? JSON.parse(m[3].replace(/'/g, '"')) : {} } : { features: '', specific: {} }
-  } catch { return { features: '', specific: {} } }
-}
+// ── 查表（readFM/classRow 单源 core.mjs——2026-09-26 机械层收拢,本地副本就此退役）──
 const rnd = () => Math.random()
 const pick = (arr, n) => {
   const pool = [...arr]
@@ -202,17 +180,9 @@ const panel = {
 
 // ── 写玩家面板 ──
 mkdirSync('characters', { recursive: true })  // 种子无此目录（角色未出生时 runtime/ 无 characters/）——t0 首建
-// ── 裁剪律落地（模板 _tpl：没有什么能力就没有相关字段）──
+// ── 裁剪律落地（模板 _tpl：没有什么能力就没有相关字段；stripEmptyArrays 单源 core.mjs）──
 // 空数组键整族删除，注入面板(玩家/NPC 原样 stringify)不再带 [] 占位；
 // null(无子职/无暗视)与空字符串(无甲)仍有语义，保留。
-const stripEmptyArrays = (obj) => {
-  const out = {}
-  for (const [k, v] of Object.entries(obj)) {
-    if (Array.isArray(v) && v.length === 0) continue
-    out[k] = v
-  }
-  return out
-}
 writeFileSync(`characters/player.json`, JSON.stringify(stripEmptyArrays(panel), null, 1))
 
 // ── patch state.md ──

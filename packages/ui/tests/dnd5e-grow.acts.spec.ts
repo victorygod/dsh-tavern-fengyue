@@ -182,12 +182,10 @@ describe('growClose / 外侧 / Esc · 放弃即弃选', () => {
     ctx.actEl.dataset = { inc: 'int' }; (acts as Record<string, (c: unknown) => void>).growInc(ctx)
     return { ctx, ui, calls }
   }
-  it('growClose:框收+选区清空+ui 回 null+repaint', async () => {
-    const { ctx, ui } = await openAsi()
+  it('growClose:框收+选区清空（grow ui-state 断链已删,2026-09-27——面板视图本就不读 grow）', async () => {
+    const { ctx } = await openAsi()
     acts.growClose(ctx)
     expect(dlg()).toBeNull()
-    expect(ui['grow']).toEqual({ open: null })
-    expect(ctx.repaint).toHaveBeenCalled()
   })
   it('Esc:keydown 两次接线(跨 resetModules)也不串——框收且不触发 front_commit', async () => {
     const { calls } = await openAsi()

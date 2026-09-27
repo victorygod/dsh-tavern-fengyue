@@ -189,9 +189,9 @@ const PROF_TIPS = {
   '工具熟练': 'Tools——用该工具做检定加熟练加值',
   '语言掌握': 'Languages——会说/会读/会写(SRD 语言不属熟练家族)',
 }
-function capPend(t, pend, open, kind, tip) {
+function capPend(t, pend, kind, tip) {
   const cap = pend
-    ? `<div class="bk-cap g-pend ${open ? 'on' : ''}" data-act="grow" data-kind="${kind}" data-tip="${esc(tip ?? '')}（有待分配——点开分配对话框，册保持在后）">${esc(t)}<span class="g-wait">有待分配</span></div>`
+    ? `<div class="bk-cap g-pend" data-act="grow" data-kind="${kind}" data-tip="${esc(tip ?? '')}（有待分配——点开分配对话框，册保持在后）">${esc(t)}<span class="g-wait">有待分配</span></div>`
     : `<div class="bk-cap"${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(t)}</div>`
   return cap
 }
@@ -299,7 +299,7 @@ const profGroups = (c) => [
 ].filter(Boolean)
 const NONE_ROW = '<span class="bk-empty">无</span>'
 
-export function bookHtml(c, avatars = {}, grow = {}) {
+export function bookHtml(c, avatars = {}) {
   const g = genderOf(c)
   const d = c.derived ?? {}
   const unk = d.hpPct == null   // 缺席=未知:满血充+??? 文本,不算濒死
@@ -336,7 +336,7 @@ export function bookHtml(c, avatars = {}, grow = {}) {
       ${(c.hd_available != null && c.level != null) ? chip('治愈骰', c.hd_available + '/' + c.level) : ''}
     </div>`
   const left = c.role === 'pc' || d.skills ? `
-      ${capPend('Ability Scores', asiPend, grow?.open === 'asi', 'asi', CAP_TIPS.ability)}
+      ${capPend('Ability Scores', asiPend, 'asi', CAP_TIPS.ability)}
       ${radarSvg(c, d)}
       ${sec('Saving Throws', `<div class="bk-saves">${(d.saves ?? []).filter(s2 => s2.prof).map(s2 => `<span class="bk-sv prof">${esc(ATTRS.find(a => a[1] === s2.key)?.[0] ?? s2.key)} ${sign(s2.mod)}</span>`).join('') || NONE_ROW}</div>`, CAP_TIPS.saves)}
       ${sec('Vitals', vitChips, CAP_TIPS.vitals)}
@@ -354,7 +354,7 @@ export function bookHtml(c, avatars = {}, grow = {}) {
         <div class="bk-slots">${d.slotsLv.map(s2 => `<div class="bk-slot"><span class="lv">${s2.lv}环</span><span class="pips">${Array.from({ length: s2.total }, (_, i) => `<span class="pip ${i < s2.now ? '' : 'used'}"></span>`).join('')}</span></div>`).join('')}</div>
         <div class="bk-spells">${spRow('戏法', spFaces.cantrips)}${spRow('已知', spFaces.known)}${spRow('已备', c.spells_prepared)}</div>` : NONE_ROW
   const castHtml = `
-      <div class="bk-sec">${capPend('Spellcasting', spellsPend, grow?.open === 'spells', 'spells', CAP_TIPS.cast)}${castInner}</div>`
+      <div class="bk-sec">${capPend('Spellcasting', spellsPend, 'spells', CAP_TIPS.cast)}${castInner}</div>`
   const sts = c.statuses ?? []
   const stHtml = `
       <div class="bk-sec"><div class="bk-cap" data-tip="${esc(CAP_TIPS.cond)}">Conditions</div>
@@ -375,7 +375,6 @@ export function bookHtml(c, avatars = {}, grow = {}) {
         <div class="bk-rows bk-note-rows">
           ${(c.features ?? []).map(f => { const seg = String(f).split('|'); const right = [seg[1], seg[2]].filter(Boolean).join(' · '); return `<div class="bk-row"><span class="a">${esc(featureNameCn(seg[0]))}</span>${right ? `<span class="b">${esc(right)}</span>` : ''}</div>` }).join('') || NONE_ROW}
         </div>`, CAP_TIPS.feats)
-  const profHtml = ''
   const defHtml = sec('Resistances / Immunities', `
         <div class="bk-chips">
           ${(c.resist ?? []).map(r => chip('抗', r)).join('')}

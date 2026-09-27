@@ -53,7 +53,7 @@ describe('heroPanel · 待办 chip 非按钮化', () => {
 })
 
 describe('bookHtml · 版面与术语锚', () => {
-  const html = bookHtml(WIZ, {}, { open: null })
+  const html = bookHtml(WIZ, {})
   it('节标题=SRD 英文,顺序=左[AbilityScores→SavingThrows→Vitals→Skills→Proficiencies]右[Spellcasting→Conditions→…]', () => {
     const caps = ['Ability Scores', 'Saving Throws', 'Vitals', 'Skills', 'Proficiencies', 'Spellcasting', 'Conditions', 'Equipment', 'Gear', 'Features', 'Resistances / Immunities']
     let last = -1
@@ -66,18 +66,15 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(html).toContain('data-tip="六维属性——')
     expect(html).toContain('data-tip="熟练加值——随等级 2→6')
   })
-  it('呼吸标题=有待办节,g-pend+「有待分配」+data-act=grow+kind;open 态落 on 类', () => {
+  it('呼吸标题=有待办节,g-pend+「有待分配」+data-act=grow+kind(on 高亮断链已删,2026-09-27)', () => {
     expect(html).toContain('g-pend')
     expect(html).toContain('data-act="grow" data-kind="asi"')
     expect(html).toContain('data-act="grow" data-kind="spells"')
     expect(html.match(/class="g-wait"/g)?.length).toBe(2)
     expect(html).not.toContain('g-pend on')
-    const openAsi = bookHtml(WIZ, {}, { open: 'asi' })
-    expect(openAsi).toContain('g-pend on')
-    expect(openAsi.split('g-pend on').length - 1).toBe(1)   // 只有 asi 节亮 on
   })
   it('无待办 NPC 不出现呼吸件(FIGHTER)', () => {
-    expect(bookHtml(FIGHTER, {}, {})).not.toContain('g-pend')
+    expect(bookHtml(FIGHTER, {})).not.toContain('g-pend')
   })
   it('Proficiencies:PB 单值居节首+组名中文+逐项 data-tip;缺族组照裁剪', () => {
     expect(html).toContain('Proficiency Bonus<b>+2</b>')
@@ -91,20 +88,20 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(html).toContain('>戏法</span><span class="nms">火焰箭</span>')
     expect(html).toContain('>已知</span><span class="nms">魔法飞弹 · 护盾术</span>')
     expect(html).toContain('>已备</span><span class="nms">魔法飞弹</span>')
-    const noSplit = bookHtml({ ...WIZ, spellSplit: undefined }, {}, {})
+    const noSplit = bookHtml({ ...WIZ, spellSplit: undefined }, {})
     expect(noSplit).toContain('>已知</span><span class="nms">火焰箭 · 魔法飞弹 · 护盾术</span>')   // 泵缺席回退=已知行
-    const f = bookHtml(FIGHTER, {}, {})
+    const f = bookHtml(FIGHTER, {})
     expect(f).toContain('<span class="bk-empty">无</span>')
     expect(f).not.toContain('bk-slot')
   })
   it('空数据节常驻「无」:状态/抗免/背包(Gear 行尾)/护甲', () => {
-    const f = bookHtml({ ...FIGHTER, gear: [], shield: false }, {}, {})
+    const f = bookHtml({ ...FIGHTER, gear: [], shield: false }, {})
     expect(f.split('bk-empty">无</span>').length - 1).toBeGreaterThanOrEqual(4)
   })
   it('avatar:图槽→av-clip 内裁层包 av-img;缺席→仅首字', () => {
-    const withImg = bookHtml({ ...WIZ, race: 'human' }, AV, {})
+    const withImg = bookHtml({ ...WIZ, race: 'human' }, AV)
     expect(withImg).toContain('av-clip')
     expect(withImg).toContain('class="av-img"')
-    expect(bookHtml({ ...WIZ }, {}, {})).not.toContain('av-clip')
+    expect(bookHtml({ ...WIZ }, {})).not.toContain('av-clip')
   })
 })
