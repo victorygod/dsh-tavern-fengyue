@@ -2,6 +2,15 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-27 双批定案:①芙宁娜「卡住」=失败可见性断链 ②Windows 全卡报废=沙盒拒绝
+
+- **现象(用户报,双机分叉)**:mac 上芙宁娜「消耗 token 但无法对话」(实则 401 秒拒,token 未计费);Windows 上全卡齐挂(galgame「数据源未就绪」、dnd「opening 落盘失败」,报错原文自陈 `sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined`)。
+- **根因一(诊断链)**:会话 transcript 每拍 `turn/end reason=error 401` 官端认证拒绝——`settings.yaml` 缺位使宿主回落官端(`llm-deepseek.baseURL` 须指 internal `/api/anthropic/v1`,0.1.7 适配器讲 Anthropic 协议,见 [[2026-09-27-dsh-017-migration]])。**顺带破案:`settings.yaml` 是一次性导入件,宿主 boot 读取吸收后改名 `settings.yaml.imported`(mtime 原样保留)**——9-22「E2E 删除」实为导入协议残影;恢复=cp 回正名+restart(换 baseURL 必 restart,LLM 配置 boot 快照)。
+- **根因二(看不见)**:失败回合宿主侧唯一出口=转写红行(`.errMsg`),而 galgame 卡 `chat.css` 明文「转写区恒隐」——画了,但生在玩家看不见的地方;卡泵 `gal_data` 的失败又在 api→face 三层被吞成空串。dnd 卡「有报错」是可见性差异而非特权差异;两机两个案子共用同一个病根:**被丢弃的是失败的原因本身**。
+- **修复(两批,拆两份正式笔记)**:turnError face 三层+芙宁娜失败演出(横幅/即刻回落/回声锁,含 E2E 判据分叉)→ [turn-error-face-channel](feature/2026-09-27-turn-error-face-channel.zh.md);引擎 spawn 显式信任策略(trustedScriptPolicy)+分诊探针 → [windows-sandbox-refusal](bug-fix/2026-09-27-windows-sandbox-refusal.zh.md)。
+- **验证**:UI 192/192、引擎 194/194(各含新钉);真机 error/happy 双 phase(401→404 换装各验)全绿;分诊探针本机跑通(dnd 工作区业务回执恰证「栈通≠退出码干净」)。
+- **防复发归档**:settings.yaml 导入协议、galgame E2E 落定判据分叉与 CSS modules 哈希断言、回声锁两序真机案,均已入 CHANGELOG 与两份正式笔记;工作区快照纪律照旧(卡件 cp 就地同步,本批同步 151939,13:17 的旧 401 区已被宿主回收)。
+
 ## 2026-09-25 转写着陆合约落地：按会话阅读锚 + cause 贯通仲裁；滚动链路从零锚定到双侧钉死
 
 - **现象（用户报）**：芙宁娜回复中切到别的会话再切回，视图自动跳到最新一行；需求「点到哪里回来就到哪里、历史点开不剧透、不丢消息」。

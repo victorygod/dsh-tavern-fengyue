@@ -38,14 +38,20 @@
 
 ## 三、环境面：LLM 端点与模型
 
-0.1.7 的 DeepSeek 适配器讲 **Anthropic Messages 协议**（`POST <base>/messages` SSE，`frame.event` 必须等于 JSON `type`）。本机 profile 的用户覆盖（`~/.dsh-tavern-fengyue/profiles/tavern-fengyue/cordis.patch.yml`）把 baseURL 指向蚂蚁 internal：`https://internal[.]example[.]com/api/anthropic/v1`。实测要点：
+0.1.7 的 DeepSeek 适配器讲 **Anthropic Messages 协议**（`POST <base>/messages` SSE，`frame.event` 必须等于 JSON `type`；`config.baseURL ?? env DEEPSEEK_BASE_URL ?? 官端` 的优先级里 **config 恒压 env**）。本机 profile 的用户覆盖（`~/.dsh-tavern-fengyue/profiles/tavern-fengyue/cordis.patch.yml`）把 baseURL 钉成 `!!js` 表达式实现**双路切换**：
+
+```yaml
+baseURL: !!js process.env.DEEPSEEK_BASE_URL ?? 'https://internal[.]example[.]com/api/anthropic/v1'
+```
+
+带 env 跑 env（本地 mock 等）、无 env 走 internal；key 层天然同语义（进程 env > `.credentials.yaml` 管理库）。双路 Playwright 实测全绿。**fallback 必须是 `/api/anthropic/v1`**——适配器只讲 Anthropic `/messages`，openai 路径恒 404。其他实测要点：
 
 - 鉴权 `Authorization: Bearer <key>` 或 `x-api-key` 均可；
 - 模型名是 internal 的目录名（本 token 可用 `Qwen3-32B`；`DeepSeek-V41-Flash` 在 internal 不存在——客户端模型选择必须选目录内名字）；
 - **非流式调用必须 `enable_thinking:false`**，否则 MPE-001（本项目全走流式，无此约束）；
-- mock（`scripts/mock-llm.mjs`）已补 `/messages` 路由 + Anthropic SSE + `event:` 行；字符串载荷（`[DONE]`、malformed_json）保持裸排不加引号。
+- mock（`scripts/mock-llm.mjs`）已补 `/messages` 路由 + Anthropic SSE + `event:` 行；字符串载荷（`[DONE]`、malformed_json）保持裸排不加引号；**带 thinking 的真请求**（`reasoningEffort: low` → `thinking.enabled`）必须走 `message_start → thinking 块(thinking_delta) → text 块 → message_delta/stop` 的块流——OpenAI 的 `reasoning_content` 帧首帧无 `type`，宿主即报 event type mismatch（裸 curl 正确、真请求即炸的坑）。
 
-连带修了 `bin/dev.mjs bootstrap`：profile `cordis.patch.yml` 只在缺席时落占位（原实现每次无条件覆写成 `[]`，会把 internal 这类用户覆盖静默抹掉、打回默认端）。
+连带修了 `bin/dev.mjs bootstrap`：profile `cordis.patch.yml` 只在缺席时落占位（原实现每次无条件覆写成 `[]`，会把 internal 这类用户覆盖静默抹掉、打回默认端）。该文件可能被多个会话共编，改动前先重读。
 
 ## 四、实测验收（Playwright，真 token 非全好评）
 
@@ -58,8 +64,20 @@
 
 工艺教训（巨贵）：**坏日志直接 zstd 解压逐行看**（`zstd -dc session.v4.jsonl.zstd`），比猜校验器快一个数量级；profile 版本（bootstrap 装了什么）与宿主版本是两个独立轴，「客户端全军覆没」类故障先查它。
 
+## 五、升级工具链（2026-09-27 落地）
+
+这次 0.1.5→0.1.7 跨两个 minor 的大迁移里，机械部分已全部脚本化（三脚本均实跑验证）：
+
+| 脚本 | 职责 | 验证 |
+|---|---|---|
+| `scripts/bump-dsh.mjs <ver\|latest\|next>` | 伞包精确钉 + 子包范围锚点（`>=x <0.2` 只动锚不动上界）+ verified 白名单 + bundle 镜像 + lockfile 重解析；幂等 | 同版本 no-op ✅ |
+| `scripts/gen-typert.mjs [上游路径]` | REGENERATE.md 流程全程自动化：vendor protocol 源码 → tsconfig 接线（host extends+reference / base paths）→ tsx 直跑生成器（`checkDiagnostics:false`）→ 写回四件 → **接线全部回退** | 产物与已提交逐字节一致、`git diff` 干净 ✅ |
+| `scripts/re-vendor.mjs [上游路径]` | 上游 `ui-{renderer,session}/src` + ui-chat 契约整树拷回（逐字节不打补丁）+ exports 入口存在性体检（防 `.tsx→.ts` 扩展名漂移） | diff 与上游零差异 ✅ |
+
+**诚实的边界**：语义破坏面（`open→retain`、消息源模型、preset 格式、会话格式校验）是判断题，脚本无法替代——本次六个面里五六个都是它。把「大改」变成「小改」的真正杠杆是**连续跟版**：`next` 出新 rc 就跑 `bump-dsh next` + 全套测试，每次只消化一两个破坏面，而不是攒两个 minor 一起扛。可再进一步：CI 定时任务对 `@deepseek-ai/dsh@next` 装机跑 build/test 红绿通报（探测自动化，修复仍人工）。
+
 ## 遗留（不阻塞运行）
 
 - `credentials/reference-updated` 等 `$on` 词表增强未随 ui 包加载（现 `as never` 兜底）——上游把词表紧到一个未被 ui 链引入的文件里，待有干净引法再收；
 - `packages/client-runtime`（jsdom slot 测试运行时）的 spec 在 `tests-client-plane/**`，vitest `include` 一直没吃（上游同款 KNOWN GAP）——pending 接线或换上游发布的 `@deepseek-ai/dsh-client-test-runtime`；
-- pnpm 自动升级脚本（盯 `next` tag）未建，presently 手动 `pnpm add -D @deepseek-ai/dsh@<ver>` + 子包锚点。
+- CI 对 `next` 的定时探测（canary）未建——上表的脚本已把「升级的机械动作」归零，剩下的是把它接进流水线。

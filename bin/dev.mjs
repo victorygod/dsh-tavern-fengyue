@@ -138,11 +138,9 @@ async function probeHostExports() {
 }
 
 /** Create or refresh the profile directory. Idempotent; always re-links and re-syncs. */
-function bootstrap() {
-  warnHostCompatibility()
-  const dir = profileDir()
-  mkdirSync(dir, { recursive: true })
-  const dependencies = {
+/** The profile dependency set bootstrap() generates — the reconcile contract with {@link reconcileProfile}. */
+function expectedProfileDependencies() {
+  return {
     '@deepseek-ai/dsh-base': COMPATIBILITY.verified.at(-1),
     '@deepseek-ai/dsh-web-app': COMPATIBILITY.verified.at(-1),
     'dsh-tavern-fengyue': `link:${join(REPO_ROOT, 'packages', 'bundle')}`,
@@ -150,6 +148,13 @@ function bootstrap() {
     'dsh-tavern-fengyue-api': `link:${join(REPO_ROOT, 'packages', 'api')}`,
     'dsh-tavern-fengyue-ui': `link:${join(REPO_ROOT, 'packages', 'ui')}`,
   }
+}
+
+function bootstrap() {
+  warnHostCompatibility()
+  const dir = profileDir()
+  mkdirSync(dir, { recursive: true })
+  const dependencies = expectedProfileDependencies()
   const manifest = {
     name: `dsh-profile-${PROFILE}`,
     version: readJson(join(REPO_ROOT, 'package.json')).version,
@@ -241,6 +246,27 @@ function sameDependencies(a, b) {
 }
 
 /**
+ * Start 前的 profile 对账——使用者的 dsh 无感线。git pull 换了 verified 宿主、
+ * checkout 挪了位、或 node_modules 被清后，不跑 bootstrap 直接 start 会拿旧装
+ * 配（甚至旧宿主）开张，而使用者无从感知这件事。对账口径：profile manifest
+ * 的依赖集与现算结果一致、且宿主包真的在 profile node_modules 里装机——两考
+ * 通过则零噪声跳过；任一不满足内联 bootstrap（generation stamp 决定 frozen/
+ * 解冻，幂等）。只对账不升级语义：verified 清单仍是仓库显式backing的版本。
+ */
+function reconcileProfile() {
+  const dir = profileDir()
+  let current
+  try { current = readJson(join(dir, 'package.json')).dependencies } catch { current = undefined }
+  let hostInstalled = false
+  try {
+    hostInstalled = readJson(join(dir, 'node_modules', '@deepseek-ai', 'dsh-base', 'package.json')).version === COMPATIBILITY.verified.at(-1)
+  } catch { hostInstalled = false }
+  if (sameDependencies(current, expectedProfileDependencies()) && hostInstalled) return
+  console.log('[dev] profile 与仓库装配不同代（宿主 pin/checkout 路径/安装面变化）——自动 bootstrap')
+  bootstrap()
+}
+
+/**
  * Parse the repo-root `.env` (KEY=VALUE lines) into credential variables for
  * the host child. Monorepo days ran every tavern with a root .env, so the
  * stock "添加一个 API Key" onboarding dialog never appeared there; without
@@ -328,8 +354,8 @@ const commands = {
   },
   async start() {
     await probeHostExports()
-    if (!existsSync(join(profileDir(), 'package.json'))) bootstrap()
-    else warnHostCompatibility()
+    reconcileProfile()
+    warnHostCompatibility()
     startHost(BG ? 'bg' : 'fg')
   },
   async stop() {
