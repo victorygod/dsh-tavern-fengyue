@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, existsSync, utimesSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync, existsSync, utimesSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -293,17 +293,21 @@ describe('saves', () => {
   // 载入与旧树解绑顺序的组合把世界削成半截。三条性质:拷贝失败退回原位、
   // 成功后无退役残留、退役树对编辑树不可见。
   it('loadSave rolls the live runtime back in place when the snapshot copy fails', () => {
-    if (process.getuid?.() === 0) return  // root 读穿权限位,置 0 拦不住 copyFileSync
     const root = freshRoot()
     seedRuntime(root)
     writeFileSync(join(root, 'runtime/state.md'), '载入前真身')
     manualSave(root, '快照')
     writeFileSync(join(root, 'runtime/state.md'), '被改坏的世界')
-    chmodSync(join(root, SAVINGS_DIR, '快照', 'state.md'), 0o000)
+    // 拷贝失败注入要平台中立:chmod 0o000 在 Windows 只映射只读属性不拦读(本测试
+    // 2026-09-27 CI 翻车根因);悬空链(Windows=junction 免提权,POSIX=file 符号链)
+    // 让 copyTree 的 statSync 跟随时炸——与 uid 无关,三平台同路。
+    const snap = join(root, SAVINGS_DIR, '快照')
+    symlinkSync(join(snap, 'missing-target.md'), join(snap, 'broken.md'),
+      process.platform === 'win32' ? 'junction' : 'file')
     try {
-      expect(() =>{  loadSave(root, '快照') }).toThrow()
+      expect(() => { loadSave(root, '快照') }).toThrow()
     } finally {
-      chmodSync(join(root, SAVINGS_DIR, '快照', 'state.md'), 0o644)
+      rmSync(join(snap, 'broken.md'), { force: true })
     }
     // 回滚:runtime 原位保留(注意:保留的是载入前状态,不是快照),无退役残留。
     expect(readFileSystem(join(root, 'runtime/state.md'))).toBe('被改坏的世界')

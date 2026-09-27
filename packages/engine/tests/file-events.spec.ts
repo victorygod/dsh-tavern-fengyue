@@ -55,16 +55,9 @@ describe('createWorkspaceWatcher(真实 fs.watch)', () => {
     expect(hit.paths.every(p => !p.includes('\\') && p !== '')).toBe(true)
   })
 
-  it('CAP 50:大 burst 截断为 truncated 帧', async () => {
-    const base = mkdtempSync(join(tmpdir(), 'fe-watch-'))
-    const batches: FilesBatch[] = []
-    const watcher = createWorkspaceWatcher({ baseDir: base })
-    watchers.push(watcher)
-    watcher.onBatch(b => { batches.push(b) })
-    burst(base, Array.from({ length: 60 }, (_, i) => `ws-cap/preset/f${String(i).padStart(3, '0')}.json`))
-    const hit = await waitBatch(() => batches, b => b.truncated)
-    expect(hit.paths).toHaveLength(50)
-  })
+  // 大 burst 截断(truncated 精确形态)的钉在下方 fake 层——真盘 fs.watch 在 Windows
+  // 上 burst 会缓冲溢出(错误→关闭→退避重开)或全给 null 暗帧,零批帧是平台常态而非
+  // 回归;精确形态断言违反本文件头「真盘只断信号在场」纪律,故下沉 fake。
 })
 
 describe('watcher(fake factory:暗帧/错误降级/ENOENT poll-appear)', () => {
@@ -97,6 +90,18 @@ describe('watcher(fake factory:暗帧/错误降级/ENOENT poll-appear)', () => {
     instances[0]?.raw('change', null)
     const hit = await waitBatch(() => batches, b => b.paths.length === 0)
     expect(hit.truncated).toBe(false)
+  })
+
+  it('CAP 50:大 burst 截断为 truncated 帧(fake 层定形:聚合器语义与平台时序解耦)', async () => {
+    const batches: FilesBatch[] = []
+    const { instances, factory } = buildFakeFactory()
+    const watcher = createWorkspaceWatcher({ baseDir: '/tavern-workspace', watchFactory: factory })
+    watchers.push(watcher)
+    watcher.onBatch(b => { batches.push(b) })
+    for (let i = 0; i < 60; i += 1) instances[0]?.raw('change', `ws-cap/preset/f${String(i).padStart(3, '0')}.json`)
+    const hit = await waitBatch(() => batches, b => b.truncated)
+    expect(hit.paths).toHaveLength(50)
+    expect(hit.paths[0]).toBe('ws-cap/preset/f000.json')   // 升序截断:留前 50,弃尾 10
   })
 
   it('on(error)→ onError 留痕 + health(false);指数退避重开(1s→2s),防 storm;dispose 透停', async () => {

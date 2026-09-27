@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -60,7 +60,7 @@ const SPELL_FIXTURE = { spells: SPELLS }
 
 type Res = { ok: boolean;[k: string]: unknown }
 function run(cwd: string, script: 'opening_data.mjs' | 'opening_commit.mjs', argv: Record<string, unknown>): Res {
-  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(argv))}];await import(${JSON.stringify(join(ROOT, 'tavern_presets', 'dnd5e', 'preset', 'scripts', script))})`
+  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(argv))}];await import(${JSON.stringify(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'preset', 'scripts', script)).href)})`
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd, encoding: 'utf8' })
   const out = r.stdout.trim()
   const json = out.split('\n').filter(l => l.startsWith('{')).pop() ?? '{}'

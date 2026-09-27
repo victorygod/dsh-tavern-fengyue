@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -52,12 +52,12 @@ function rig() {
 }
 
 function runTool(runtime: string, tool: string, args: Record<string, unknown>) {
-  const code = `globalThis.argv=${JSON.stringify(args)};await import(${JSON.stringify(join(CARD, 'tools', `${tool}.mjs`))})`
+  const code = `globalThis.argv=${JSON.stringify(args)};await import(${JSON.stringify(pathToFileURL(join(CARD, 'tools', `${tool}.mjs`)).href)})`
   return spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
 }
 
 function runOp(runtime: string, op: Record<string, unknown>): Record<string, unknown> {
-  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(op))}];await import(${JSON.stringify(join(CARD, 'scripts', 'ui_data.mjs'))})`
+  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(op))}];await import(${JSON.stringify(pathToFileURL(join(CARD, 'scripts', 'ui_data.mjs')).href)})`
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
   if (r.status !== 0) throw new Error(`ui_data ${JSON.stringify(op)} exit ${r.status}: ${r.stderr.slice(0, 400)}`)
   return JSON.parse(r.stdout.trim().split('\n').filter(Boolean).pop() ?? '')

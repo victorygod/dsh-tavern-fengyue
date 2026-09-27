@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -72,7 +72,7 @@ function injectRows(rt: string) {
 interface PumpOut { ok: boolean; rev?: string; changed?: boolean; data?: any; error?: string }
 function pump(rt: string, name: string, argv: Record<string, unknown> = {}): PumpOut {
   const op = { op: 'panel', name, ...argv }
-  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(op))}];await import(${JSON.stringify(join(PRE, 'scripts', 'ui_data.mjs'))})`
+  const code = `globalThis.argv=[${JSON.stringify(JSON.stringify(op))}];await import(${JSON.stringify(pathToFileURL(join(PRE, 'scripts', 'ui_data.mjs')).href)})`
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: rt, encoding: 'utf8' })
   if (r.status !== 0) throw new Error(`ui_data ${name} exit ${r.status}: ${r.stderr.slice(0, 300)}`)
   const line = r.stdout.trim().split('\n').filter(Boolean).pop() ?? ''

@@ -3,8 +3,9 @@
 // 真模块真样式挂进临时 fixture 页(preset/ui/ 同层,file:// 同目录模块可 import):
 // ①面板链(呼应对话框/待办 chip) ②对话框居中+token 不透明 ③±列表 delta ④保存双通道落 fixture 机械层
 // ⑤vtip 0.1s ⑥头像 138% 裁层 ⑦截图人工比对原型 docs/hud-proto-grow.html。
-// Chrome 缺席环境整体跳过(静默 skip,不假绿——skip 明 writing Reasons)。
+// Chrome 或 playwright-core 缺席环境整体跳过(静默 skip,不假绿——skip 明 writing Reasons)。
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
+import { createRequire } from 'node:module'
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -14,6 +15,9 @@ const ROOT = join(HERE, '..', '..', '..')
 const UI = join(ROOT, 'tavern_presets', 'dnd5e', 'preset', 'ui')
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const hasChrome = existsSync(CHROME)
+// playwright-core 是本机手工装的(spec 不进 package.json)——fresh CI 的 mac runner 恰好预装
+// Chrome,只查 hasChrome 会放行到行内 import 才炸;可解析性一并守住,缺席与 Chrome 同权跳过。
+const hasPw = (() => { try { return !!createRequire(import.meta.url).resolve('playwright-core') } catch { return false } })()
 
 let pw: typeof import('playwright-core') | null = null
 let browser: import('playwright-core').Browser | null = null
@@ -123,7 +127,7 @@ function writeFixture() {
   return file
 }
 
-describe.runIf(hasChrome)('dnd5e 成长流浏览器层(playwright 无头 Chrome)', () => {
+describe.runIf(hasChrome && hasPw)('dnd5e 成长流浏览器层(playwright 无头 Chrome)', () => {
   let page: import('playwright-core').Page
 
   beforeAll(async () => {

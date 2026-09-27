@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -29,8 +29,8 @@ function rig(player = PLAYER) {
 
 function runTool(runtime: string, tool: string, args: Record<string, unknown>, seed?: number) {
   // seed 可选：core.mjs 的 setSeed 固定 LCG 流——未播种时 rnd 走 Math.random，nat1 等随缘分支让断言 1/20 概率翻红。
-  const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(join(CARD, 'lib', 'core.mjs'))})).setSeed(${seed});`
-  const code = `globalThis.argv=${JSON.stringify(args)};${prelude}await import(${JSON.stringify(join(CARD, 'tools', `${tool}.mjs`))})`
+  const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(pathToFileURL(join(CARD, 'lib', 'core.mjs')).href)})).setSeed(${seed});`
+  const code = `globalThis.argv=${JSON.stringify(args)};${prelude}await import(${JSON.stringify(pathToFileURL(join(CARD, 'tools', `${tool}.mjs`)).href)})`
   return spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
 }
 const j = (rt: string, f: string) => JSON.parse(readFileSync(join(rt, 'characters', f), 'utf8'))
