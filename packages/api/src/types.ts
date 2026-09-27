@@ -302,8 +302,8 @@ export interface TavernPromptRequest {
 export interface TavernScriptFailure {
   /** The placeholder name whose script failed. */
   readonly name: string
-  /** Grammar/budget refusals (parse, depth, oversized arg, spawn cap) or the run's own outcome. */
-  readonly reason: 'parse' | 'depth' | 'args' | 'limit' | 'missing' | 'exit' | 'timeout' | 'abort'
+  /** Grammar/budget refusals (parse, depth, oversized arg, spawn cap), the run's own outcome, or `rescan` (a stdout-borne token the one-level rescan stripped). */
+  readonly reason: 'parse' | 'depth' | 'args' | 'limit' | 'missing' | 'exit' | 'timeout' | 'abort' | 'rescan'
   /** Exit code, present only for `reason: 'exit'`. */
   readonly exitCode?: number
 }

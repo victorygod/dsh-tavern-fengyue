@@ -162,7 +162,7 @@ describe('full fold + work order + report', () => {
   it('folds V1/legacy cards with a work order only when there is material to report', () => {
     const pristine = importFromJson({ data: { name: '纯净卡', description: 'd' } }, 'x', undefined)
     expect(pristine.files['preset/st-import/README.md']).toBeUndefined()
-    expect(pristine.files['preset/scripts/persona.mjs']).toBeDefined()
+    expect(pristine.files['preset/scripts/st.mjs']).toBeDefined()
     expect(pristine.files['preset/prompt/postPrompt']).toBe('')
 
     const rich = importFromJson({
@@ -286,7 +286,7 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     // 无书即无 {{lorebook()}} 占位——postPrompt 只剩用户层文本。
     const post = parsed.files['preset/prompt/postPrompt'] ?? ''
     expect(post.startsWith('{{lorebook()}}')).toBe(false)
-    expect(parsed.files['preset/scripts/persona.mjs']).toBeDefined()
+    expect(parsed.files['preset/scripts/st.mjs']).toBeDefined()
     expect(parsed.files['preset/setup/persona.md']).toBeDefined()
   })
 
@@ -339,5 +339,75 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     expect(readme).toContain('builtInCss')
     expect(readme).toContain('背景图')
     expect(readme).toContain('suggested_questions_after_answer')
+  })
+
+  it('translates runtime-dependence macros into st(...) calls and keeps our own call forms', () => {
+    const parsed = importFromJson({
+      name: '宏卡',
+      // V3 形状字段的宏落 systemPrompt 开场组件;persona 值进人设段。
+      spec: 'chara_card_v2', data: {
+        name: '宏卡',
+        description: '你好 {{user}},我是 {{char}}。我叫 <BOT>。',
+        personality: '爱好 {{description}} 里的 {{random:a;b}}',
+        first_mes: '{{time}} 见,{{setvar::hp::5}}血量 {{getvar::hp}}。',
+        post_history_instructions: '{{lastMessage}} 之前,{{input}} 是输入。',
+        character_book: { entries: [{ keys: ['鱼'], content: '{{user}} 提到鱼就 {{roll:d20+2}}', enabled: true, insertion_order: 1 }] },
+      },
+    }, 'x', undefined)
+    const sys = parsed.files['preset/prompt/systemPrompt']!
+    const greet = String(JSON.parse(parsed.files['preset/greetings.json']!).greetings[0])
+    const lore = JSON.parse(parsed.files['preset/lorebook.json']!) as { entries: { content: string }[] }
+    expect(sys).toContain("{{st('user')}}")
+    expect(sys).toContain("{{st('char')}}")
+    expect(sys).not.toContain('<BOT>')
+    expect(sys).not.toContain('{{user}}')
+    expect(sys).not.toContain('{{char}}')
+    expect(sys).toContain("{{st('random','a;b')}}")
+    expect(sys).toContain('爱好 ')
+    expect(sys).not.toContain('{{description}}')
+    expect(greet).toContain("{{st('time')}}")
+    expect(greet).toContain("{{st('set','hp','5')}}")
+    expect(greet).toContain("{{st('get','hp')}}")
+    expect(lore.entries[0]!.content).toContain("{{st('user')}}")
+    expect(lore.entries[0]!.content).toContain("{{st('roll','d20+2')}}")
+    const post = parsed.files['preset/prompt/postPrompt']!
+    expect(post).toContain("{{st('last')}}")
+    expect(post).toContain("{{st('pending')}}")
+  })
+
+  it('bakes static self-references and 1v1 constants; drops the dead lint with audit rows', () => {
+    const parsed = importFromJson({
+      spec: 'chara_card_v2', data: {
+        name: '烘焙卡',
+        character_version: '2.1',
+        description: '版本 {{charVersion}},群 {{group}},此后 {{newline}}换行 {{noop}}',
+        personality: '引用 {{charPrompt}} 与 {{charDepthPrompt}}',
+        system_prompt: '系统原文',
+        post_history_instructions: '后注',
+        extensions: { depth_prompt: { prompt: '深指令' } },
+        creator_notes: '创意 {{original}} {{pipe}} {{model}}',
+        first_mes: '',
+      },
+    }, 'x', undefined)
+    const sys = parsed.files['preset/prompt/systemPrompt']!
+    expect(sys).toContain('版本 2.1')
+    expect(sys).toContain('群 ,')
+    expect(sys).toContain('此后 \n换行')
+    expect(sys).toContain('引用 系统原文 与 深指令')
+    expect(sys).not.toContain('{{charPrompt}}')
+    expect(sys).not.toContain('{{group}}')
+    expect(sys).not.toContain('{{noop}}')
+    const readme = parsed.files['preset/st-import/README.md']!
+    expect(readme).toContain('宏烘焙/常量')
+    expect(readme).toContain('宏剔除')
+    expect(readme).toContain('{{original}}')
+  })
+
+  it('fengyue texts get the same sorter; opening.html stays verbatim', () => {
+    const fy = { ...fyCard, pre_prompt: '你是 {{char}} 引擎,玩家 {{user}}。', cg_book: [], banned_words: [] }
+    const parsed = importFromJson(fy, 'x', undefined)
+    expect(parsed.files['preset/prompt/systemPrompt']).toBe("你是 {{st('char')}} 引擎,玩家 {{st('user')}}。")
+    expect(parsed.files['preset/setup/opening.html']).toContain('<style>')
+    expect(parsed.files['preset/st-import/README.md']).toContain('宏翻译')
   })
 })

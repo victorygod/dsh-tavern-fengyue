@@ -119,7 +119,7 @@ arg   := call | literal          ; literal = 引号串，或不含 ( ) , 的裸�
 | 正则 promptOnly | `regex/engine.js:334,350-354` | 脚本读 `.chat.snapshot.jsonl` 输出改写段（全量快照=确定性） | ✅ 语义等价 |
 | 正则 markdownOnly | 同上 | 渲染钩子（PR5 评估） | ⏳ 明示推迟 |
 | 世界书（恒定/触发+预算扫描） | `world-info.js:73` 起 | 恒定入 systemPrompt；触发= `{{lorebook()}}` 扫 `./.chat.snapshot.jsonl` | ✅ 核心；递归/概率/分组卡自实现 |
-| 文本宏 | `macros.js:610` | 脚本化（骨架 `read.sh` 抵 boilerplate；per-render 去重控成本） | ✅ 语义等价 |
+| 文本宏 | `macros.js:610` | **导入期分拣 + `st.mjs` 标准脚本**（2026-09-27 宏兼容批）：活数译成 `{{st(...)}}`，死数烘焙，死角剔除+审计；记忆化沿用渲染器 memo——同 token 一装配一值（ST 每次出现重掷，有意偏差记档）；spawn 预算 24/renderPass | ✅ 语义等价（两处偏差明示） |
 | STscript DSL | `SlashCommandParser.js:43` | 不移植 DSL：bash（数据）+ JS（表现）覆盖能力域 | ✅ 能力覆盖、语法不兼容（明示） |
 | Quick Replies（含角色级） | `quick-reply/index.js:144-166` | 面板按钮 + DOM 回填 `.tavern-textarea`（填），或卡自绘输入框经 `tavern.submit` 直发 | ✅ |
 | 扩展插件 JS（主文档 module） | `extensions.js:826-832` | `mount(tavern)` 同形态 | ✅ 同构 |

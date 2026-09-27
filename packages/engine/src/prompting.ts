@@ -62,10 +62,12 @@ export type ScriptRenderFailure = {
   readonly name: string
   /**
    * `parse`/`depth` failed before any script ran; `args`/`limit` are
-   * structural budgets (>16KB argument, >8 scripts per render); the rest are
+   * structural budgets (>16KB argument, >24 scripts per render); the rest are
    * the script run's own outcomes (`exitCode` present only for `exit`).
+   * `rescan` marks a stdout-borne token the one-level rescan could not
+   * resolve — it was stripped from the text (fail-visible here, never in it).
    */
-  readonly reason: 'parse' | 'depth' | 'args' | 'limit' | 'missing' | 'exit' | 'timeout' | 'abort'
+  readonly reason: 'parse' | 'depth' | 'args' | 'limit' | 'missing' | 'exit' | 'timeout' | 'abort' | 'rescan'
   /** Exit code, present only for `reason: 'exit'`. */
   readonly exitCode?: number
 }
@@ -81,7 +83,10 @@ export interface RenderedText {
 /** Placeholder evaluation budgets: nesting depth, argv size, scripts per render, script timeout. */
 export const MAX_PLACEHOLDER_DEPTH = 4
 export const MAX_PLACEHOLDER_ARG = 16_000
-export const MAX_PLACEHOLDER_SPAWNS = 8
+// 24(2026-09-27 宏兼容批):ST 导入卡把宏译成 `{{st(...)}}` 调用,setvar 族键多
+// 且各异、memo 不去重——8 的旧顶棚会让重卡撞 `limit` 失败行。允许量按
+// 「lorebook+get 三键+幂等若干」的实测量级放宽,重扫与主扫共享同一 budget。
+export const MAX_PLACEHOLDER_SPAWNS = 24
 const SCRIPT_TIMEOUT_MS = 60_000
 
 /** Quote one argv value for bash: POSIX single-quote with the standard escape. */
@@ -312,39 +317,68 @@ export async function renderPlaceholders(
   const failures: ScriptRenderFailure[] = []
   const memo = new Map<string, string>()
   const budget = { spawns: 0 }
-  let out = ''
-  let cursor = 0
-  for (;;) {
-    const start = text.indexOf('{{', cursor)
-    if (start === -1) {
-      out += text.slice(cursor)
-      break
-    }
-    const end = matchTokenEnd(text, start)
-    if (end === null) {
-      out += text.slice(cursor)
-      break
-    }
-    const token = text.slice(start, end)
-    out += text.slice(cursor, start)
-    const cached = memo.get(token)
-    if (cached !== undefined) {
-      out += cached
-    } else {
-      const result = await evalToken(token, root, shell, signal, 1, budget)
-      if (result.ok) {
-        memo.set(token, result.value)
-        out += result.value
-      } else {
-        if (result.silent !== true) {
-          failures.push({ name: result.name, reason: result.reason, ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }) })
+  /** Sweep any token a rescan pass could not resolve (chains like
+   * book→st→book): a stdout-borne survivor in kernel-facing text is a
+   * landmine, so it drops to empty WITH an explicit failure row. */
+  const scrubResidue = (text: string): string => text.replace(/\{\{[^{}]*\}\}/g, (whole: string) => {
+    failures.push({ name: /^\{\{([A-Za-z0-9_-]+)/.exec(whole)?.[1] ?? '', reason: 'rescan' })
+    return ''
+  })
+  /**
+   * One scanner pass. `stdoutRescan` marks the one-level re-evaluation of
+   * script stdout: world-book content reaches the system prompt through
+   * `{{lorebook()}}` stdout carrying its own `{{st(...)}}` calls. A rescan
+   * segment resolves its tokens but never reseeds another pass (depth 1 by
+   * construction — loop chains are cut by `scrubResidue` at the call site),
+   * and a failing token inside a rescan segment drops to the EMPTY string —
+   * never verbatim — with an explicit failure row instead: the
+   * verbatim-artifact contract below is safe only for tokens the card
+   * authored; a stdout-borne survivor is a kernel-facing landmine.
+   */
+  const scan = (segment: string, stdoutRescan: boolean): Promise<string> => {
+    let out = ''
+    let cursor = 0
+    const step = async (): Promise<string> => {
+      for (;;) {
+        const start = segment.indexOf('{{', cursor)
+        if (start === -1) {
+          out += segment.slice(cursor)
+          return out
         }
-        out += token
+        const end = matchTokenEnd(segment, start)
+        if (end === null) {
+          out += segment.slice(cursor)
+          return out
+        }
+        const token = segment.slice(start, end)
+        out += segment.slice(cursor, start)
+        const cached = memo.get(token)
+        if (cached !== undefined) {
+          out += cached
+        } else {
+          const result = await evalToken(token, root, shell, signal, 1, budget)
+          if (result.ok) {
+            const value = !stdoutRescan && result.value.includes('{{')
+              ? scrubResidue(await scan(result.value, true))
+              : result.value
+            memo.set(token, value)
+            out += value
+          } else {
+            if (stdoutRescan) {
+              // 重扫段内任何失败(含裸 {{name}})都必须留痕——静默清除等于撒谎。
+              failures.push({ name: result.name, reason: result.reason, ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }) })
+            } else if (result.silent !== true) {
+              failures.push({ name: result.name, reason: result.reason, ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }) })
+            }
+            out += stdoutRescan ? '' : token
+          }
+        }
+        cursor = end
       }
     }
-    cursor = end
+    return step()
   }
-  return { text: out, failures }
+  return { text: await scan(text, false), failures }
 }
 
 /**

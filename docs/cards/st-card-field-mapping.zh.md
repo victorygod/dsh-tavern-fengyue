@@ -177,8 +177,8 @@ ST 侧事实（`public/scripts/world-info.js`）：
 
 | ST 机制 | 我方落点 | 精度 |
 |---|---|---|
-| Personas（用户人格） | **✅ 脚本承担（拍板）**：`preset/scripts/persona.sh` + 玩家自写 `runtime/persona.md`，`{{persona()}}` 挂 systemPrompt。ST 卡不携带 persona → 导入仅搭脚本骨架 + 空文件，非卡内容迁移 | ✅ |
-| 文本宏 `{{char}}`/`{{user}}`/`{{random}}` 等 | 脚本承担：`{{char}}`=meta.title、`{{random}}`=`$RANDOM`、`{{user}}`=persona 脚本 | ✅ |
+| Personas（用户人格） | **✅ 文档承担（2026-09-27 定型）**：`runtime/persona.md` = YAML frontmatter `name:`（玩家名）+ 正文（人格描述）；导入发 `preset/scripts/st.mjs` 供 `{{st('user')/('persona')}}` 取值。ST 卡不携带 persona → 空文件播种，非卡内容迁移 | ✅ |
+| 文本宏 `{{...}}`（全家族） | **导入期分拣三档（getvar note 终案）**：活数 → `{{st(...)}}` 调用（st.mjs 标准：user/persona/char/time/roll/random/pick/set/get/last…）；死数 → 折叠期烘焙字面（字段自引用/1v1 常量）；死角 → 剔除+审计行。**运行时零 ST 宏**，kernel 面零裸 token；审计三本账进导入报告 | ✅ |
 | 总结 / `depth_prompt` | **内核调研结论**：压缩指令是 `compaction-basic/src/summarizer.ts:31` 写死常量，Config 无指令字段。tavern 内建第五提示词文件（如 `preset/prompt/compactionPrompt`）**本身合法**；但让它生效只有两条路：(a) tavern 自实现 compaction provider（capability seam 允许 provider 替换，但压力/检查点/溢出机器全套重写，重）；(b) 内核开「可插拔摘要指令」口子 → 📋 TODO | 📋 |
 | Author's Note（任意深度） | 动态 post 尾注段（深度固定 = 最后 user 之后，任意深度不可达同 §4.3；与 AN 的「浮动独立消息」形态同型） | ⚠️ |
 | 记忆 / 向量 / 智能上下文 | 尾代理 `runtime/` 世界状态（机制不同）→ 📋 TODO 长程记忆 | 📋 |

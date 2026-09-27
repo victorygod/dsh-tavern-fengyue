@@ -201,6 +201,47 @@ describe('placeholder rendering', () => {
     })
   })
 
+  it('rescans script stdout one level so stdout-borne tokens resolve', async () => {
+    const root = join(base, 'rescan')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/scripts/book.mjs'), '// generic\n')
+    writeFileSync(join(root, 'preset/scripts/v.mjs'), '// generic\n')
+    const scriptB64 = (name: string): string => Buffer.from(join(root, 'preset/scripts', `${name}.mjs`)).toString('base64')
+    const { shell, calls } = fakeShell((entry) => {
+      if (entry.command.includes(scriptB64('book'))) return { exitCode: 0, stdout: 'A{{v()}}B' }
+      return { exitCode: 0, stdout: 'V' }
+    })
+    const rendered = await renderPlaceholders('{{book()}}', root, shell)
+    expect(rendered.text).toBe('AVB')
+    expect(rendered.failures).toEqual([])
+    expect(calls.length).toBe(2)
+  })
+
+  it('cuts rescan loop chains: a stdout survivor is scrubbed with a rescan failure row', async () => {
+    const root = join(base, 'rescan-chain')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/scripts/a.mjs'), '// generic\n')
+    writeFileSync(join(root, 'preset/scripts/b.mjs'), '// generic\n')
+    const scriptB64 = (name: string): string => Buffer.from(join(root, 'preset/scripts', `${name}.mjs`)).toString('base64')
+    const { shell } = fakeShell((entry) => {
+      if (entry.command.includes(scriptB64('a'))) return { exitCode: 0, stdout: '{{b()}}' }
+      return { exitCode: 0, stdout: 'X{{a()}}Y' }
+    })
+    const rendered = await renderPlaceholders('{{a()}}', root, shell)
+    expect(rendered.text).toBe('XY')
+    expect(rendered.failures.some(failure => failure.reason === 'rescan' && failure.name === 'a')).toBe(true)
+  })
+
+  it('a missing script inside stdout drops empty with a visible failure row', async () => {
+    const root = join(base, 'rescan-miss')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/scripts/book.mjs'), '// generic\n')
+    const { shell } = fakeShell(() => ({ exitCode: 0, stdout: 'P{{ghost()}}Q' }))
+    const rendered = await renderPlaceholders('{{book()}}', root, shell)
+    expect(rendered.text).toBe('PQ')
+    expect(rendered.failures).toEqual([{ name: 'ghost', reason: 'missing' }])
+  })
+
   it('caps nesting depth, argv size, and spawns per render', async () => {
     const root = join(base, 'limits')
     writeCardSkeleton(root)
@@ -211,8 +252,8 @@ describe('placeholder rendering', () => {
     const deep = '{{echo({{echo({{echo({{echo({{echo()}})}})}})}})}}'
     // 单个实参超过 16K 字符。
     const huge = `{{echo('${'x'.repeat(16_001)}')}}`
-    // 九个不同调用，超过单渲染 8 次 spawn 上限。
-    const many = Array.from({ length: 9 }, (_v, index) => `{{echo(${index})}}`).join('')
+    // 二十五个不同调用，超过单渲染 24 次 spawn 上限（2026-09-27 宏兼容批 8→24）。
+    const many = Array.from({ length: 25 }, (_v, index) => `{{echo(${index})}}`).join('')
 
     const deepRendered = await renderPlaceholders(`深 ${deep}`, root, shell)
     expect(deepRendered.failures.some(failure => failure.reason === 'depth')).toBe(true)

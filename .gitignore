@@ -27,3 +27,6 @@ tavern_workspace/
 !.env.example
 .dsh-tavern-fengyue
 packages/ui/tests/__artifacts__/
+
+# 战测语料不入库（存 ~/Desktop/dsh-test-cards/,2026-09-27 移出）
+docs/test_cards/

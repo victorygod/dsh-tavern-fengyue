@@ -1075,6 +1075,11 @@ function TavernChatView(props: {
   // 标题+简介。点击只填输入框：与 opening.html 选项共用 updateDraft 入口，发送
   // 仍由玩家按键触发。opening.html 卡不走这里（有卡自绘开场页时选项不加载）。
   const [greetings, setGreetings] = useState<readonly string[]>([])
+  // 开场三键替换的值源(2026-09-27 宏兼容批):runtime/persona.md 的 frontmatter
+  // `name:` 与正文、preset/meta.json 的 title——与引擎 st.mjs 读同一组文档。
+  // 客户端不求值任何脚本:只认 {{st('user')/('persona')/('char')}} 三个键,
+  // 其余 token 按契约保持原样(用户面本就不渲染,字面量无害)。
+  const [openingVars, setOpeningVars] = useState<{ user: string; persona: string; char: string }>({ user: '', persona: '', char: '' })
   useEffect(() => {
     if (opening !== null) { setGreetings([]); return }
     let cancelled = false
@@ -1092,8 +1097,30 @@ function TavernChatView(props: {
       } catch { list = [] /* 坏 JSON 视为无选项 — 可选数据文件，静默回退 */ }
       setGreetings(list)
     }, () => { if (!cancelled) setGreetings([]) })
+    void rpc.readText({ sessionId, path: 'runtime/persona.md' }).then((value) => {
+      if (cancelled) return
+      const fence = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(value.text)
+      if (fence === null) { setOpeningVars(current => ({ ...current, persona: value.text })); return }
+      const name = /^name:\s*(.*?)\s*$/m.exec(fence[1] ?? '')
+      setOpeningVars(current => ({ ...current, user: name === null ? '' : name[1] ?? '', persona: (fence[2] ?? '').replace(/^\r?\n/, '') }))
+    }, () => { /* 可选文件缺席:persona/user 保持空串(展示装饰面,无上报通道) */ })
+    void rpc.readText({ sessionId, path: 'preset/meta.json' }).then((value) => {
+      if (cancelled) return
+      try { setOpeningVars(current => ({ ...current, char: String(JSON.parse(value.text).title ?? '') })) }
+      catch { setOpeningVars(current => ({ ...current, char: '' })) }
+    }, () => { /* meta 缺 title 同上 */ })
     return () => { cancelled = true }
   }, [rpc, sessionId, opening])
+  /** 开场三键替换:契约口径见 getvar note——只认 {{st('key')}} 一种形态。 */
+  const resolveOpeningMacros = (text: string): string => text.replace(
+    /\{\{st\('([^']*)'\)\}\}/g,
+    (whole: string, key: string): string => {
+      if (key === 'user') return openingVars.user
+      if (key === 'persona') return openingVars.persona
+      if (key === 'char') return openingVars.char
+      return whole
+    },
+  )
   // 卡片界面：绑定/换绑时加载 preset/ui/（授权一次、样式注入、mount(tavern)）。
   const [cardUi, setCardUi] = useState<CardUiHandle | null>(null)
   const [extraShown, setExtraShown] = useState(0)
@@ -1655,13 +1682,16 @@ function TavernChatView(props: {
                   {greetings.length > 0 && (
                     <div className={css.greetBlock}>
                       <div className={`${css.greetLabel} ${coverAsset !== undefined ? css.onCover : ''}`}>{t('opening.greetings')}</div>
-                      {greetings.map((text, index) => (
-                        <button
-                          key={`${index}-${text}`}
-                          type="button" className={css.greetBtn}
-                          onClick={() => { updateDraft(text) }}
-                        >{text}</button>
-                      ))}
+                      {greetings.map((text, index) => {
+                        const resolved = resolveOpeningMacros(text)
+                        return (
+                          <button
+                            key={`${index}-${text}`}
+                            type="button" className={css.greetBtn}
+                            onClick={() => { updateDraft(resolved) }}
+                          >{resolved}</button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

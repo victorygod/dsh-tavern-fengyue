@@ -1,121 +1,113 @@
-# Agent Note：ST 文本宏翻译期封装（get_var）+ runtime 变量文档
+# Agent Note：ST 宏明确不支持 + 导入期脚本翻译（st.mjs）
 
-Status: draft — 方案已对齐,待实现。不改渲染器语法契约;导入器新增宏翻译;引擎/客户端各加一档只读消费。
+Status: implemented（2026-09-27 施工完成；B1 引擎重扫/预算、B2 导入器分拣+st.mjs、B3 客户端开场三键、全套 499 绿、build 双面）。文件名沿用 `getvar`（初案定名）；终案脚本为 `st.mjs`，与调用名 `{{st(...)}}` 同名（家法：调用名≡`preset/scripts/` 下的脚本文件名）。
 
 中文
 
 ## 问题
 
-酒馆卡的字段里普遍埋着文本宏(`{{user}}` / `{{char}}`,偶尔 `{{persona}}`)。当前链路:
+酒馆卡的 systemPrompt / postPrompt / 世界书条目 / 开场白里普遍埋着文本宏（实测九张真卡：裸 `{{user}}`≈45 处、`{{char}}`≈36 处）。当前链路下它们：导入侧原样保留 → 卡层渲染器"裸=字面量"静默穿过（`prompting.ts:200-204`）→ kernel 严格插值层对任何 `{{...}}` 组抛 `unknown prompt variable` → **回合装配失败**。另两条伤：
+- lorebook() stdout 不被重扫，书条目里的宏直穿进 section；
+- greetings.json 是客户端直读直显（`card-ui.ts:258-271`），字面量直接端给玩家。
+在案事故：`devlog.zh.md` 裸 `{{...}}` 撞内核插值层 turn/end error（09-14 写手列）。
 
-- **导入侧**：原样保留(`st-import.ts` 全程 `str()` 直搬,与 ST 导入侧同一哲学——不替换、不清洗)；
-- **卡层渲染器**：语法契约是「占位符 = 唯一一种东西：脚本调用」，裸 `{{name}}` 废弃、显式静默保持字面量（`prompting.ts:200-204`）；
-- **kernel 严格插值层**：对穿过来的**任何** `{{...}}` 组（不分有没有括号）做收紧校验，未注册名直接 throw（`@deepseek-ai/dsh-system-prompt` 的 `interpolate`）。
+## ST 机制调研（SillyTavern-release 1.18.0，浓缩）
 
-三者拼起来:导入酒馆卡后,systemPrompt 段里的裸 `{{user}}` 会撞 kernel → `unknown prompt variable` → **回合装配失败**;world 书条目经 `lorebook()` stdout 拼进 prompt 的同样炸;greetings/opening.html 不经过渲染器,字面量直接端给玩家。同型事故在案:`docs/notes/devlog.zh.md:282`(裸 `{{...}}` 撞内核插值层 → turn/end error)。
+导入侧原样入库；替换全在渲染端懒执行（`substituteParams` → 封闭内置宏注册表，handler 全是 ST 编译期闭包）；宏家族 = 名字类 + 字段自引用类 + 时间骰子类 + 有状态类（setvar/getvar）+ 群聊类 + STScript 专用（pipe/original 等）。ST 的宏层**没有**"裸 token 调卡作者脚本"机制——可编程在其另一层（STScript/正则扩展，我们已退役）。
 
-`docs/cards/st-card-field-mapping.zh.md:181` 早就许了愿——「文本宏 `{{char}}`/`{{user}}` → **脚本承担** ✅」——但从未落地,且 `st-import.ts:322` 生成的 persona.mjs 注释教卡作者写**裸** `{{persona}}`,与权威文档的 `{{persona()}}` 互相矛盾。
+## 决策史（三轮，各留理由）
 
-## 调研（SillyTavern-release 1.18.0）
+1. **09-25 初案**：翻译期封装 `{{get_var('key')}}`（当时拍板）；
+2. **09-27 复审**：一度翻向"渲染器内置文本宏白名单"方案——依据是渲染咽喉唯一（systemPrompt/postPrompt/lorebook stdout 同过 `renderPlaceholders`）；
+3. **09-27 终案（用户裁定）**：内置白名单是**半吊子方言**——要支持 ST 语法就得整个家族支持；而家族里的字段自引用类需要运行时持有的原始卡字段，本架构折叠后**不保存 canonical card**，全家族内置意味着新增一份卡原文持久化。故:**明确不支持 ST 宏语法,导入期用脚本翻译**——脚本机械（折叠期已知值 + 脚本 fs/快照/Date 能力）覆盖全家族,内置白名单方案作废。
 
-- ST 导入侧同样**原样入库**（`charaFormatData` 直接 `_.set`，`characters.js:579-626`），无导入期替换选项。
-- 替换全在渲染端懒执行:`baseChatReplace` → `substituteParams` → 宏注册表（新引擎 `MacroRegistry.registerMacro(name, {handler})`,handler 是内置闭包）。分档:
-  - 纯字符串:`{{user}}`=Persona 名(name1)、`{{char}}`=角色名(name2)、`{{persona}}`=Persona 描述文本、`{{description}}` 等字段引用;
-  - 计算带参:`{{random:a;b}}` `{{roll:d20}}`(内置函数吃参数,`::`/`;` 分隔);
-  - 有状态:`{{setvar::k::v}}`/`{{getvar::k}}`(聊天作用域存储)。
-- **ST 的宏层没有「裸 token → 调用卡作者脚本」机制**;可编程能力在另一层(STScript/正则扩展)。我们退役的正是那一层;我们的 `{{script(args)}}` 扮演它的角色,宏层不该与其合并。
-- 顺序学:ST 递归有序,字段引用先、user/char 最后替换(防递归)。
+## 不变量（家法文本，四条）
 
-## 决策一：翻译期封装,不做渲染器内置宏表
+1. 运行时唯一占位符语法 = 脚本调用 `{{scriptName(args)}}`；09-15 裸 `{{name}}`="废弃字面量"契约**原样破例为零**；
+2. **折叠后，面向 kernel 的文本中不存在裸 `{{name}}`**；
+3. ST 宏语法在本项目不存在运行时；导入器是唯一翻译边界；
+4. 翻译只动折叠产物，`st`/`fy` 槽 verbatim 不变（原文永远可追溯，重折叠之源）。
 
-**导入折叠时,把白名单内的 ST 文本宏改写成我们的脚本调用形态**;渲染器对裸 `{{name}}` 的「废弃保持字面量」契约原封不动(我们自己的卡禁止裸形态,导入卡是翻译边界——与世界书→lorebook.mjs+scan.kinds 同一性质的翻译)。
+## 终版分箱（导入期三类处置 + 一撮真死角）
 
-备选「渲染器加内置文本宏表」被否,四条理由:
+**第一档 烘焙为字面（值在卡里已是死数，折叠时直接写进文本）**：
+`{{description}}` `{{personality}}` `{{scenario}}` `{{mesExamples}}` `{{charPrompt}}` `{{charJailbreak}}` `{{charDepthPrompt}}` `{{charCreatorNotes}}` `{{charVersion}}`；`{{newline}}`→字面换行、`{{noop}}`→去除、`{{trim}}`→去重白。零运行时成本。
 
-1. 本方案实现的是映射文档 181 已拍板的「脚本承担」,不是新规则;
-2. 保住 09-15「唯一语法」契约**双向**:裸形态对我们自己的卡继续非法,翻译只发生在导入边界;
-3. 更 doc-first:卡文档里白纸黑字写着 `{{get_var('user')}}`,机制可读;内置表是运行时隐式认词;
-4. 渲染器零改动(除下文 stdout 重扫一条)。
+**第二档 翻译为 `st.mjs` 脚本调用（值在运行时才存在）**：
+导入器把 ST 宏的活的逻辑写进**卡自己的 scripts**：`preset/scripts/st.mjs`（单文件多子命令，argv[0] 分发；文件名与调用名同名，同 lorebook.mjs 之家法）。**零特殊地位**——和 lorebook.mjs 同类同待遇：引擎不认识它、不注册它；调用失败走普通脚本失败行（`scriptFailures` 上屏不静默）；玩家可编辑可删除，删了对应调用照常失败。
 
-## 决策二：runtime 变量文档 = 值的唯一来源
+| ST 宏（族） | 翻译为 | 取值 |
+|---|---|---|
+| `{{user}}` / `{{persona}}` | `{{st('user')}}` / `{{st('persona')}}` | `runtime/persona.md` frontmatter `name:` / 正文 |
+| `{{char}}`（=`{{name2}}`） | `{{st('char')}}` | `../preset/meta.json` 的 `title` |
+| `{{name1}}/{{name2}}`、`<BOT>/<USER>/<CHAR>` | 同上（旧标记顺手映射） | — |
+| `{{time}}/{{date}}/{{isotime}}/{{isodate}}/{{weekday}}` | `{{st('time')}}` 等 | 脚本内 `Date` |
+| `{{roll:d20+2}}` | `{{st('roll','d20+2')}}` | 骰式解析 |
+| `{{random:a;b}}` / `{{pick:a;b}}` | `{{st('random','a;b')}}` / `{{st('pick','a;b')}}` | 参数拆分随机取 |
+| `{{setvar::k::v}}` / `{{getvar::k}}`（+global 族） | `{{st('set','k','v')}}` / `{{st('get','k')}}` | 读写 `runtime/vars.json`（脚本有 fs 权限；ST 的 stabilization 编序语义不做等价，按求值顺序落） |
+| `{{lastMessage}}/{{lastUserMessage}}` / `{{input}}`(pending) | `{{st('last')}}` / `{{st('pending')}}` | 读 `.chat.snapshot.jsonl`（lorebook 同款数据源） |
 
-**`runtime/persona.md` 定型:YAML frontmatter 的 `name:` 字段 + 正文 = Persona 描述。** 玩家仍编辑这一个文档,setup 播种照旧。解析契约:frontmatter 进快照,正文为描述——persona.mjs 时代「整文件即描述」随之退役。
+**第三档 产品语境常量（不用脚本，用 1v1 语境规则）**：
+`{{group}}`→空串、`{{groupNotMuted}}`→空串、`{{notChar}}`→空串、`{{charIfNotGroup}}`→`{{st('char')}}`。
 
-`{{char}}` 是**卡侧静态**值,不落 runtime 文档(两处真源必漂移),渲染时直读 `preset/meta.json` 的 title。与 ST 对称(玩家侧 name1/persona,卡侧 name2)。
+**真死角（明确放弃，剔除+审计行，原文留槽）**：`{{original}}`、`{{pipe}}`（STScript 内部流水语境，无处可还）；`{{model}}`（宿主运行模型，卡脚本不可触及——除非日后宿主把模型写进快照）；`{{input}}` 仅发送期 pending 面可取，其余语境（载入/开场预览/书重扫时）缺失，记半弃。半支持记偏差：`setvar/getvar` 只做"求值顺序读写 vars.json"，ST 的 stabilization/延迟重映射编序不做等价。
+**勘误更正（施工期复核 ST 语义）**：`{{charFirstMessage}}/{{greeting}}/{{greeting::N}}` 在 ST 里是**静态卡数据**（macro registry 返回 `data.first_mes`/`alternate_greetings[N]`），归**烘焙档**而非剔除——上稿勘误一节的"自引用无处安放"判断撤回；烘焙在草稿填装语义下的代价是引用文本字面进入提示词、玩家若再选同一开场文即出现一次重复，与 ST 行为同构，可接受。
 
-## 决策三：get_var 单脚本三键
+## 引擎配套（复审后：一件新增、一件已存在、一处常量上调）
 
-导入器生成 `preset/scripts/get_var.mjs`(取代现 persona.mjs 的职责):
+1. **stdout 一层重扫（唯一新增件）**：`renderPlaceholders` 对脚本 stdout 再求值一轮（深度限 1），书条目里翻译出的 `{{st(...)}}` 在插入 section 前被解掉；重扫产物同样进 memo 防环；失败 → failure row，不静默。
+2. **记忆化已存在，不是新增件**：`renderPlaceholders` 的 `memo`（`prompting.ts:313,330-336`，注释原文 "Identical tokens inside one render resolve once"）。复审前把它列为方案新增件是错的。语义差异照记：ST 每次出现重掷，我们同 token 一装配一值——`pick` 语义免费复现，`random/roll/time` 一装配内恒定。
+3. **spawn 预算上调（新方案件）**：`MAX_PLACEHOLDER_SPAWNS = 8`（`prompting.ts:84`）是每 renderPlaceholders 调用一份预算——system 每装配、postPrompt 每提交各一渲。导入卡 setvar 族（键多且各异、memo 不去重）会撞 `limit` 失败行。方案含常量上调（建议 24，终值施工定）；`prompting.ts` 是 packages/engine 自家文件非 lib/ 内核，可直接改。Rappa 复算：lorebook + st('user') + st('char') = 3，余量足。
 
-- `get_var('user')` → frontmatter `name`;
-- `get_var('persona')` → 正文;
-- `get_var('char')` → `../preset/meta.json` 的 title(cwd=runtime/)。
+## 客户端开场契约（复审重写）
 
-一份文档、一个脚本、一个翻译动作闭环。键集白名单就是上面三个+后续可议扩展,表外不扩。
+**开场的产品语义 = 草稿填装快捷键**：点击 greeting 只是 `updateDraft(text)`（`TavernApp.tsx:1655-1663`），玩家手按发送；文本从头到尾是**用户面文本**，引擎对玩家提交内容不做任何占位符渲染（`index.ts:833-838` 原样入会话）。渲染只发生在两处：system 装配（`prompting.ts:507+`）与 postPrompt 提交（`index.ts:827-832`，渲染产物经 postStash 入**模型上下文**，永不入 durable 聊天记录——此前方案里"postPrompt 渲染结果成为 durable 消息"的表述是错的）。
 
-## 翻译覆盖面
+由此：
+- 替换时机 = **点击装 draft 之前**客户端替换（三键：`st('user')/('persona')/('char')`，读同一 persona 文档 + meta.json；按钮常驻文案同表替换纯为预览美感）；`time/roll` 类在预览文案保持原样的局限依旧（用户面不渲染，本就无炸面）；
+- 玩家若原样转发含 token 的文本，落进用户消息 = 字面量无害（kernel 不插值用户消息）。
 
-| 位置 | 处理 |
-|---|---|
-| systemPrompt 各段(composeSystemPrompt 产出) | 翻译 |
-| postPrompt(含 `{{lorebook()}}` 座外的正文) | 翻译 |
-| `first_mes` / `alternate_greetings` → greetings.json | 翻译(配合客户端契约,见下) |
-| 世界书条目 content → lorebook.json | 翻译 |
-| `mes_example` | 翻译 |
-| `description` → `preset/setup/opening.html` | **不翻**(iframe 无求值器,翻了字面量更难看);报告行提示 |
-| 白名单外的一切宏(`{{random}}`/`{{setvar::…}}`/…) | 不翻;原样+导入报告「宏审计」行 |
+## 值源与 persona.md 契约变更
 
-翻译只动**白名单三员**;naive 全量改写等于把 ST 配置语言招回来,不做。
+`runtime/persona.md` 定型为 YAML frontmatter `name:` + 正文=人格描述；播种器兼容旧文件（无 frontmatter = 整文即描述，`user` 空串）。`{{user}}` 无名字 → 空串，不猜代词，审计行披露。**persona.mjs 退役**：导入器不再生成（存量卡的 `{{persona()}}` 走脚本注册表照常工作）；`st-import.ts` 脚手架注释一并修正（现教裸 `{{persona}}`，与权威文档打架）。
 
-## 客户端预览契约
+## 导入审计（三本账）
 
-开场选项按钮是客户端直读直显(`card-ui.ts:258-271`),不经过任何渲染器。契约:客户端开场页渲染 greetings 前,读 `runtime/persona.md`(frontmatter)与 `meta.title`,对文本做同表替换——**只认一个形态** `{{get_var('key')}}`,键查上面三员,约 15 行纯函数,零新 RPC。(裸 `{{user}}` 不认——那是外来习语,翻译后不存在。)
-
-## 稳定性收口（本批一并）
-
-1. **stdout 引爆面**:脚本 stdout 不被渲染器重扫,而 kernel 对任何 `{{...}}` 组都收紧——`{{get_var('user')}}` 进 stdout 一样炸。方案:渲染器对脚本 stdout 做**一层**、深度受限的重扫(复用现有 depth guard);或 lorebook.mjs 模板对条目内容收尾处理后输出。二选一实现时定,但「stdout 里的 {{...}} 是地雷」必须收掉,**否则翻译只是把 `{{user}}` 换成另一个炸法**。
-2. **未知裸 token 审计**:导入期扫描全部文本字段,报告单列「宏审计」行(认识几个、翻几个、剩哪些);不认识的维持原样。运行时炸 kernel 的风险由 1+2 合力收口。
-3. **fan-out 去重**:同一段 prompt 里 `{{get_var('user')}}` 出现 N 次不展开成 N 个进程——导入期同 key 合并不可行(位置语义),接受并发小账;评估渲染器脚本调用缓存(process 级 memo,同 key 同参数同回合)。
-4. **保真语义改口**:work-order 的「原文 verbatim 挂 `st` 槽」承诺修订为「原文挂 `st` 槽,宏已翻译」;翻译后的 token 集合记进导入报告,符合「无静默丢弃」。
-5. **脚手架注释修正**:`st-import.ts:321-328` 教裸 `{{persona}}` 的注释改为 get_var 版;persona.mjs 下架或改为 get_var 别名。
-
-## 同批查出：ST JSON 兼容债（复现矩阵实测）
-
-对真实世界常见 JSON 形态逐个过 `parseTavernCard`(jsdom 实测,基线 19/19 绿):
-
-| 形态 | 结果 |
-|---|---|
-| ST v2 spec 导出 / ST 真实导出(`getCharaCardV2`,顶层 v1+`data.*` 并存) | ✅ |
-| V1 裸卡(顶层 `name`) / UTF-8 BOM 前缀 | ✅ |
-| **Pygmalion 平铺**(`char_name`/`char_persona`/`world_scenario`/`char_greeting`/`example_dialogue`) | ❌ 报「不认识的卡格式」——ST 自己支持(`characters.js:929-956` 五字段映射),我们缺 |
-| **顶层 `world_book` 数组的社区卡** | ⚠️ **静默劫持成风月方言**:error=null 但 description/first_mes 全丢、systemPrompt 空——「三方零重叠」前提(`st-import.ts:87`)在真实世界不成立,`world_book` 不是风月独占;违反 nothing-silently-dropped |
-| 世界书导出 JSON(`{entries}`) / spec 在 data 缺 | ❌ 拒收(设计外),文案未指路 |
-| GBK 字节 | 导入成功但中文 mojibake(可后议) |
-
-**world_book 劫持是本批最阴的一条**,修复方向(待拍板,不在本 note 范围):`isFengyueCard` 收紧——风月判定要求 `pre_prompt` 在场,或按条目形状(`key_region`/`value_region`/`group` 位码键)而非字段名判定。
+报告行三列：**翻译 N**（逐宏族计数）、**烘焙 M**、**剔除 K**（真死角逐宏列名）——加既有 system 位/key_region 缺位等行。无静默丢弃；`st`/`fy` 槽保真可回溯。
 
 ## 测试计划
 
-- st-import:白名单宏翻译矩阵(三员各自落点+白名单外原样+审计行);world_book 收紧后的 ST 社区卡回归(第一方言优先)。
-- prompting:stdout 一层重扫(嵌套深度上限、失败上报不静默)。
-- ui:开场预览替换契约(greetings 含 `{{get_var('user')}}` × frontmatter 文档快照)。
-- 新增端到端烟测:一张真 ST 卡(字段埋 `{{user}}`/`{{char}}`/`{{persona}}`)导入→回合跑通→开场按钮替换正确。
+- st-import：分箱矩阵（三档各抽查 + 死角剔除 + 审计行三本账 + `<BOT>` 旧标记）；ST/风月双方言回归。
+- prompting：stdout 重扫（嵌套深度/失败上行不静默）；记忆化（同 token 一 pass 一值）。
+- ui：开场预览 get 三键替换契约 × persona.md frontmatter 兼容旧文件。
+- ui：开场**点击装 draft 前替换**契约（三键 × persona.md frontmatter 兼容旧文件）；spawn 预算上调后的 setvar 重卡回归。
 
-## 边界(不做什么)
+## 复审勘误（2026-09-27 第二轮，逐条对码）
 
-- 不做完整 ST 宏引擎:函数宏(random/roll/setvar/getvar)、`<BOT>`/`<USER>` 旧标记一律不迁;`{{random}}` 归脚本(`$RANDOM` 语义已存在),setvar 类拒绝。
-- 不给用户暴露「导入时把 {{char}} 烘成名字」之类选项(导入时玩家未知,语义上不可能)。
-- greeting 预览不做 RPC 渲染(锁一档客户端只读契约)。
+1. **记忆化已存在**（`renderPlaceholders` 的 `memo`）——复审前列为新增件是错的；
+2. **greeting 语义重定**：草稿填装快捷键（`updateDraft`），非"AI 开场消息"——`st('greet0')` 整项撤销入死角，postPrompt"durable"旧表述一并纠正；
+3. **spawn 预算 8 顶棚此前漏算**——方案新增常量上调件（setvar 重卡会撞 limit）；
+4. **基础面复核通过**（方案站住的承重墙）：调用名≡文件名由 `evalToken` 按文件查证强制（`prompting.ts:273-274`，无注册表）；参数语法原生支持引号/转义/嵌套（`:232-253`，`{{st('roll','d20+2')}}` 直接可写）；`readText` 是整工作区栅栏面（`index.ts:1289`），客户端读 `runtime/persona.md`/`meta.json` 无障碍；脚本 spawn 显式全开放（`tools.ts:130` trustedScriptPolicy），`st('set')` 写 `runtime/vars.json` 可行；脚本 cwd=`runtime/`，`../preset/` 相对路径persona.mjs 已有先例。
 
-## 2026-09-27 战测与裁定(docs\test_cards 九份真实样本)
+## 真不做什么
 
-用户在仓库根放入 `docs\test_cards\*` 九份真实样本(带字面反斜杠的散文件)战测:四张 ST 卡(PNG×3+JSON×1,折叠结果 json 与 png 全等)、一张真风月卡、两包正则脚本、一份 ST 设置导出。裁定与落地:
+不建 ST 宏运行时；不为自引用家族保存 canonical card；不建群聊；opening.html 不解析；不做 ST 的 stabilization 编序等价；greeting 预览不做 time/roll 客户端求值。
 
-1. **system 位重建 → 先不支持**(维持恒不命中+报告行);
-2. **AND 组合键 → 支持**:`foldFengyueCard` 落 `mode:"and"`,`lorebook.mjs` v1.6 全含判定,撤「AND 未迁移」报告行;
-3. **kinds 集合>1 只扫最近一条 → 维持我们的逻辑**(与风月正主的高保真合并行为差异接受);
-4. **key_region 缺位 → 不触发**(对齐 chat_core `_parse_region(0)` 空集语义,不再是默认 user+assistant);
-5. **value_region 塌缩 postPrompt → 维持**;
-6. **CG(cg_book)远期方向记档**:我们不适合照搬"[图片: url]"后缀——更贴项目的是 **CSS 承载**:图进 CSS,LLM 产出带对应 CSS 类标签的 HTML。档在本文,暂不建机制。
-7. **双方言并存确认有效**:`.json` 单入口特征分流 已实证(Rappa.json=ST 路、fengyue.json=风月路、双折叠结果正确);为兼容性收紧 `isFengyueCard`=pre_prompt ∧ 三特征任一(WT 社区顶层 world_book 卡不被劫持)。
-8. **空壳与正则包防线落地**:设置/预设导出(只名零内容)拒收;正则包(数组/ Marinara)专属文案。九卡复跑全部符合预期(4+1 OK、2 拒、1 拒)。
+---
+
+## 附一：2026-09-27 战测与裁定（docs/test_cards 十份真实样本）
+
+战测语料存放**仓库外**：`~/Desktop/dsh-test-cards/`（不跟踪进 git；曾短暂入库后移出，见 7602978 入库记录）。内容：四张 ST 卡（PNG×3+JSON×1，折叠 json/png 全等）、一张真风月卡、两包正则脚本、一份 ST 设置导出、一份风月卡世界书解析正主 `chat_core.py`。裁定与落地（**均已随兼容批落地**，全套 499/499 绿）：
+
+1. system 位重建 → 先不支持（恒不命中+报告行）；
+2. AND 组合键 → 支持：fold 落 `mode:"and"`，`lorebook.mjs` v1.6 全含判定；
+3. kinds 集合>1 只扫最近一条 → 维持现逻辑；
+4. key_region 缺位 → 不触发（对齐 chat_core `_parse_region(0)` 空集语义）；
+5. value_region 塌缩 postPrompt → 维持；
+6. CG 远期记档：CSS 承载图 + LLM 产出带 CSS 类 HTML（不照搬"[图片:url]"），未建机制；
+7. 双方言并存实证 + `isFengyueCard` 收紧（`pre_prompt` ∧ 三特征任一）；
+8. 空壳/正则包拒收防线（九卡复跑 4+1 OK、2 专属文案拒、1 拒）。
+
+## 附二：为什么不选"渲染器内置宏族"（终案对比备忘）
+
+内置全家族需要运行时持有原始卡字段（canonical card）——折叠架构刻意不存；setvar 族需要编排语义与第二套状态机制（与 state.md 家法竞争）；group 族在本产品无语境。折叠期手里恰好握有全部静态值与全部翻译信息，脚本机械又恰好握有全部运行时能力——B 路（边界翻译）两头的便宜都占。
