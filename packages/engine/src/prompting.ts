@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
-import { cardScriptCommand, cardToolSchema, type ShellSeam } from './tools.ts'
+import { cardScriptCommand, cardToolSchema, trustedScriptPolicy, type ShellSeam } from './tools.ts'
 import { PRESET_DIR, RUNTIME_DIR, promptPath, readCardMeta, readMaintenancePrompt } from './workspace.ts'
 
 /** The card's own system-prompt section (`preset/prompt/systemPrompt`). */
@@ -94,10 +94,12 @@ export function quoteArg(value: string): string {
  * writable world: bare paths in scripts touch runtime state; sibling areas
  * resolve as `../preset/…`). No tavern-layer output cap — the executor's own
  * configured cap stays the deployment bound. The caller's abort signal kills
- * the process.
+ * the process. The request carries an explicit trust policy (`trustedScriptPolicy`)
+ * — engine spawns must not inherit the session's sandbox surface (2026-09-27).
  * @param shell - the deployment's shell executor.
  * @param command - the command line to run.
  * @param workdir - absolute working directory (the workspace's `runtime/`).
+ * @param root - absolute workspace root (the trust policy's writable root).
  * @param signal - caller's abort signal; fired means the run was cancelled.
  * @returns the collected stdout text, or the structured failure.
  */
@@ -105,12 +107,14 @@ async function runScript(
   shell: ShellSeam,
   command: string,
   workdir: string,
+  root: string,
   signal: AbortSignal | undefined,
 ): Promise<{ ok: true; text: string } | { ok: false; reason: 'exit' | 'timeout' | 'abort'; exitCode?: number }> {
   const result = await (await shell.execute(shell.resolve({
     command,
     workdir,
     timeoutMs: SCRIPT_TIMEOUT_MS,
+    sandboxPolicy: trustedScriptPolicy(root),
     ...(signal === undefined ? {} : { signal }),
   }))).result()
   if (result.aborted) return { ok: false, reason: 'abort' }
@@ -274,6 +278,7 @@ async function evalToken(
     shell,
     cardScriptCommand(script, JSON.stringify(args)),
     join(root, RUNTIME_DIR),
+    root,
     signal,
   )
   if (!executed.ok) {
@@ -391,6 +396,7 @@ export async function runCardScript(
     shell,
     cardScriptCommand(script, JSON.stringify(args)),
     join(root, RUNTIME_DIR),
+    root,
     signal,
   )
   return executed.ok ? { ok: true, text: executed.text.trim() } : executed

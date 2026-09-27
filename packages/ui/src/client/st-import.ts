@@ -81,13 +81,28 @@ function strArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string' && entry !== '') : []
 }
 
+/** ST 正则脚本条目的形状（Pura 数组包 / Marinara 对象包共用这两键）。 */
+function isRegexPack(item: unknown): boolean {
+  return isRecord(item) && (typeof item.findRegex === 'string' || typeof item.scriptName === 'string')
+}
+
+/** 空壳判定：「有名字、零角色内容字段」（white-lotus 类设置导出），见 normalizeCard。 */
+function isHollowCard(card: CanonicalCard): boolean {
+  return card.description.trim() === '' && card.personality.trim() === '' && card.scenario.trim() === ''
+    && card.firstMes.trim() === '' && card.mesExample.trim() === '' && card.systemPrompt.trim() === ''
+    && card.postHistoryInstructions.trim() === '' && card.creatorNotes.trim() === ''
+    && card.legacyPrePrompt.trim() === '' && card.legacyPostPrompt.trim() === ''
+    && (card.characterBook?.entries.length ?? 0) === 0 && card.alternateGreetings.length === 0
+}
+
 /**
- * 风月（catai.wiki 生态）JSON 卡的识别特征：`pre_text` / `post_text` / `world_book`
- * 任一在场。旧 DSH 导出只有 `pre_prompt` / `post_prompt` 一对（见 legacy 分支），
- * ST 卡用 `character_book` / `world`——三方互不重叠。
+ * 风月（catai.wiki 生态）JSON 卡的识别特征：`pre_prompt` 与 `pre_text` / `post_text`
+ * / `world_book` 任一**同时**在场。只认后三个会误劫持带顶层 `world_book` 的 ST
+ * 社区卡（真实战测连同批 white-lotus 一起坐实）；风月卡必有 `pre_prompt` 而 ST
+ * 生态没有这个字段（旧 DSH 有，但那三个特征全无——见 legacy 分支测试钉）。
  */
 export function isFengyueCard(raw: unknown): boolean {
-  if (!isRecord(raw)) return false
+  if (!isRecord(raw) || typeof raw.pre_prompt !== 'string') return false
   return typeof raw.pre_text === 'string' || typeof raw.post_text === 'string'
     || (Array.isArray(raw.world_book) && raw.world_book.length > 0)
 }
@@ -181,7 +196,18 @@ function toBase64(bytes: Uint8Array): string {
  * @throws with a user-facing message when the JSON matches no accepted shape.
  */
 export function normalizeCard(raw: unknown): { card: CanonicalCard } {
+  if (Array.isArray(raw)) {
+    const first = raw.find(item => isRecord(item))
+    if (first !== undefined && isRegexPack(first)) {
+      throw new Error('这是 SillyTavern 正则脚本包（数组形态），不是角色卡——暂不支持直接导入')
+    }
+    throw new Error('不是有效的卡片 JSON')
+  }
   if (!isRecord(raw)) throw new Error('不是有效的卡片 JSON')
+  if (Array.isArray(raw.regexScripts) && raw.regexScripts.length > 0) {
+    // Marinara 式导出（{kind, regexScripts:[…]}）也是正则包，挡在卡守卫之前。
+    throw new Error('这是 SillyTavern 正则脚本导出，不是角色卡——暂不支持直接导入')
+  }
   const spec = str(raw.spec)
   const versioned = spec === 'chara_card_v2' || spec === 'chara_card_v3'
   if (!versioned && !isRecord(raw.data) && str(raw.name) === '' && str(raw.pre_prompt) === '' && str(raw.post_prompt) === '') {
@@ -191,29 +217,33 @@ export function normalizeCard(raw: unknown): { card: CanonicalCard } {
   const data: Record<string, unknown> = isRecord(raw.data) ? raw.data : raw
   const extensions = isRecord(data.extensions) ? data.extensions : {}
   const bookRaw = data.character_book
-  return {
-    card: {
-      name: str(data.name),
-      description: str(data.description),
-      personality: str(data.personality),
-      scenario: str(data.scenario),
-      firstMes: str(data.first_mes),
-      mesExample: str(data.mes_example),
-      creatorNotes: str(data.creator_notes) || str(raw.creatorcomment),
-      systemPrompt: str(data.system_prompt),
-      postHistoryInstructions: str(data.post_history_instructions),
-      tags: strArray(data.tags),
-      creator: str(data.creator),
-      characterVersion: str(data.character_version),
-      alternateGreetings: strArray(data.alternate_greetings),
-      characterBook: isRecord(bookRaw) ? normalizeBook(bookRaw) : undefined,
-      regexScripts: Array.isArray(extensions.regex_scripts) ? extensions.regex_scripts.filter(isRecord) : [],
-      depthPrompt: str(isRecord(extensions.depth_prompt) ? extensions.depth_prompt.prompt : ''),
-      worldRef: str(extensions.world),
-      legacyPrePrompt: str(raw.pre_prompt),
-      legacyPostPrompt: str(raw.post_prompt),
-    },
+  const card: CanonicalCard = {
+    name: str(data.name),
+    description: str(data.description),
+    personality: str(data.personality),
+    scenario: str(data.scenario),
+    firstMes: str(data.first_mes),
+    mesExample: str(data.mes_example),
+    creatorNotes: str(data.creator_notes) || str(raw.creatorcomment),
+    systemPrompt: str(data.system_prompt),
+    postHistoryInstructions: str(data.post_history_instructions),
+    tags: strArray(data.tags),
+    creator: str(data.creator),
+    characterVersion: str(data.character_version),
+    alternateGreetings: strArray(data.alternate_greetings),
+    characterBook: isRecord(bookRaw) ? normalizeBook(bookRaw) : undefined,
+    regexScripts: Array.isArray(extensions.regex_scripts) ? extensions.regex_scripts.filter(isRecord) : [],
+    depthPrompt: str(isRecord(extensions.depth_prompt) ? extensions.depth_prompt.prompt : ''),
+    worldRef: str(extensions.world),
+    legacyPrePrompt: str(raw.pre_prompt),
+    legacyPostPrompt: str(raw.post_prompt),
   }
+  if (!versioned && isHollowCard(card)) {
+    // 空壳防线（white-lotus 实测）：无 spec、有名字、零内容字段——十有八九是 ST 的
+    // 设置/预设导出。静默折叠成空卡比报错糟糕，宁可拒收。
+    throw new Error('不认识的卡格式：该 JSON 只有名字、没有任何角色内容字段——像是 SillyTavern 的设置/预设导出，不是角色卡')
+  }
+  return { card }
 }
 
 /** Normalize one character_book; the original entry verbatim rides `raw`. */
@@ -327,12 +357,14 @@ const PERSONA_MJS = [
   '',
 ].join('\n')
 
-const LOREBOOK_MJS = `// 世界书扫描 v1.5（导入生成，可编辑）：条目两种匹配面——
+const LOREBOOK_MJS = `// 世界书扫描 v1.6（导入生成，可编辑）：条目两种匹配面——
 // ① 带scan.kinds（风月卡，key_region 位码 1=system/2=user/4=assistant 折叠而来）：
-//    取该种类集合「最近一条」消息做键匹配（快照没有 system 行，system 位恒不命中；
-//    发送期最近一条 user 常是引擎预投影的本回合输入）。
+//    取该种类集合「最近一条」消息做键匹配；kinds 是空数组 = key_region 缺位，视为
+//    不触发（条目仍在书里，恒不命中）。快照没有 system 行，system 位恒不命中；
+//    发送期最近一条 user 常是引擎预投影的本回合输入。
 // ② 无scan（ST 卡）：沿用最近 N 条 user/assistant 拼合窗口，argv[0] 可调（默认 12）。
-// 命中（含 constant 条目）按 id 序输出 content；prob<100 掷次骰。
+// 命中判定：mode:"and" 全含（风月 _and_ 组合键），否则任一子串命中；
+// 含 constant 条目，按 id 序输出 content；prob<100 掷次骰。
 // 数据 ../preset/lorebook.json；文件或快照缺席时静默退出，世界书即失效。
 // 不含递归/分组/预算（映射 §4 的 v1 简化）；重折叠由导入器重生成，别在本文件堆逻辑。
 // cwd = runtime/；全局 argv = 位置参数数组（[窗口条数]，仅②生效）。
@@ -357,8 +389,17 @@ const latest = kinds => {
 for (const entry of data.entries ?? []) {
   if (!entry.content) continue
   const kinds = entry.scan?.kinds
-  const text = Array.isArray(kinds) && kinds.length > 0 ? latest(kinds) : window
-  const hit = entry.constant === true || (entry.keys ?? []).some(k => text.includes(k))
+  let text
+  if (Array.isArray(kinds)) {
+    if (kinds.length === 0) continue
+    text = latest(kinds)
+  } else {
+    text = window
+  }
+  const keys = entry.keys ?? []
+  const hit = entry.constant === true || (entry.mode === "and"
+    ? keys.every(k => text.includes(k))
+    : keys.some(k => text.includes(k)))
   if (!hit) continue
   const prob = entry.probability ?? 100
   if (prob < 100 && Math.floor(Math.random() * 100) >= prob) continue
@@ -524,8 +565,9 @@ function fengyueKeys(rawKey: string): { keys: string[]; mode: 'or' | 'and' | 'pl
 }
 
 /**
- * 风月 key_region 位码 → 扫描消息种类（用户口述契约）：1=system、2=user、4=assistant，
-  按位取和。0 或非数（缺失/脏数据）落默认 user+assistant，`defaulted` 供报告行计数。
+ * 风月 key_region 位码 → 扫描消息种类：1=system、2=user、4=assistant，按位取和。
+ * 0 或非数（缺失/脏数据）＝不扫描，条目恒不命中——风月正主语义（chat_core.py 的
+ * `_parse_region(0)` 同样得空集 → 永不触发），2026-09-27 战测裁定对齐。
  */
 function fengyueScanKinds(keyRegion: unknown): { kinds: string[]; defaulted: boolean } {
   const mask = typeof keyRegion === 'number' && Number.isSafeInteger(keyRegion) ? keyRegion : 0
@@ -534,7 +576,7 @@ function fengyueScanKinds(keyRegion: unknown): { kinds: string[]; defaulted: boo
     ...(mask & 4 ? ['assistant'] : []),
     ...(mask & 1 ? ['system'] : []),
   ]
-  return kinds.length > 0 ? { kinds, defaulted: false } : { kinds: ['user', 'assistant'], defaulted: true }
+  return kinds.length > 0 ? { kinds, defaulted: false } : { kinds: [], defaulted: true }
 }
 
 /**
@@ -563,9 +605,6 @@ export function foldFengyueCard(
     .filter(isRecord)
     .map((item, index) => {
       const { keys, mode } = fengyueKeys(str(item.key))
-      if (mode === 'and') {
-        report.push(`- 世界书 #${index}：AND 组语义未迁移（我们的扫描器是 OR 触发）——原文 key：${str(item.key)}`)
-      }
       if (str(item.group) !== '') {
         report.push(`- 世界书 #${index}：group「${str(item.group)}」分组语义未建，按独立条目处理`)
       }
@@ -575,6 +614,8 @@ export function foldFengyueCard(
         id: `e${index}`,
         keys,
         content: str(item.value),
+        /** `_and_` 组合键的全含语义（风月正主 chat_core 的 and 模式）；缺省 = OR。 */
+        ...(mode === 'and' ? { mode: 'and' } : {}),
         probability: 100,
         position: 'before_char',
         insertionOrder: index,
@@ -603,7 +644,7 @@ export function foldFengyueCard(
       report.push(`- 世界书：${systemBit} 条带 system 位（key_region bit1）——聊天快照无 system 行，该部分恒不命中`)
     }
     if (defaultedKinds > 0) {
-      report.push(`- 世界书：${defaultedKinds} 条 key_region 缺位或非数，扫描面落默认 user+assistant 最近一条`)
+      report.push(`- 世界书：${defaultedKinds} 条 key_region 缺位或非数——按风月语义视为不触发，条目仍入书但恒不命中`)
     }
   }
   // 无键/无内容/非对象条目静默丢弃是在撒谎——数量进报告。
@@ -629,9 +670,14 @@ export function foldFengyueCard(
 
   if (coverNote !== undefined) report.push(coverNote)
   if (strArray(raw.banned_words).length > 0) report.push(`- 违禁词表 ${strArray(raw.banned_words).length} 条：无对位机制，未迁移`)
-  if (Array.isArray(raw.cg_book) && raw.cg_book.length > 0) report.push(`- cg_book（CG 图鉴）${raw.cg_book.length} 条：无对位机制，未迁移`)
+  if (Array.isArray(raw.cg_book) && raw.cg_book.length > 0) report.push(`- cg_book（CG 图鉴）${raw.cg_book.length} 条：暂无对位机制，未迁移（远期方向见 getvar note：CSS 承载 + LLM 产出带类 HTML）`)
   if (Array.isArray(raw.shortcut_commands) && raw.shortcut_commands.length > 0) report.push(`- shortcut_commands ${raw.shortcut_commands.length} 条：斜杠命令流不存在，丢弃`)
   if (Array.isArray(raw.preset_chats) && raw.preset_chats.length > 0) report.push(`- preset_chats（预置聊天记录）${raw.preset_chats.length} 条：对话播种未建（同 ST first_mes 决策），未迁移`)
+  if (str(raw.builtInCss) !== '') report.push('- builtInCss（内置 CSS 样式）：无对位机制，未迁移')
+  if (str(raw.bg_image) !== '' || str(raw.bg_mobile) !== '') report.push('- 背景图（bg_image/bg_mobile）：无对位机制，未迁移')
+  if (isRecord(raw.suggested_questions_after_answer) && raw.suggested_questions_after_answer.enabled === true) {
+    report.push('- suggested_questions_after_answer（答后追问）：无对位机制，未迁移')
+  }
   report.push(`- 体量：世界书条目 ${entries.length} → lorebook.json（按 scan.kinds 最近一条消息匹配；值内容一律注入 postPrompt 的 {{lorebook()}} 座——value_region 不另设位）；开场选项 ${greetings.length} → greetings.json；开场页 ${desc.trim() !== '' ? '有' : '无'} → setup/opening.html`)
 
   // 风月卡没有 ST 那种“需要理解后手翻”的源料（映射全机械），报告即全部——

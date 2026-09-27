@@ -12,9 +12,13 @@ export function createRepo({ runScript, views, onScript, onDead }) {
   let userSeq = 0, asstSeq = 0
   let bootTimer = null
 
+  // tryFetch(client-rpc-no-silent-catch 家族,2026-09-27 批):失败原因必须进
+  // 信封——吞掉后 boot 只剩"数据源未就绪"一个样,分诊(如 Windows 全卡同败)
+  // 无从下手。宿主面抛错(face failure 或 RPC 拒绝)→ not-ok 信封携带原文。
   const tryFetch = async () => {
     if (disposed) return null
-    try { return JSON.parse(await runScript('gal_data.mjs', JSON.stringify({ op: 'panel' }))) } catch { return null }
+    try { return JSON.parse(await runScript('gal_data.mjs', JSON.stringify({ op: 'panel' }))) }
+    catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) } }
   }
 
   const emit = (reason, d, value, freshAsst, freshUser) => {

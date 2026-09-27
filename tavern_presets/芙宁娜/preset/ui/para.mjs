@@ -282,11 +282,15 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     void stage.prime(fact.assetKeys)                                    // ⑤ 资产补缺
   }
 
-  /* boot 连接失败上屏(BOOT_TRIES 上界后停摆,不再自旋)。 */
+  /* boot 连接失败上屏(BOOT_TRIES 上界后停摆,不再自旋):具体原因照登——
+     只显示"详见控制台"曾让 Windows 全卡同败的分诊无从下手(2026-09-27)。 */
   function dead(error) {
     if (nodes.who == null) return
     nodes.who.textContent = '芙宁娜'
-    nodes.text.textContent = '—— 数据通道未就绪(详见控制台)——'
+    const message = String(error ?? '').trim()
+    nodes.text.textContent = message === ''
+      ? '—— 数据通道未就绪(详见控制台)——'
+      : `—— 数据通道未就绪:${message} ——`
     console.warn('[gg] gal_data 连接失败:', error ?? '数据源未就绪')
   }
 

@@ -133,7 +133,7 @@ describe('systemPrompt fold (ST assembly order)', () => {
   })
 
   it('an empty book and a purely constant book produce no lorebook mount', () => {
-    expect(buildLorebook(normalizeCard({ data: {} }).card)).toBeUndefined()
+    expect(buildLorebook(normalizeCard({ data: { name: 'x', description: 'd' } }).card)).toBeUndefined()
     const constantOnly = normalizeCard({
       data: { character_book: { entries: [{ keys: [], content: 'c', constant: true, position: 'before_char' }] } },
     }).card
@@ -212,7 +212,7 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     opening_statement: '选择一段开场白',
     suggested_questions: ['今日战局如何？'],
     world_book: [
-      // key_region 位码（1=system/2=user/4=assistant）：6/4/5 各钉一种折叠面，0 钉缺落默认。
+      // key_region 位码（1=system/2=user/4=assistant）：6/4/5 各钉一种折叠面，0 钉不触发（风月正主语义）。
       { key: '_or_日本@wb@自卫队', value: '日本军事力量…', group: '', key_region: 6, value_region: 1 },
       { key: '_and_美国@wb@美军', value: '美军…', group: 'x', key_region: 2, value_region: 1 },
       { key: '_or_台湾@wb@台海', value: '台湾军事力量…', group: '', key_region: 5, value_region: 1 },
@@ -244,11 +244,12 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     }
     expect(lorebook.entries).toHaveLength(4)
     expect(lorebook.entries[0]!.keys).toEqual(['日本', '自卫队'])
-    // 位码 6 = user|assistant；2 = 仅 user；5 = assistant|system；0 缺落 → 默认 user+assistant。
+    // 位码 6 = user|assistant；2 = 仅 user；5 = assistant|system；0 缺位 = 不触发（kinds 空数组）。
     expect(lorebook.entries[0]!.scan.kinds).toEqual(['user', 'assistant'])
     expect(lorebook.entries[1]!.scan.kinds).toEqual(['user'])
     expect(lorebook.entries[2]!.scan.kinds).toEqual(['assistant', 'system'])
-    expect(lorebook.entries[3]!.scan.kinds).toEqual(['user', 'assistant'])
+    expect(lorebook.entries[3]!.scan.kinds).toEqual([])
+    expect(lorebook.entries[1]!.mode).toBe('and')
     expect(lorebook.entries[0]!.fy).toMatchObject({ key_region: 6 })
     // 生成脚本带双匹配面：scan.kinds 走「最近一条」，无 scan 的（ST）走窗口。
     const script = parsed.files['preset/scripts/lorebook.mjs']!
@@ -256,11 +257,14 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     expect(script).toContain('kinds.includes')
     expect(script).toContain('slice(-n)')
     const readme = parsed.files['preset/st-import/README.md']!
-    expect(readme).toContain('AND 组语义未迁移')
+    expect(readme).not.toContain('AND 组语义未迁移')
     expect(readme).toContain('group「x」')
     expect(readme).toContain('无键或无内容')
     expect(readme).toContain('system 位')
-    expect(readme).toContain('落默认 user+assistant')
+    expect(readme).toContain('视为不触发')
+    // 生成脚本带 AND 全含判定与「空 kinds = 不触发」分支。
+    expect(script).toContain('.every(')
+    expect(script).toContain('kinds.length === 0')
     // 体量行明示扫描面与注入位决策（value_region 不另设位）。
     expect(readme).toContain('value_region 不另设位')
   })
@@ -302,5 +306,38 @@ describe('fengyue (风月) dialect: detection + fold', () => {
     expect(parsed.files['preset/setup/opening.html']).toBeUndefined()
     expect((parsed.files['preset/prompt/postPrompt'] ?? '')).not.toContain('{{lorebook()}}')
     expect((parsed.files['preset/prompt/systemPrompt'] ?? '')).not.toBe('前段')
+  })
+
+  it('an ST community card carrying a top-level world_book stays on the ST route (no fengyue hijack)', () => {
+    const parsed = importFromJson(
+      { name: '旅行者', description: '旅人', first_mes: '嘿。', world_book: [{ key: '_or_路@wb@途', value: '山路', key_region: 2, value_region: 1 }] },
+      'x', undefined,
+    )
+    expect(parsed.error).toBeUndefined()
+    expect(parsed.files['preset/prompt/systemPrompt']).toContain('旅人')
+    expect(parsed.files['preset/setup/opening.html']).toBeUndefined()
+  })
+
+  it('a settings/preset export (named but content-empty) is rejected instead of folding a hollow card', () => {
+    const settings = { name: 'White Lotus', temperature: 0.8, prompts: [{ name: 'main' }], extensions: {} }
+    expect(importFromJson(settings, 'x', undefined).error).toContain('设置/预设导出')
+  })
+
+  it('regex packs (array / Marinara object) get dedicated refusals, not generic card errors', () => {
+    const pack = [{ scriptName: 'Trim', findRegex: '/a/b', placement: [5] }]
+    expect(importFromJson(pack, 'x', undefined).error).toContain('正则脚本包')
+    const marinara = { kind: 'regex', version: 1, exportedAt: '2026-01-01', regexScripts: [{ scriptName: 'a', findRegex: 'b' }] }
+    expect(importFromJson(marinara, 'x', undefined).error).toContain('正则脚本导出')
+  })
+
+  it('non-migratable fengyue presentation fields land as report rows when non-empty', () => {
+    const parsed = importFromJson(
+      { ...fyCard, builtInCss: '<style>x</style>', bg_image: 'bg.webp', suggested_questions_after_answer: { enabled: true } },
+      'x', undefined,
+    )
+    const readme = parsed.files['preset/st-import/README.md']!
+    expect(readme).toContain('builtInCss')
+    expect(readme).toContain('背景图')
+    expect(readme).toContain('suggested_questions_after_answer')
   })
 })

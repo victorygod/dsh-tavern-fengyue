@@ -17,7 +17,7 @@ afterAll(() => {
   rmSync(base, { recursive: true, force: true })
 })
 
-interface ShellRun { command: string; workdir: string }
+interface ShellRun { command: string; workdir: string; sandboxPolicy?: { mode: string; workspaceRoot: string } }
 
 function fakeShell(impl: (entry: ShellRun) => { exitCode: number | null; aborted?: boolean; timedOut?: boolean; stdout: string }): {
   calls: ShellRun[]
@@ -25,9 +25,9 @@ function fakeShell(impl: (entry: ShellRun) => { exitCode: number | null; aborted
 } {
   const calls: ShellRun[] = []
   const shell = {
-    resolve: (request: { command: string; workdir: string }) => {
-      calls.push({ command: request.command, workdir: request.workdir })
-      return { command: request.command, workdir: request.workdir }
+    resolve: (request: { command: string; workdir: string; sandboxPolicy?: { mode: string; workspaceRoot: string } }) => {
+      calls.push({ command: request.command, workdir: request.workdir, ...(request.sandboxPolicy === undefined ? {} : { sandboxPolicy: request.sandboxPolicy }) })
+      return { command: request.command, workdir: request.workdir, ...(request.sandboxPolicy === undefined ? {} : { sandboxPolicy: request.sandboxPolicy }) }
     },
     execute: (spec: object) => {
       const entry = spec as ShellRun
@@ -75,6 +75,8 @@ describe('placeholder rendering', () => {
       expect(calls[0]?.command).toContain(Buffer.from(join(root, 'preset/scripts/get_turn.mjs')).toString('base64'))
       expect(calls[0]?.command).toContain(Buffer.from('[]').toString('base64'))
       expect(calls[0]?.workdir).toBe(join(root, 'runtime'))
+      // 信任策略随令落地(2026-09-27 Windows 分诊批):卡 spawn 不继承会话沙盒。
+      expect(calls[0]?.sandboxPolicy).toEqual({ mode: 'danger-full-access', workspaceRoot: root })
     })
   })
 
@@ -238,6 +240,8 @@ describe('runCardScript', () => {
       expect(calls[0]?.command).toContain(Buffer.from(join(root, 'preset/scripts/echo.mjs')).toString('base64'))
       expect(calls[0]?.command).toContain(Buffer.from(JSON.stringify(["it's", 'a b'])).toString('base64'))
       expect(calls[0]?.workdir).toBe(join(root, 'runtime'))
+      // 信任策略随令落地(2026-09-27 Windows 分诊批):卡 spawn 不继承会话沙盒。
+      expect(calls[0]?.sandboxPolicy).toEqual({ mode: 'danger-full-access', workspaceRoot: root })
     })
   })
 

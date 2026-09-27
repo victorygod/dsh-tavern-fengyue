@@ -501,29 +501,51 @@ async function completeText(
   reason: 'stop' | 'length',
   delayMs: number,
   pickSuccessText: () => string,
+  forceReasoning = false,
 ): Promise<void> {
   const text = pickSuccessText()
   const anthropic = record.path.endsWith('/messages')
+  // Anthropic/Messages SSE is authored WHOLE here: message_start must precede
+  // every block, and the reasoning phase rides its own `thinking` block before
+  // the text one (the OpenAI callers stream reasoning themselves upstream).
   if (anthropic) {
     writeSse(record, response, { type: 'message_start', message: {
       id: 'msg-mock', type: 'message', role: 'assistant', content: [], model: 'mock',
       stop_reason: null, stop_sequence: null,
       usage: { input_tokens: 3, output_tokens: 0 },
     } })
-    writeSse(record, response, { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+    let index = 0
+    if (forceReasoning || (options.reasoningConfigured && requestThinkingEnabled(record))) {
+      writeSse(record, response, { type: 'content_block_start', index, content_block: { type: 'thinking', thinking: '' } })
+      for (const chunk of splitText(options.reasoningText === undefined ? '' : options.reasoningText, options.chunkSize)) {
+        writeSse(record, response, { type: 'content_block_delta', index, delta: { type: 'thinking_delta', thinking: chunk } })
+        if (!await pause(options.chunkDelayMs, response)) { finishRecord(options, record, 'client_closed'); return }
+      }
+      writeSse(record, response, { type: 'content_block_stop', index })
+      index += 1
+      if (!await pause(options.reasoningGapMs, response)) { finishRecord(options, record, 'client_closed'); return }
+    }
+    writeSse(record, response, { type: 'content_block_start', index, content_block: { type: 'text', text: '' } })
+    for (const chunk of splitText(text, options.chunkSize)) {
+      writeSse(record, response, { type: 'content_block_delta', index, delta: { type: 'text_delta', text: chunk } })
+      if (!await pause(delayMs, response)) { finishRecord(options, record, 'client_closed'); return }
+    }
+    writeSse(record, response, { type: 'content_block_stop', index })
+    writeSse(record, response, { type: 'message_delta', delta: { stop_reason: reason === 'length' ? 'max_tokens' : 'end_turn', stop_sequence: null }, usage: { output_tokens: Array.from(text).length } })
+    writeSse(record, response, { type: 'message_stop' })
+    response.end()
+    finishRecord(options, record, 'completed', {
+      ...forceReasoning || (options.reasoningConfigured && requestThinkingEnabled(record)) ? { reasoning: options.reasoningText } : {},
+      assistantText: text,
+    })
+    return
   }
   if (!await streamText(options, record, response, text, delayMs)) {
     finishRecord(options, record, 'client_closed')
     return
   }
-  if (anthropic) {
-    writeSse(record, response, { type: 'content_block_stop', index: 0 })
-    writeSse(record, response, { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: Array.from(text).length } })
-    writeSse(record, response, { type: 'message_stop' })
-  } else {
-    writeSse(record, response, terminalChunk(reason, Array.from(text).length))
-    writeDone(record, response)
-  }
+  writeSse(record, response, terminalChunk(reason, Array.from(text).length))
+  writeDone(record, response)
   response.end()
   finishRecord(options, record, 'completed', {
     // Reasoning rides the same single result event (it streams before the
@@ -679,7 +701,10 @@ async function runBehavior(
       // the adapter maps the deltas to reasoning_content, which the client
       // turns into its 思考 row) — a thinking-off request gets prose only.
       // reasoning_success reserves the dedicated forced-reasoning case.
-      if (options.reasoningConfigured && requestThinkingEnabled(record)) {
+      // Anthropic/Messages requests author reasoning INSIDE completeText
+      // (message_start must land before any block) — the OpenAI pre-stream
+      // here only serves the chat/completions wire.
+      if (!record.path.endsWith('/messages') && options.reasoningConfigured && requestThinkingEnabled(record)) {
         if (!await streamReasoning(options, record, response)) {
           finishRecord(options, record, 'client_closed')
           return
@@ -689,11 +714,13 @@ async function runBehavior(
       return
     case 'reasoning_success':
       openSse(response)
-      if (!await streamReasoning(options, record, response)) {
-        finishRecord(options, record, 'client_closed')
-        return
+      if (!record.path.endsWith('/messages')) {
+        if (!await streamReasoning(options, record, response)) {
+          finishRecord(options, record, 'client_closed')
+          return
+        }
       }
-      await completeText(options, record, response, 'stop', 0, pickSuccessText)
+      await completeText(options, record, response, 'stop', 0, pickSuccessText, true)
       return
     case 'tool_call_success':
       openSse(response)

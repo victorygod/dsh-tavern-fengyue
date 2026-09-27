@@ -118,6 +118,19 @@ export function cardScriptCommand(scriptPath: string, argsPayloadJson: string): 
   return `node ${quoteRunner()} ${b64(scriptPath)} ${b64(argsPayloadJson)}`
 }
 
+/**
+ * 卡 spawn 的信任策略(2026-09-27 Windows 分诊批):卡=受信宿主代码(card-ui
+ * 信任模型明文如此),引擎侧 spawn 不继承会话沙盒表面——继承 workspace-write
+ * 会在无沙盒后端的宿主(典型:Windows 无 ACL restricted-token runner)整线拒绝,
+ * dnd 卡「落盘失败: no sandbox backend is usable」即此。显式全开放:卡脚本
+ * 只写本卡 runtime/,可写根仍然挂本工作区。
+ * @param root - absolute workspace root.
+ * @returns the explicit full-access sandbox policy for engine-owned spawns.
+ */
+export function trustedScriptPolicy(root: string): { mode: 'danger-full-access'; workspaceRoot: string } {
+  return { mode: 'danger-full-access', workspaceRoot: root }
+}
+
 const SCHEMA_CACHE = new Map<string, { mtimeMs: number; schema: CardToolSchema | null }>()
 
 /**
@@ -210,6 +223,9 @@ async function runCardTool(
     workdir: join(root, RUNTIME_DIR),
     timeoutMs: TOOL_TIMEOUT_MS,
     stdoutMaxBytes: TOOL_OUTPUT_CAP,
+    // 卡面直写工具同样受信(归属声明制,与卡 prompt/泵 face 同一信任级):
+    // 不继承会话沙盒——见 trustedScriptPolicy 的 Windows 拒绝案。
+    sandboxPolicy: trustedScriptPolicy(root),
     ...(signal === undefined ? {} : { signal }),
   })
   const result = await (await shell.execute(spec)).result()

@@ -528,8 +528,16 @@ export async function loadCardUi(
       // 卡入口拿到:数据通道(runScript 文本形/callScript 结构形)+已装载的模块家族+声明。
       // v2 面板的实例化(index.js 组装 runtime+views+acts)是卡自携逻辑——宿主不再是运行时。
       const returned = mod?.mount?.({
+        // 数据通道(client-rpc-no-silent-catch 家族,2026-09-27 批):失败回执
+        // `failure` 在场即抛——只取 text 会把"原因卡在脸上"变成所有失败一个样
+        // (reason/exitCode 被扔掉,卡面只见空串,Windows 分诊无从下手)。
         runScript: (name: string, ...args: string[]) =>
-          rpc.runScript({ sessionId, name, args }).then(value => value.text),
+          rpc.runScript({ sessionId, name, args }).then(value => {
+            if (value.failure !== undefined) {
+              throw new Error(`script "${name}" failed (${value.failure.reason}${value.failure.exitCode === undefined ? '' : ` exit ${value.failure.exitCode}`})`)
+            }
+            return value.text
+          }),
         callScript: (name: string, ...args: string[]) => rpc.runScript({ sessionId, name, args }),
         // 玩家手势发送:卡自持输入的 Enter/发送键直接走宿主同一 RPC 通道。
         // requestId 每次现生成(不可预测不可复用);与原生 composer 完全同 admission。
