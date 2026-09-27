@@ -42,10 +42,10 @@ const TOOL_OUTPUT_CAP = 8_000
 /** Timeout of one tool-script invocation. */
 const TOOL_TIMEOUT_MS = 10_000
 
-/** The shell executor's narrow resolve/run surface. */
+/** The shell executor's narrow resolve/execute surface. */
 export type ShellSeam = {
   resolve: (request: ShellExecRequest) => ShellExecSpec
-  run: (spec: ShellExecSpec) => Promise<ShellRunResult>
+  execute: (spec: ShellExecSpec) => Promise<{ result(): Promise<ShellRunResult> }>
 }
 
 /** A parsed `@tavern-schema` header block of one card tool script. */
@@ -212,7 +212,7 @@ async function runCardTool(
     stdoutMaxBytes: TOOL_OUTPUT_CAP,
     ...(signal === undefined ? {} : { signal }),
   })
-  const result = await shell.run(spec)
+  const result = await (await shell.execute(spec)).result()
   const banner = `Exit: ${result.exitCode === null ? 'signal' : result.exitCode}`
   const out = result.stdout.text.replace(/\s+$/, '')
   const errOut = result.stderr.text.replace(/\s+$/, '').slice(0, TOOL_OUTPUT_CAP)

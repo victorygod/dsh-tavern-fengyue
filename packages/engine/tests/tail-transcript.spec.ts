@@ -26,7 +26,7 @@ const toolResult = (callId: string, text: string, seq = 13): SessionEvent =>
   ({
     type: 'tool/result',
     seq,
-    data: { turn: 1, step: 1, message: { role: 'user', content: [{ type: 'tool-result', toolCallId: callId, content: [{ type: 'text', text }] }] } },
+    data: { turn: 1, step: 1, message: { role: 'tool', source: { kind: 'tool', callId }, toolCallId: callId, content: [{ type: 'text', text }] } },
   }) as unknown as SessionEvent
 
 const assistant = (text: string, seq = 18): SessionEvent =>

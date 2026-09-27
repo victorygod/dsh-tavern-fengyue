@@ -24,23 +24,24 @@
   disabled: true
 
 # The card IS the whole world: main and tail agents run on the `empty`
-# preset (zero rows — no persona, no tools; the card's own system prompt and
-# tool face stand alone), while the card-writing agent runs on `standard` so
-# it keeps the full product tool face (fs read/write, shell, web, todo). The
-# preset-selection UI row stays out of the tavern composition entirely, and
-# the `empty` preset itself ships inside the engine package — its mount-time
-# mirror (syncShippedPresets) lands it on the profile preset root below, so
-# the roots row needs no cwd-relative assumption.
+# preset (zero child plugins — no persona, no tools; the card's own system
+# prompt and tool face stand alone), while the card-writing agent runs on
+# `standard` so it keeps the full product tool face (fs read/write, shell,
+# web, todo). The preset-selection UI row stays out of the tavern composition
+# entirely. In 0.1.7 a preset is a `@deepseek-ai/dsh-agent-preset` SERVICE row
+# (one per preset: config.id + config.plugins) declared directly in the patch;
+# `standard` ships with the web-app base.
 - id: ui-agent-preset
   disabled: true
 
-- id: agent-presets
-  name: '@deepseek-ai/dsh-agent-presets'
-  config:
-    default: standard
-    roots:
-      - path: !!js dshHomePath('profiles', 'tavern-fengyue', 'presets')
-        trust: system
+- insert:
+    - id: preset-empty
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: empty
+        description: 不挂载任何工具与 persona 的空白 Agent（酒馆主/尾代理专用，卡片自带全部系统提示词与工具）
+        order: 9
+        plugins: []
 
 # The tavern serves on its own port. `dsh web` and the tavern profile are two
 # profiles that can perfectly well run side by side, and 3080 is the web-app

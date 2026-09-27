@@ -273,6 +273,67 @@ describe('files face 契约(文件事件通道,2026-09-25 通道批)', () => {
   })
 })
 
+describe('turnError face 契约(回合失败通道,2026-09-27 通道批)', () => {
+  const SUPPORT = {
+    'preset/ui/index.js': 'export function mount() {}',
+    'preset/ui/layout.json': JSON.stringify({ html: true, panels: [] }),
+  }
+
+  it('纯事件面:不做去重(同错连发都送达)、双订阅收齐、单摘只发余者、dispose 后静默', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const handle = await loadCardUi(rpcWithFiles(SUPPORT), SESSION)
+    if (handle === null) throw new Error('handle missing')
+    const a1: string[] = []
+    const a2: string[] = []
+    const unsub = handle.turnError.subscribe(error => { a1.push(error.message) })
+    handle.feedTurnError({ message: 'Authentication Fails' })
+    handle.feedTurnError({ message: 'Authentication Fails' })   // 无去重:纯事件,每次都广播
+    expect(a1).toEqual(['Authentication Fails', 'Authentication Fails'])
+    handle.turnError.subscribe(error => { a2.push(error.message) })
+    handle.feedTurnError({ seq: 9, code: 'AUTH', message: 'Rate Limited' })
+    expect(a1).toEqual(['Authentication Fails', 'Authentication Fails', 'Rate Limited'])
+    expect(a2).toEqual(['Rate Limited'])
+    unsub()
+    handle.feedTurnError({ message: 'after unsub' })
+    expect(a1).toEqual(['Authentication Fails', 'Authentication Fails', 'Rate Limited'])
+    expect(a2).toEqual(['Rate Limited', 'after unsub'])
+    handle.dispose()
+    handle.feedTurnError({ message: 'after dispose' })
+    expect(a2).toEqual(['Rate Limited', 'after unsub'])          // dispose 后广播静默(listener 已清)
+  })
+
+  it('mount face 拿到 turnError:卡经 tavern.turnError 接住失败通道(转写恒隐卡的活路)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const handle = await loadCardUi(rpcWithFiles({
+      // capture 面写进 globalThis,外层读(node 环境无真 blob import,mount 常兜底——
+      // 能跑通则真实断言,跑不通则由卡侧行为钉(galgame-card spec ⑦ 域)承担)
+      'preset/ui/index.js': [
+        'export function mount(tavern) {',
+        '  globalThis.__tavernFace = tavern',
+        '}',
+      ].join('\n'),
+      'preset/ui/layout.json': JSON.stringify({ html: true, panels: [] }),
+    }), SESSION)
+    if (handle === null) throw new Error('handle missing')
+    const face = (globalThis as { __tavernFace?: Record<string, unknown> }).__tavernFace
+    if (face !== undefined) {
+      const live = face.turnError as { subscribe?: unknown } | undefined
+      expect(live).toBeTypeOf('object')
+      expect(live?.subscribe).toBeTypeOf('function')
+      if (typeof live?.subscribe === 'function') {
+        const got: string[] = []
+        live.subscribe((error: { message: string }) => { got.push(error.message) })
+        handle.feedTurnError({ message: 'wired through' })
+        expect(got).toEqual(['wired through'])
+      }
+    } else {
+      console.warn('node 环境无 blob import——face 断言由 jsdom 真机 CDP 承担')
+    }
+    delete (globalThis as { __tavernFace?: unknown }).__tavernFace
+    handle.dispose()
+  })
+})
+
 describe('composerDock vault 契约(G3: 卡供槽,宿主搬运,2026-09-25 停靠批)', () => {
   const SUPPORT = {
     'preset/ui/index.js': 'export function mount() {}',

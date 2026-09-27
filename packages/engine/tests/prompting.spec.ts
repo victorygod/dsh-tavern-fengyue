@@ -29,15 +29,19 @@ function fakeShell(impl: (entry: ShellRun) => { exitCode: number | null; aborted
       calls.push({ command: request.command, workdir: request.workdir })
       return { command: request.command, workdir: request.workdir }
     },
-    run: (spec: object) => {
+    execute: (spec: object) => {
       const entry = spec as ShellRun
-      return Promise.resolve(impl(entry))
-        .then(result => ({
-          exitCode: result.exitCode,
-          aborted: result.aborted ?? false,
-          timedOut: result.timedOut ?? false,
-          stdout: { text: result.stdout },
-        }))
+      return {
+        result: async () => {
+          const result = await impl(entry)
+          return {
+            exitCode: result.exitCode,
+            aborted: result.aborted ?? false,
+            timedOut: result.timedOut ?? false,
+            stdout: { text: result.stdout },
+          }
+        },
+      }
     },
   } as unknown as ShellFace
   return { calls, shell }

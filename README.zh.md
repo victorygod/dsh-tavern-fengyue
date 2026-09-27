@@ -58,7 +58,7 @@ SillyTavern 同时抬高了使用者和卡作者的理解成本——用户不�
 
 **前置**：Node.js ≥ 22.19 或 ≥ 24，pnpm（`npm i -g pnpm` 或 `corepack enable`）。
 
-**兼容性**：已在 `@deepseek-ai/dsh` **0.1.5-rc.1** 与 **0.1.5-rc.2** 上验证——清单列在 [`config/dsh-compatibility.json`](config/dsh-compatibility.json)，`pnpm bootstrap` 会把最新的已验证版本装进 profile。上游 dsh 处于 developer preview(内核明示会有破坏性变更)；新版 dsh 若破坏 tavern profile，重跑 `pnpm bootstrap` 恢复已验证版本，或按 [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md) 的外装回退路径操作。
+**兼容性**：已在 `@deepseek-ai/dsh` **0.1.5-rc.1 / 0.1.5-rc.2 / 0.1.7-rc.2（next）** 上验证（0.1.7 迁移定案见 [docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md](docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md)）——清单列在 [`config/dsh-compatibility.json`](config/dsh-compatibility.json)，`pnpm bootstrap` 会把最新的已验证版本装进 profile。上游 dsh 处于 developer preview(内核明示会有破坏性变更)；新版 dsh 若破坏 tavern profile，重跑 `pnpm bootstrap` 恢复已验证版本，或按 [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md) 的外装回退路径操作。
 
 ### 本项目的分发形态
 

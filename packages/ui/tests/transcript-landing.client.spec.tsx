@@ -105,7 +105,10 @@ const turnEnd = (seq: number, turn: number) => ({ type: 'event', event: { type: 
 
 /** 多会话假面：列表快照可控切 current；每会话独立事件流；open 兜底注册新 id。 */
 function multiSessions(initial: { ids: string[]; current: string }, entriesBySession: Record<string, readonly unknown[]>) {
-  let snapshot = { ids: initial.ids as string[], byId: Object.fromEntries(initial.ids.map(id => [id, { title: id }])), current: initial.current }
+  // 0.1.7 会话假面:list 无 current——「当前」= retainedBy.tavern > 0 的那一行(单 current 模型)。
+  let currentHolder = initial.current
+  const makeRow = (id: string): unknown => ({ id, title: id, retainedBy: { tavern: id === currentHolder ? 1 : 0 } })
+  let snapshot = { ids: initial.ids as string[], byId: Object.fromEntries(initial.ids.map(id => [id, makeRow(id)])), phase: 'ready' as const, projectionsBySession: {} }
   const listListeners = new Set<() => void>()
   const sessionListeners = new Map<string, Set<() => void>>()
   const entries: Record<string, unknown[]> = {}
@@ -150,13 +153,16 @@ function multiSessions(initial: { ids: string[]; current: string }, entriesBySes
   }
   const bindingCache = new Map<string, unknown>()
   return {
-    open: (id: string) => {
-      if (!snapshot.ids.includes(id)) snapshot = { ...snapshot, ids: [...snapshot.ids, id] }
-      snapshot = { ...snapshot, current: id }
+    retain: (id: string) => {
+      const ids = snapshot.ids.includes(id) ? snapshot.ids : [...snapshot.ids, id]
+      currentHolder = id
+      snapshot = { ...snapshot, ids, byId: Object.fromEntries(ids.map(rid => [rid, makeRow(rid)])) }
       for (const listener of listListeners) listener()
+      return { release: () => {} }
     },
     setCurrent: (id: string) => {
-      snapshot = { ...snapshot, current: id }
+      currentHolder = id
+      snapshot = { ...snapshot, byId: Object.fromEntries(snapshot.ids.map(rid => [rid, makeRow(rid)])) }
       for (const listener of listListeners) listener()
     },
     setRunning: (id: string, value: boolean) => {

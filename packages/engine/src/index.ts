@@ -28,7 +28,7 @@ import type { LlmAttemptId } from '@deepseek-ai/dsh-llm'
 import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-subagent'
-import type { Session, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
+import type { Session, SessionEvent, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionPromptValue, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type { CommandId } from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-shell'
@@ -82,7 +82,8 @@ export function scanSettlement(events: Iterable<{ type: string; seq: number; dat
     if (event.type === 'turn/start') lastTurnStart = event.seq
     else if (event.type === 'turn/end') lastTurnEnd = event.seq
     else if (event.type === 'command/done'
-      && (event.data as { commandId?: unknown } | undefined)?.commandId === 'tavern-tail-done') lastDone = event.seq
+      && typeof (event.data as { commandId?: unknown } | undefined)?.commandId === 'string'
+      && String((event.data as { commandId?: unknown }).commandId).startsWith('tavern-tail-done')) lastDone = event.seq
   }
   return { lastTurnStart, lastTurnEnd, lastDone }
 }
@@ -131,8 +132,18 @@ const WRITER_FILE = '.tavern-writer'
  *  tombstones awaiting the boot GC (see {@link writerLogGC}). Hidden from the
  *  editor tree (dot-prefixed) and fenced inside runtime/ like any client write. */
 const WRITER_REGISTRY_FILE = 'runtime/.writer-sessions.json'
-/** Message-source plugin token on every engine-injected post message (composer and scanner share it). */
-const PLUGIN_SOURCE = 'dsh-tavern-fengyue-engine'
+/** The engine's own message producer — the post-prompt snapshot rows it injects (composer and scanner share it). */
+interface TavernEngineSource {
+  kind: 'tavern'
+  form: 'snapshot'
+  sections: readonly { name: string; text: string }[]
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    tavern: TavernEngineSource
+  }
+}
 /** Where a card's narrator-tools flag lives: an explicit boolean field on the
  *  card identity itself (`preset/meta.json`), not a hidden side-file — every
  *  preset whole-copy boundary (发布 / 编辑保存 / 导卡) carries meta.json, so
@@ -313,6 +324,14 @@ export class TavernRuntime extends Service {
    * queue-to-turn window.
    */
   private readonly postStash = new Map<SessionId, { readonly text: string }[]>()
+  /**
+   * Post nodes queued for shadowing (surface seqs), drained on the step's
+   * `step/start`. The pre-step fires between `turn/start` and `step/start`,
+   * and 0.1.7's session format requires every `system/message` to carry the
+   * OPEN turn and step — appending there fails loud, so the shadow appends
+   * defer to the step boundary (see {@link injectPosts}).
+   */
+  private readonly pendingShadows = new Map<SessionId, SessionSeq[]>()
   /** Per-workspace FIFO chain serializing engine-side writes (editor RPC, file ops, snapshot rewrites). */
   private readonly writeQueues = new Map<string, Promise<unknown>>()
   /** Per-main-agent card-tool re-sync; the engine's preset mutation points call it so the change lands on the current request. */
@@ -1546,6 +1565,36 @@ export class TavernRuntime extends Service {
     }
     const root = this.workspaces.get(session.id)
     if (root === undefined) return
+    // The queued post shadows append HERE, inside the freshly opened step:
+    // this is the first point where the turn/step pair 0.1.7's format
+    // validator demands for a system/message is actually open. Failure keeps
+    // the previous post live one extra turn (the same accepted degradation).
+    if (event.type === 'step/start') {
+      const queued = this.pendingShadows.get(session.id)
+      if (queued !== undefined && queued.length > 0) {
+        this.pendingShadows.delete(session.id)
+        // 直接 append 会撞上内核的发布重入禁令（本回调正随 step/start 的 append
+        // 同步执行）；推迟一个 microtask——内核在 prepareRequest 的首个 await 处
+        // 让出事件循环，此刻 step 已开（格式校验要求）且请求视图尚未派生，
+        // 影子恰好插在两者之间。
+        queueMicrotask(() => {
+          try {
+            for (const seq of queued) {
+              session.append('system/message', {
+                turn: event.data.turn,
+                step: event.data.step,
+                message: createSystemMessage(''),
+              }, {
+                surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
+                sourceEventSeqs: [seq],
+              })
+            }
+          } catch (error) {
+            this.ctx.logger.warn(withHostGuidance('post 影子化退场', error))
+          }
+        })
+      }
+    }
     // Every durable player/assistant message changes the conversation snapshot
     // the card scripts read; the disposable cache heals on each rewrite.
     if (event.type === 'user/message' || event.type === 'assistant/message') {
@@ -1596,8 +1645,19 @@ export class TavernRuntime extends Service {
    */
   private notifyTailSettled(session: Session): void {
     try {
+      // 0.1.7 会话格式强校验 command/done 须有同 commandId 的 command/run 先行
+      // （否则 SessionFormatError: "command/done has no prior command/run"）。
+      // 此处补一条 log-only 的 command/run 配对；commandId 还须全局唯一（0.1.7
+      // 另校验 "command/run repeats commandId"），故以当前 seq 作后缀——消费两端
+      // （结算扫描 + 客户端解锁）一律按 `tavern-tail-done` 前缀匹配。
+      const commandId = brandString<CommandId>(`tavern-tail-done-${String(session.seq)}`)
+      session.append('command/run', {
+        commandId,
+        name: 'tavern-tail-done',
+        source: { kind: 'user' },
+      })
       session.append('command/done', {
-        commandId: brandString<CommandId>('tavern-tail-done'),
+        commandId,
         kind: 'success',
       })
     } catch (error) {
@@ -1865,19 +1925,17 @@ export class TavernRuntime extends Service {
     const session = payload.agent.session
     if (payload.messages.length === 0 || this.workspaces.get(session.id) === undefined) return []
     try {
+      // Shadowing defers to step/start (see pendingShadows): the pre-step runs
+      // before step/start, and a system/message there cannot carry the open
+      // turn/step 0.1.7's format validator demands.
+      const queued = this.pendingShadows.get(session.id) ?? []
       for (const seq of session.surface.nodes) {
         const event = session.eventAt(seq)
         if (event?.type !== 'user/message') continue
-        if (event.data.source.kind !== 'plugin' || event.data.source.plugin !== PLUGIN_SOURCE) continue
-        session.append('system/message', {
-          turn: payload.turn,
-          step: payload.step,
-          message: createSystemMessage('', PLUGIN_SOURCE),
-        }, {
-          surfaceOp: { op: 'replace', startSeq: seq, endSeq: seq },
-          sourceEventSeqs: [seq],
-        })
+        if (event.data.source.kind !== 'tavern') continue
+        if (!queued.includes(seq)) queued.push(seq)
       }
+      if (queued.length > 0) this.pendingShadows.set(session.id, queued)
     } catch (error) {
       // The ride itself still proceeds: worst case the previous post stays
       // live one extra turn (accumulation on the wire), never a broken turn.
@@ -1895,7 +1953,7 @@ export class TavernRuntime extends Service {
       if (entry.text === '') continue
       rides.push(createUserMessage({
         content: [{ type: 'text', text: entry.text }],
-        source: { kind: 'plugin', plugin: PLUGIN_SOURCE, form: 'snapshot', sections: [{ name: 'post', text: entry.text }] },
+        source: { kind: 'tavern', form: 'snapshot', sections: [{ name: 'post', text: entry.text }] },
       }))
     }
     if (stash.length === 0) this.postStash.delete(session.id)

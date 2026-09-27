@@ -73,15 +73,14 @@ function capResult(text: string): string {
 /** The visible text of one `tool/result` event, errors noted first. */
 function resultText(event: SessionEvent): string {
   const data = event.data as {
-    message?: { content?: { type?: string; content?: { type?: string; text?: string }[] }[] }
+    message?: { content?: { type?: string; text?: string }[] }
     error?: { name?: string; code?: string }
   }
   if (data.error !== undefined) return `${data.error.name ?? 'error'}: ${data.error.code ?? ''}`
-  // message.content = [ToolResultBlock]; the visible text lives in the tool-
-  // result block's own content list.
+  // message.content is a flat ContentBlock[] in 0.1.7 — the visible text lives
+  // directly in the text blocks, with no nested tool-result shell.
   if (!Array.isArray(data.message?.content)) return ''
   return (data.message!.content ?? [])
-    .flatMap(block => Array.isArray(block?.content) ? block.content : [])
     .filter(block => block.type === 'text' && typeof block.text === 'string')
     .map(block => block.text ?? '')
     .join('')
@@ -118,13 +117,9 @@ function deriveRun(childId: SessionId, at: number, log: ChildLog): TailTranscrip
   const results = new Map<string, string>()
   for (const event of events) {
     if (event.type !== 'tool/result') continue
-    const data = event.data as { message?: { content?: { type?: string; toolCallId?: string }[] } }
-    const block = (data.message?.content ?? []).find(
-      (item): item is { type: 'tool-result'; toolCallId: string } =>
-        typeof item === 'object' && item !== null && (item as { type?: unknown }).type === 'tool-result',
-    )
+    const callId = event.data.message.toolCallId
     const text = resultText(event)
-    if (block !== undefined && text !== '') results.set(block.toolCallId, capResult(text))
+    if (text !== '') results.set(callId, capResult(text))
   }
   const actions: TailAction[] = []
   let reply = ''
@@ -144,9 +139,7 @@ function deriveRun(childId: SessionId, at: number, log: ChildLog): TailTranscrip
         })
       }
     } else if (event.type === 'assistant/message') {
-      const message = (event.data as { message: { content?: { type: string; text?: string }[] } }).message
-      const text = message.content
-      if (text === undefined) continue
+      const text = event.data.message.content
       const part = text.filter(block => block.type === 'text')
         .map(block => (block as { text?: string }).text ?? '')
         .join('')

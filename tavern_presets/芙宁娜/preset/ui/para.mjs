@@ -16,6 +16,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
   let paras = []                    // 展示队列(剧本段副本 + live 追加;正本在剧本)
   let typing = null
   let waitGuard = null
+  let errJust = false               // 回声锁:失败拍早于本回合玩家行落盘(快败竞态)时,首拍 ② = 回声
   const stops = []
   const add = fn => { if (typeof fn === 'function') stops.push(fn) }
 
@@ -220,6 +221,8 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
   /* ── 落定校准(① freshAsst):以剧本为准重建队列——流式已推过的段保留
      (r 不后退),尾部残片/缺口由 durable 替换;落定后无活性行。── */
   function settle(fact) {
+    clearInterrupt()   // ① 真回复落地 = 成功拍,失败横幅揭幕(下一失败重来)
+    errJust = false    // 成功拍同时解回声锁(失败链彻底翻篇)
     const prevR = r
     adopt(fact.script)
     liveTail = ''
@@ -238,6 +241,8 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
 
   /* ── boot(首拍定态):泵态换景/资产 → 空回落输入态 / 三分支读位恢复。── */
   function bootFact(fact) {
+    clearInterrupt()
+    errJust = false    // 新开场样 = 成功拍族:锁一并解
     adopt(fact.script)
     void stage.warm()                                   // manifest 索引本拍预载(boot 原序)
     void stage.show(fact.cg?.id ?? null, fact.cg?.layers)
@@ -266,6 +271,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     if (fact.aSeq > bm.asstSeq) bookmark.touch({ asstSeq: fact.aSeq })
     if (fact.reason === 'boot') { bootFact(fact); return }
     if (fact.freshAsst) { settle(fact); return }                       // ① 新回复落定 → 校准
+    if (fact.freshUser && errJust) { errJust = false; return }         // ② 回声:失败回合自己的玩家行,不当新发送
     if (fact.freshUser && mode === 'input') {                          // ② 新玩家行 → 清屏进 waiting
       paras = []; r = 0; bookmark.touch({ r: 0 })
       nodes.text.textContent = ''; nodes.next.classList.remove('gg-on')
@@ -282,6 +288,28 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     nodes.who.textContent = '芙宁娜'
     nodes.text.textContent = '—— 数据通道未就绪(详见控制台)——'
     console.warn('[gg] gal_data 连接失败:', error ?? '数据源未就绪')
+  }
+
+  /* ── 回合失败拍(turnError face,2026-09-27 通道批):转写区恒隐后的唯一
+     失败出口。等待即刻回落——看门狗 120s 是死回合的兜底,不是 UX;横幅存活到
+     下一成功拍(揭幕=①settle/boot),跨 waiting 回落仍可见。空文案(宿主未携
+     信息失败)不吞屏——横幅空文比静默更迷惑,退回看门狗兜底。── */
+  function interrupt(text) {
+    if (disposed || nodes.err == null) return
+    const message = String(text ?? '').trim()
+    if (message === '') return
+    nodes.err.textContent = message
+    nodes.err.style.display = 'block'
+    console.warn('[gg] 回合失败:', message)
+    if (mode === 'waiting') setMode('input')   // ② 已消费(慢败序):直接回落
+    else errJust = true                        // ② 未到(快败拍先到):本回合玩家行成回声,不再进 waiting
+    dbg()
+  }
+  /* 成功拍揭幕:boot(新开场样)与 ①settle(真回复落地)调用。 */
+  function clearInterrupt() {
+    if (nodes.err == null) return
+    nodes.err.textContent = ''
+    nodes.err.style.display = 'none'
   }
 
   /* ── 装配(组组装建好的节点,此处只挂交互)── */
@@ -301,6 +329,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     think,
     pulse: syncDomState,   // opening 契约翻转 → 重渲一拍
     dead,
+    interrupt,             // 回合失败拍(turnError face):横幅上屏 + waiting 回落
     dispose() {
       disposed = true
       if (typing !== null) { clearInterval(typing); typing = null }

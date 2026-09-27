@@ -57,14 +57,16 @@ async function assemble(listeners: ReturnType<typeof registry>['assembleListener
 }
 
 // Structural fake: the fake's resolve round-trips only the command, which is
-// all the fake run() needs back — the casts keep the fixture off the
-// provider's full ShellExecSpec shape without weakening the seam types.
+// all the fake execute().result() needs back — the casts keep the fixture off
+// the provider's full ShellExecSpec shape without weakening the seam types.
 const fakeShell = (stdout: (command: string) => string): ShellSeam => ({
   resolve: request => ({ command: request.command }) as unknown as ShellExecSpec,
-  run: spec => Promise.resolve({
-    exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
-    stdout: { text: stdout((spec as unknown as { command: string }).command), truncated: false },
-    stderr: { text: '', truncated: false },
+  execute: spec => Promise.resolve({
+    result: () => Promise.resolve({
+      exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
+      stdout: { text: stdout((spec as unknown as { command: string }).command), truncated: false },
+      stderr: { text: '', truncated: false },
+    }),
   }),
 })
 
@@ -142,9 +144,11 @@ describe('card tools', () => {
         seen.push({ command: request.command, signal: request.signal })
         return { command: request.command } as unknown as ShellExecSpec
       },
-      run: () => Promise.resolve({
-        exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
-        stdout: { text: 'ok', truncated: false }, stderr: { text: '', truncated: false },
+      execute: () => Promise.resolve({
+        result: () => Promise.resolve({
+          exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
+          stdout: { text: 'ok', truncated: false }, stderr: { text: '', truncated: false },
+        }),
       }),
     })
     const controller = new AbortController()

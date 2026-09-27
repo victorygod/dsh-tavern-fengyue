@@ -590,7 +590,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     }).get(sessionId)!.snapshotEvents()
     const turnEnds = settled.filter(event => event.type === 'turn/end')
     const dones = settled.filter(event => event.type === 'command/done'
-      && (event.data as { commandId?: unknown }).commandId === 'tavern-tail-done')
+      && String((event.data as { commandId?: unknown }).commandId).startsWith('tavern-tail-done'))
     expect(turnEnds).toHaveLength(1)
     expect(dones).toHaveLength(1)
     expect(dones[0]!.seq).toBeGreaterThan(turnEnds[0]!.seq)
@@ -725,7 +725,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     for (const [index, id] of [sessionId, freshId].entries()) {
       const events = sessionsFace.get(id)!.snapshotEvents()
       const userMessages = events.filter(event => event.type === 'user/message')
-      const postMessages = userMessages.filter(event => (event.data.source as { plugin?: string } | undefined)?.plugin === 'dsh-tavern-fengyue-engine')
+      const postMessages = userMessages.filter(event => (event.data.source as { kind?: string } | undefined)?.kind === 'tavern')
       const raws = index === 0 ? ['第一回合', '第二回合', '第三回合'] : ['第四回合']
       expect(postMessages).toHaveLength(raws.length)
       for (const row of postMessages) {
@@ -736,7 +736,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
         && Array.isArray((event.data as { message?: { content?: unknown[] } }).message?.content)
         && ((event.data as { message?: { content?: unknown[] } }).message?.content ?? []).length === 0)
       expect(shadows).toHaveLength(index === 0 ? raws.length - 1 : 0)
-      const runtimeContext = userMessages.filter(event => (event.data.source as { plugin?: string } | undefined)?.plugin === '@deepseek-ai/dsh-system-prompt')
+      const runtimeContext = userMessages.filter(event => (event.data.source as { kind?: string } | undefined)?.kind === 'system-prompt')
       expect(runtimeContext).toHaveLength(0)
       const playerMessages = userMessages.filter(event => (event.data.source as { kind?: string } | undefined)?.kind === 'user')
       expect(playerMessages).toHaveLength(raws.length)
@@ -854,7 +854,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
       }).get(sessionId)!.snapshotEvents()
       const localTurnEndSeq = current.filter(event => event.type === 'turn/end').at(-1)!.seq
       const dones = current.filter(event => event.type === 'command/done'
-        && (event.data as { commandId?: unknown }).commandId === 'tavern-tail-done')
+        && String((event.data as { commandId?: unknown }).commandId).startsWith('tavern-tail-done'))
       expect(dones).toHaveLength(1)
       expect(dones[0]!.seq).toBeGreaterThan(localTurnEndSeq)
     }, { timeout: 20_000, interval: 50 })
@@ -943,7 +943,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     // 落定信号恰落在 error turn/end 之后——修复前这里永不到达(跨重启锁死 composer)。
     await vi.waitFor(() => {
       const dones = events().filter(event => event.type === 'command/done'
-        && (event.data as { commandId?: unknown }).commandId === 'tavern-tail-done')
+        && String((event.data as { commandId?: unknown }).commandId).startsWith('tavern-tail-done'))
       expect(dones).toHaveLength(2)
       expect(dones.at(-1)!.seq).toBeGreaterThan(turnEnds.at(-1)!.seq)
     }, { timeout: 15_000, interval: 100 })
@@ -1059,7 +1059,7 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     }
     const tailDones = (events: { type: string; seq: number; data: Record<string, unknown> }[]): { seq: number }[] =>
       events.filter(event => event.type === 'command/done'
-        && (event.data as { commandId?: unknown }).commandId === 'tavern-tail-done')
+        && String((event.data as { commandId?: unknown }).commandId).startsWith('tavern-tail-done'))
 
     await engine.prompt({ sessionId, text: '第一回合', requestId: 'rpc-off-1', clientTimeZone: 'Asia/Shanghai' }, new AbortController().signal)
     await agent!.whenIdle()

@@ -58,7 +58,7 @@ SillyTavern raises the learning curve for both players and card authors — play
 
 **Prerequisites**: Node.js ≥ 22.19 or ≥ 24, pnpm (`npm i -g pnpm` or `corepack enable`).
 
-**Compatibility**: verified against `@deepseek-ai/dsh` **0.1.5-rc.1** and **0.1.5-rc.2** — the list lives in [`config/dsh-compatibility.json`](config/dsh-compatibility.json), and `pnpm bootstrap` installs the newest verified version into the profile. Upstream dsh is in developer preview with breaking changes expected; if a newer dsh breaks the tavern profile, re-run `pnpm bootstrap` to restore the verified profile, or follow the external-install fallback in [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md).
+**Compatibility**: verified against `@deepseek-ai/dsh` **0.1.5-rc.1 / 0.1.5-rc.2 / 0.1.7-rc.2 (next)** — the list lives in [`config/dsh-compatibility.json`](config/dsh-compatibility.json), and `pnpm bootstrap` installs the newest verified version into the profile. Upstream dsh is in developer preview with breaking changes expected; if a newer dsh breaks the tavern profile, re-run `pnpm bootstrap` to restore the verified profile, or follow the external-install fallback in [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md).
 
 ### How this is distributed
 

@@ -35,7 +35,7 @@ function fakeShell(onFired?: (name: string) => void): ShellSeam & { readonly fir
   return {
     fired,
     resolve: (request) => request as never,
-    run: async (spec) => {
+    execute: async (spec) => {
       const command = (spec as unknown as { command: string }).command
       // v3 命令面尾两个 token：b64(脚本路径) b64(参数载荷)——取倒数第二个。
       const payload = /(\S+) \S+$/.exec(command)?.[1] ?? ''
@@ -43,8 +43,10 @@ function fakeShell(onFired?: (name: string) => void): ShellSeam & { readonly fir
       const name = /^\/\/ marker:(\S+)/m.exec(readFileSync(scriptPath, 'utf8'))?.[1] ?? '?'
       fired.push(name)
       onFired?.(name)
-      if (name === 'flaky.mjs') return { exitCode: 7, timedOut: false, aborted: false, stdout: { text: '' } } as never
-      return { exitCode: 0, timedOut: false, aborted: false, stdout: { text: 'ran' } } as never
+      const outcome = name === 'flaky.mjs'
+        ? { exitCode: 7, timedOut: false, aborted: false, stdout: { text: '' } }
+        : { exitCode: 0, timedOut: false, aborted: false, stdout: { text: 'ran' } }
+      return { result: async () => outcome } as never
     },
   }
 }

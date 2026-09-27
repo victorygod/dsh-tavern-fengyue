@@ -7,7 +7,9 @@
 //      v10 拆迁后原「900ms 每拍必拉」断例按"断而不删改写"迁到此处;
 //   ③ 订阅时序:boot 基线就绪前不挂 files 订阅(防与 applyTurn 双驱动竞态);
 //   ④ waiting 看门狗(一次性,120s)+ 玩家行→waiting 的 poll ② 链;
-//   ⑤ unmount 清理纪律;⑥ bootPoll 上界+失败上屏。
+//   ⑤ unmount 清理纪律;⑥ bootPoll 上界+失败上屏;
+//   ⑦ 回合失败演出(turnError 通道批,2026-09-27):横幅上屏、等待即刻回落、
+//      存活到成功拍、空文案不吞屏、旧宿主降级留痕。
 // 设计:docs/notes/feature/2026-09-25-cards-zero-poll-migration.zh.md。
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '../../../tavern_presets/芙宁娜/preset/ui/index.js'
@@ -28,8 +30,8 @@ afterEach(() => {
 interface Call { name: string; op: string }
 
 /** 制式 rig:可变 panel 应答 + 受控 files face(记录 listener、退订真实生效)
- *  + G3 停靠面(记录卡注册的槽与解停次数)。 */
-function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean; noDockFace?: boolean }) {
+ *  + G3 停靠面(记录卡注册的槽与解停次数)+ turnError face(同法,2026-09-27 通道批)。 */
+function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean; noDockFace?: boolean; noTurnErrorFace?: boolean }) {
   const calls: Call[] = []
   const filesListeners: Array<() => void> = []
   const files = {
@@ -38,6 +40,17 @@ function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean;
       return () => {
         const at = filesListeners.indexOf(cb)
         if (at >= 0) filesListeners.splice(at, 1)
+      }
+    },
+  }
+  interface TurnErrorFact { seq?: number; code?: string; message: string }
+  const turnErrorListeners: Array<(error: TurnErrorFact) => void> = []
+  const turnError = {
+    subscribe: (cb: (error: TurnErrorFact) => void) => {
+      turnErrorListeners.push(cb)
+      return () => {
+        const at = turnErrorListeners.indexOf(cb)
+        if (at >= 0) turnErrorListeners.splice(at, 1)
       }
     },
   }
@@ -67,6 +80,7 @@ function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean;
     runScript, views, readAsset: undefined, files,
     mods: { feed: feedMod, ptr: ptrMod, para: paraMod, stage: stageMod },
   }
+  if (opts?.noTurnErrorFace !== true) tavern.turnError = turnError   // 旧宿主形态 = 面缺席
   if (opts?.noDockFace !== true) {
     // G3 停靠面(2026-09-25):记录卡注册的槽;解停计数供 unmount 纪律钉。
     tavern.dockComposer = (slot: Element) => {
@@ -74,7 +88,7 @@ function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean;
       return () => { undocks.push(1) }
     }
   }
-  return { calls, filesListeners, tavern, dockSlots, undocks }
+  return { calls, filesListeners, turnErrorListeners, tavern, dockSlots, undocks }
 }
 
 const TURN = () => ({
@@ -395,6 +409,117 @@ describe('芙宁娜 galgame 卡(v10 零轮询)', () => {
     expect(panelCalls(calls)).toHaveLength(9)                        // 9 拍后自停,不再自旋
     expect(host.querySelector('.gg-text')?.textContent).toContain('数据通道未就绪')
     expect(warn).toHaveBeenCalled()
+  })
+})
+
+describe('芙宁娜 galgame 卡(⑦ 回合失败演出:turnError 通道,2026-09-27 通道批)', () => {
+  it('失败拍:横幅上文 + waiting 即刻回 input(不耗 120s 看门狗)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    let turn = TURN()
+    const { filesListeners, turnErrorListeners, tavern } = rig({ data: () => turn })
+    const host = STAGE()
+    mount(tavern)
+    await vi.advanceTimersByTimeAsync(550)
+    expect(inInputMode()).toBe(true)
+
+    turn = { ...TURN(), lastUser: { seq: 2, text: '走了' } }        // 玩家发送已落盘
+    for (const fire of [...filesListeners]) fire()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.className).toContain('gg-waiting')
+
+    for (const push of [...turnErrorListeners]) push({ seq: 9, code: 'AUTH', message: 'Authentication Fails, Your api key: ****da6a is invalid' })
+    expect(host.className).not.toContain('gg-waiting')              // 看门狗未跑满,即刻回落
+    expect(inInputMode()).toBe(true)
+    expect(host.querySelector('.gg-err')?.textContent).toContain('****da6a')
+    expect(host.querySelector('.gg-err')?.style.display).toBe('block')
+
+    await vi.advanceTimersByTimeAsync(120_000)                      // 成功回落后的看门狗不存在,无副作用
+    expect(inInputMode()).toBe(true)
+  })
+
+  it('横幅存活到成功拍:① freshAsst 落地即揭幕;再失败可再次上屏', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    let turn = TURN()
+    const { filesListeners, turnErrorListeners, tavern } = rig({ data: () => turn })
+    const host = STAGE()
+    mount(tavern)
+    await vi.advanceTimersByTimeAsync(550)
+    turn = { ...TURN(), lastUser: { seq: 2, text: '走了' } }        // ② → waiting
+    for (const fire of [...filesListeners]) fire()
+    await vi.advanceTimersByTimeAsync(0)
+    for (const push of [...turnErrorListeners]) push({ message: 'Authentication Fails' })
+    expect(host.querySelector('.gg-err')?.style.display).toBe('block')
+
+    turn = { ...TURN(), lastUser: { seq: 2, text: '走了' }, lastAssistant: { seq: 2, text: '回来了', orig: '回来了' } }
+    for (const fire of [...filesListeners]) fire()                  // ① 新回复落定 = 成功拍
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.querySelector('.gg-err')?.textContent).toBe('')
+    expect(host.querySelector('.gg-err')?.style.display).toBe('none')
+
+    for (const push of [...turnErrorListeners]) push({ message: '再失败' })
+    expect(host.querySelector('.gg-err')?.textContent).toBe('再失败')
+    expect(host.querySelector('.gg-err')?.style.display).toBe('block')
+  })
+
+  it('快败竞态:失败拍先于玩家行落盘(404 级)——回声 ② 不进等待,真新发送照常等待', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    let turn = TURN()
+    const { filesListeners, turnErrorListeners, tavern } = rig({ data: () => turn })
+    const host = STAGE()
+    mount(tavern)
+    await vi.advanceTimersByTimeAsync(550)
+    expect(inInputMode()).toBe(true)                       // input 态(② 未到)
+
+    for (const push of [...turnErrorListeners]) push({ message: 'DeepSeek Messages request failed (404)' })
+    expect(host.querySelector('.gg-err')?.style.display).toBe('block')
+    expect(host.className).not.toContain('gg-waiting')
+
+    turn = { ...TURN(), lastUser: { seq: 2, text: '走了' } }   // 本回合玩家行迟到(快败序)
+    for (const fire of [...filesListeners]) fire()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.className).not.toContain('gg-waiting')     // 回声不当新发送(看门狗不再寄生)
+
+    turn = { ...TURN(), lastUser: { seq: 3, text: '再走' } }   // 真新发送
+    for (const fire of [...filesListeners]) fire()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.className).toContain('gg-waiting')         // 正常等待语义无恙
+  })
+
+  it('空文案不吞屏:既不上横幅也不切模式(退回看门狗兜底)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    let turn = TURN()
+    const { filesListeners, turnErrorListeners, tavern } = rig({ data: () => turn })
+    const host = STAGE()
+    mount(tavern)
+    await vi.advanceTimersByTimeAsync(550)
+    turn = { ...TURN(), lastUser: { seq: 2, text: '走了' } }
+    for (const fire of [...filesListeners]) fire()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(host.className).toContain('gg-waiting')
+
+    for (const push of [...turnErrorListeners]) push({ message: '   ' })
+    expect(host.querySelector('.gg-err')?.textContent).toBe('')
+    expect(host.querySelector('.gg-err')?.style.display).toBe('none')
+    expect(host.className).toContain('gg-waiting')                  // 无失败拍可演,状态不动
+  })
+
+  it('旧宿主无 face → console 留痕 + 骨架照建;unmount 摘订阅(fire 活表)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    const { turnErrorListeners, tavern } = rig({ noTurnErrorFace: true })
+    const host = STAGE()
+    const unmount = mount(tavern)
+    await vi.advanceTimersByTimeAsync(550)
+    expect(warn.mock.calls.some(args => String(args[0]).includes('turnError'))).toBe(true)   // 留痕降级
+    expect(host.querySelector('.gg-err')).not.toBeNull()                                     // 骨架照建
+    expect(inInputMode()).toBe(true)                                                          // 其余行为照常
+
+    unmount()
+    expect(turnErrorListeners).toHaveLength(0)                      // 订阅表清空(fire 活表——不掰已退订闭包)
   })
 })
 

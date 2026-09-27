@@ -7,6 +7,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-remotes/types'
 import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -18,6 +19,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Tavern copy. */
     'tavern': TavernKey
+  }
+}
+
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    /** The tavern root view's own current-session retain source. */
+    'tavern': unknown
   }
 }
 

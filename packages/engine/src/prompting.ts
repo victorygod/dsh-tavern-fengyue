@@ -107,12 +107,12 @@ async function runScript(
   workdir: string,
   signal: AbortSignal | undefined,
 ): Promise<{ ok: true; text: string } | { ok: false; reason: 'exit' | 'timeout' | 'abort'; exitCode?: number }> {
-  const result = await shell.run(shell.resolve({
+  const result = await (await shell.execute(shell.resolve({
     command,
     workdir,
     timeoutMs: SCRIPT_TIMEOUT_MS,
     ...(signal === undefined ? {} : { signal }),
-  }))
+  }))).result()
   if (result.aborted) return { ok: false, reason: 'abort' }
   if (result.timedOut) return { ok: false, reason: 'timeout' }
   if (result.exitCode !== 0) {

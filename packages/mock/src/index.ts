@@ -371,7 +371,15 @@ function openSse(response: ServerResponse, contentType = 'text/event-stream; cha
 }
 
 function writeSse(record: MockLlmRequestRecord, response: ServerResponse, payload: unknown): void {
-  response.write(`data: ${typeof payload === 'string' ? payload : JSON.stringify(payload)}\n\n`)
+  // Anthropic/Messages SSE frames carry an `event:` line whose name must equal
+  // the JSON `type` (the WHATWG parser defaults `frame.event` to 'message'
+  // otherwise, which the DeepSeek translator rejects as a type mismatch).
+  // String payloads stay RAW on the wire ([DONE], malformed_json) — no quoting.
+  const body = typeof payload === 'string' ? payload : JSON.stringify(payload)
+  const event = typeof payload === 'object' && payload !== null && typeof (payload as { type?: unknown }).type === 'string'
+    ? (payload as { type: string }).type
+    : undefined
+  response.write(event === undefined ? `data: ${body}\n\n` : `event: ${event}\ndata: ${body}\n\n`)
   record.chunksSent += 1
 }
 
@@ -447,8 +455,11 @@ async function streamText(
   text: string,
   delayMs: number,
 ): Promise<boolean> {
+  const anthropic = record.path.endsWith('/messages')
   for (const chunk of splitText(text, options.chunkSize)) {
-    writeSse(record, response, { choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }] })
+    writeSse(record, response, anthropic
+      ? { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: chunk } }
+      : { choices: [{ index: 0, delta: { content: chunk }, finish_reason: null }] })
     if (!await pause(delayMs, response)) return false
   }
   return true
@@ -492,12 +503,27 @@ async function completeText(
   pickSuccessText: () => string,
 ): Promise<void> {
   const text = pickSuccessText()
+  const anthropic = record.path.endsWith('/messages')
+  if (anthropic) {
+    writeSse(record, response, { type: 'message_start', message: {
+      id: 'msg-mock', type: 'message', role: 'assistant', content: [], model: 'mock',
+      stop_reason: null, stop_sequence: null,
+      usage: { input_tokens: 3, output_tokens: 0 },
+    } })
+    writeSse(record, response, { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })
+  }
   if (!await streamText(options, record, response, text, delayMs)) {
     finishRecord(options, record, 'client_closed')
     return
   }
-  writeSse(record, response, terminalChunk(reason, Array.from(text).length))
-  writeDone(record, response)
+  if (anthropic) {
+    writeSse(record, response, { type: 'content_block_stop', index: 0 })
+    writeSse(record, response, { type: 'message_delta', delta: { stop_reason: 'end_turn', stop_sequence: null }, usage: { output_tokens: Array.from(text).length } })
+    writeSse(record, response, { type: 'message_stop' })
+  } else {
+    writeSse(record, response, terminalChunk(reason, Array.from(text).length))
+    writeDone(record, response)
+  }
   response.end()
   finishRecord(options, record, 'completed', {
     // Reasoning rides the same single result event (it streams before the
@@ -764,7 +790,7 @@ export async function startMockLlmServer(options: MockLlmServerOptions): Promise
       response.writeHead(405, { allow: 'POST' }).end()
       return
     }
-    if (!path.endsWith('/chat/completions')) {
+    if (!path.endsWith('/chat/completions') && !path.endsWith('/messages')) {
       response.writeHead(404).end()
       return
     }

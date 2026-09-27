@@ -164,7 +164,12 @@ function bootstrap() {
     },
   }
   writeFileSync(join(dir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
-  writeFileSync(join(dir, 'cordis.patch.yml'), '# dsh-tavern-fengyue 项目配置由 dsh-tavern-fengyue bundle 提供；此文件只保留用户覆盖。\n[]\n')
+  // cordis.patch.yml 只在缺席时落占位——它是用户的覆盖面（例如 LLM baseURL 指向
+  // 理想舱 Anthropic 线），无条件覆写会把已有覆盖静默抹掉、打回默认端。
+  const profilePatch = join(dir, 'cordis.patch.yml')
+  if (!existsSync(profilePatch)) {
+    writeFileSync(profilePatch, '# dsh-tavern-fengyue 项目配置由 dsh-tavern-fengyue bundle 提供；此文件只保留用户覆盖。\n[]\n')
+  }
   console.log(`[dev] profile 已更新：${dir}`)
   const workspacePolicy = readFileSync(join(REPO_ROOT, 'bin', 'profile-pnpm-workspace.yaml'))
   try {

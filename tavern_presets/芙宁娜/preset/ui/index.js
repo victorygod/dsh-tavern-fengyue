@@ -1,6 +1,7 @@
 // 芙宁娜 galgame 卡入口(v11 分域·组装,2026-09-25 域重构批)。
 // 本件 = 产房+拆迁办+发牌员:等容器 → 建骨架(节点一次取定)→ 造胶囊发牌 →
-//   订阅路由(live/思考流→演出机、files→仓库、opening→重渲一拍)→ 清理表逆序。
+//   订阅路由(live/思考流→演出机、files→仓库、turnError→演出机失败拍、
+//   opening→重渲一拍)→ 清理表逆序。
 // 业务全在四件(modules manifest 装载):tavern.mods.feed(仓库·单通道摄取)/
 //   ptr(书签·读位唯一可变正本)/para(演出机·唯一推进者)/stage(舞台·演出效果);
 //   规则(切分/防剧透口径/三分支/合流/渲染/指针包)在 view.mjs 纯函数。
@@ -37,6 +38,7 @@ export function mount(tavern) {
         <div class="gg-cg-mood"></div>
         <div class="gg-greet"></div>
         <div class="gg-dialog">
+          <div class="gg-err"></div>
           <span class="gg-name">芙宁娜</span>
           <button class="gg-expand" title="展开历史"><svg width="12" height="9" viewBox="0 0 12 9"><path d="M6 1 11 8H1Z" fill="currentColor"/></svg></button>
           <button class="gg-stop" title="停止并返回输入">停止</button>
@@ -80,7 +82,7 @@ export function mount(tavern) {
       root,
       front: q('.gg-front'), back: q('.gg-back'), mood: q('.gg-cg-mood'),
       dialog: q('.gg-dialog'),
-      who: q('.gg-name'), text: q('.gg-text'),
+      who: q('.gg-name'), text: q('.gg-text'), err: q('.gg-err'),
       next: q('.gg-next'), stop: q('.gg-stop'),
       greet: q('.gg-greet'), dockSlot: q('.gg-dock-slot'),
       think: q('.gg-think'), thinkBody: q('.gg-think-body'), thinkSummary: q('.gg-think-summary'),
@@ -122,6 +124,15 @@ export function mount(tavern) {
     if (typeof unsubLive === 'function') add(unsubLive)
     const unsubReason = tavern.assistantLive?.subscribeReasoning?.(presenter.think)
     if (typeof unsubReason === 'function') add(unsubReason)
+    // 回合失败拍(2026-09-27 通道批):转写区恒隐(chat.css)意味着宿主转写里的
+    // .errMsg 红行玩家永远看不到——这个 face 是失败回合唯一可见的出口。旧宿主
+    // 无 face → 留痕降级(看门狗兜底仍在,但那是静默 120s,不是 UX)。
+    if (typeof tavern.turnError?.subscribe !== 'function') {
+      console.warn('[gg] 宿主无 turnError face——失败回合无横幅,退回静默看门狗兜底(fail-visible)')
+    } else {
+      const unsubTurnError = tavern.turnError.subscribe(error => presenter.interrupt(error?.message))
+      if (typeof unsubTurnError === 'function') add(unsubTurnError)
+    }
 
     /* ── v10 零轮询:boot 基线就绪后才订 files(早订与 boot 拍竞态);
        工作区一动即拉一拍 delta(rev 同值短路在仓库)。── */

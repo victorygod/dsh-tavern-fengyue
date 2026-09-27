@@ -22,7 +22,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { createPortal } from 'react-dom'
 import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModelDirectory, ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 // Type-only: merges the tokenUsage / contextPressure / contextBreakdown / sessionStats
@@ -175,7 +175,7 @@ function faces(ctx: ClientContext): AppFaces | undefined {
     credentials,
     models,
     conversation,
-    onCredentialsChanged: listener => ctx.remote.$on('credentials/reference-updated', listener),
+    onCredentialsChanged: listener => ctx.remote.$on('credentials/reference-updated' as never, listener),
     t: ctx.locale.bind(NS),
   }
 }
@@ -204,7 +204,15 @@ function TavernAppBody(props: AppFaces): ReactNode {
     (listener: () => void) => sessions.list.subscribe(listener),
     () => sessions.list.getSnapshot(),
   )
-  const current = list.current
+  // 当前会话:0.1.7 会话服务把 `current` 摘出了 list——「当前」= 这个 root 视图
+  // 保留了 mainView 引用的那个会话(UiSession.publishMain 的同款 retainedBy.mainView
+  // 规则)。mainViewRef 自持该引用,切换/卸载时释放;current 由 list 派生,随 retain 同步。
+  const current = useMemo(
+    () => Object.values(list.byId).find(row => (row.retainedBy.tavern ?? 0) > 0)?.id,
+    [list],
+  )
+  const mainViewRef = useRef<SessionReference | undefined>(undefined)
+  useEffect(() => () => { mainViewRef.current?.release() }, [])
   const [hasCard, setHasCard] = useState<boolean | null>(null)
   const [drafting, setDrafting] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
@@ -312,9 +320,12 @@ function TavernAppBody(props: AppFaces): ReactNode {
     const pending = readPendingSession()
     if (pending === null) return
     if (!list.ids.includes(pending as SessionId)) { clearPendingSession(); return }
-    if (list.current === pending) return
-    try { sessions.open(pending as SessionId) } catch { clearPendingSession() }
-  }, [list, sessions])
+    if (current === pending) return
+    try {
+      mainViewRef.current?.release()
+      mainViewRef.current = sessions.retain(pending as SessionId, { source: 'tavern' })
+    } catch { clearPendingSession() }
+  }, [list, sessions, current])
   // 尾代理运行态：锁值唯一来源是宿主 state().tailRunning，前端不做推断。刷新时机 =
   // 挂载/切换会话立即一次 + 每个活到的 turn/end 立即一次（TavernChatView onTurnEnd）
   // + 完成信号 command/done 到达时一次（onTurnEnd(false)）。无固定周期轮询。
@@ -379,7 +390,8 @@ function TavernAppBody(props: AppFaces): ReactNode {
   const openSession = (sessionId: SessionId): void => {
     clearPendingSession()  // 侧栏显式点行＝弃用选卡页上的空白会话
     try {
-      sessions.open(sessionId)
+      mainViewRef.current?.release()
+      mainViewRef.current = sessions.retain(sessionId, { source: 'tavern' })
     } catch (error) {
       // An unknown id in the client list must not vanish as an unhandled rejection.
       console.warn('[tavern] session open failed', error)
@@ -425,7 +437,8 @@ function TavernAppBody(props: AppFaces): ReactNode {
         setSettings(undefined)
         setSaveOpen(false)
         try {
-          sessions.open(freshId)
+          mainViewRef.current?.release()
+          mainViewRef.current = sessions.retain(freshId, { source: 'tavern' })
         } catch {
           // The refreshed list can still lack the id — back off and retry.
           if (attempts >= 8) { giveUp(); return }
@@ -1308,7 +1321,8 @@ function TavernChatView(props: {
           // 成对——上锁必有与之配对的解除信号。前端据此即时 pollTail。与 turn/end 同用
           // seq 门槛：只响应本订阅期内活到的完成信号，历史重放不触发（否则重放会在主
           // 代理刚结束、尾代理闸门尚未置位的窗口里读到 tailRunning=false 而提前解锁）。
-          if ((data['commandId'] as unknown) === 'tavern-tail-done' && typeof event.seq === 'number') {
+          // commandId 带每次结算的 seq 后缀（0.1.7 格式要求全局唯一），按前缀匹配。
+          if (typeof data['commandId'] === 'string' && data['commandId'].startsWith('tavern-tail-done') && typeof event.seq === 'number') {
             if (primed && event.seq > seenCmdDone) {
               props.onTurnEnd(false)
               // 尾行换血：清 detail 缓存让各行重取落定事实（event 触发，不带轮询）——
@@ -1333,14 +1347,24 @@ function TavernChatView(props: {
           if (reason?.kind === 'error') {
             // A failed turn enters the transcript as a history line so the
             // next message appends after it, not beneath a lingering banner.
+            const failureMessage = reason.error?.code === MISSING_CREDENTIAL ? t('chat.errorKey') : reason.error?.message ?? ''
             out.push({
               kind: 'error',
-              text: reason.error?.code === MISSING_CREDENTIAL ? t('chat.errorKey') : reason.error?.message ?? '',
+              text: failureMessage,
               time,
               args: undefined,
               ...(seq === undefined ? {} : { seq }),
               live: false,
             })
+            // 回合失败通道(2026-09-27 批):活到的失败拍实时喂卡面 face——重放
+            // (重挂载首读)不补投,转写历史行仍是失败事实的正本;文本同源同变换。
+            if (primed) {
+              cardUiRef.current?.feedTurnError({
+                ...(seq === undefined ? {} : { seq }),
+                ...(reason.error?.code === undefined ? {} : { code: reason.error.code }),
+                message: failureMessage,
+              })
+            }
           }
           {/* jscpd:ignore-end */}
           setPending(false)

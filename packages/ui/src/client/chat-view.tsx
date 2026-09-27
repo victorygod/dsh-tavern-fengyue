@@ -14,7 +14,7 @@
  */
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject, type ReactNode } from 'react'
 import {
-  DisclosureRow, IconCheckOutline16, IconCopyOutline16, IconRefreshOutline16, IconThinkOutline14, writeClipboard,
+  DisclosureRow, IconCheckOutlineMedium, IconCopyOutlineMedium, IconRefreshOutlineMedium, IconThinkOutlineMedium, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ModelDirectory } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ContextBreakdownProjection, ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -226,7 +226,7 @@ function ThinkRow(props: { t: TranslateNS<typeof NS>; text: string; live: boolea
         rowClassName={css.thinkLine}
         leadingClassName={css.thinkLead}
         titleClassName={css.thinkTitle}
-        icon={<IconThinkOutline14 size={14} />}
+        icon={<IconThinkOutlineMedium size={14} />}
         title={props.t('chat.thinkRow')}
         open={open}
         expandable={expandable}
@@ -541,7 +541,7 @@ function TailFlowRow(props: {
         rowClassName={css.thinkLine}
         leadingClassName={css.thinkLead}
         titleClassName={css.thinkTitle}
-        icon={<IconThinkOutline14 size={14} />}
+        icon={<IconThinkOutlineMedium size={14} />}
         title={props.t('chat.tailRow')}
         open={open}
         expandable={expandable}
@@ -606,7 +606,7 @@ function MessageActionsRow(props: {
         title={copied ? props.t('chat.copied') : props.t('chat.copy')}
         onClick={onCopy}
       >
-        {copied ? <IconCheckOutline16 size={13} /> : <IconCopyOutline16 size={13} />}
+        {copied ? <IconCheckOutlineMedium size={13} /> : <IconCopyOutlineMedium size={13} />}
       </button>
       {props.retry && props.onRetry !== undefined && (
         <button
@@ -614,7 +614,7 @@ function MessageActionsRow(props: {
           aria-label={props.t('chat.retry')} title={props.t('chat.retry')}
           onClick={props.onRetry}
         >
-          <IconRefreshOutline16 size={13} />
+          <IconRefreshOutlineMedium size={13} />
         </button>
       )}
     </div>

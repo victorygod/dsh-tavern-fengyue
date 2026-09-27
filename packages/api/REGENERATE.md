@@ -1,11 +1,41 @@
 # typert 生成物的再生成
 
-`lib/typert.host.*` 与 `lib/typert.remote-client.*` 是 typert 生成物（2026-09-17
-快照，源点 tavern-extraction-2026-09-17 / 078257c）。它们**已纳入版本控制**
-（`.gitignore` 里 `!packages/api/lib/typert.*` 四条例外；`lib/` 其余产物照旧忽略）。
+`lib/typert.host.*` 与 `lib/typert.remote-client.*` 是 typert 生成物（现行快照：
+2026-09-27 按 0.1.7-rc.2 生成器重生成，含 strict codec 的 `create()` 工厂；更早的
+源点是 tavern-extraction-2026-09-17 / 078257c 的 0.1.5 面貌——0.1.7 typert-loader
+要求 `mode:'strict'` + `create()`，旧产物在宿主启动时 fail loud）。它们**已纳入
+版本控制**（`.gitignore` 里 `!packages/api/lib/typert.*` 四条例外；`lib/` 其余
+产物照旧忽略）。
 
-`Remote` 方法签名未变时无需再生成；若新增/修改 RPC，回到 deepseek-harness-master
-monorepo 执行：
+## 2026-09-27 起的仓内重生成流程（已演练成功）
+
+前提：同版本上游 monorepo 检出在手（0.1.7-rc.2 = `~/Desktop/learn_code/deepseek-harness-master`）。
+
+1. 临时三件套（**生成后全部回退**，勿留仓内）：
+   - 拷上游 `packages/typert/protocol/src/*.ts` 到 `packages/typert-protocol/src/`，配
+     `package.json`（name 必须恰为 `@deepseek-ai/dsh-typert-protocol`）与 `tsconfig.json`；
+   - `tsconfig.host.json` 加 `{ "path": "./packages/typert-protocol" }` 引用，并
+     `extends ./tsconfig.base.json`（不 extends 则 paths 不生效，`Remote` 会解析到
+     node_modules 的发布 `.d.ts`、`registrationForFile` 判外 → invocations 0 →
+     fail loud "publishes Remote artifacts but has no Remote methods"）；
+   - `tsconfig.base.json` 的 paths 加 `"@deepseek-ai/dsh-typert-protocol": ["./packages/typert-protocol/src/index.ts"]`。
+2. 拷上游 `packages/typert/generator/src/*.ts` 到临时目录（`scripts/tmp-gen/`），跑：
+
+   ```js
+   import { WorkspaceTypertGenerator } from './tmp-gen/workspace.ts'
+   const g = new WorkspaceTypertGenerator(process.cwd(), { checkDiagnostics: false })
+   const [r] = g.generate(['dsh-tavern-fengyue-api'])
+   // r.js / r.dts / r.remote.js / r.remote.dts → 写 packages/api/lib/typert.{host,remote-client}.{js,d.ts}
+   ```
+
+   `checkDiagnostics: false` 是逃生舱：生成器自带的 tsc 诊断对面上的
+   `ctx.tavernService` 增强声明与嵌套 cordis 版本会误报；本仓 `pnpm typecheck`
+   全绿即为面正确性的独立证据。
+3. 回退三件套 + 临时目录，`rm -rf packages/typert-protocol`，`pnpm typecheck` 确认绿。
+
+## 历史流程（上游 monorepo 内生成，仍可用于上游侧改动）
+
+若在上游 monorepo 里动了 tavern 的 RPC 面，回那边执行：
 
     pnpm run build:lib:host          # 根目录（typertPlugin workspace 模式）
     把 packages/api/tavern/lib/typert.* 四件拷回本包 lib/

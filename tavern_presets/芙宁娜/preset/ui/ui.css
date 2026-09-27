@@ -82,6 +82,13 @@
   background: #f0d28a; vertical-align: text-bottom; animation: gg-blink .8s steps(2) infinite; }
 @keyframes gg-blink { 50% { opacity: 0; } }
 
+/* 回合失败横幅(turnError 通道批,2026-09-27):转写区恒隐后失败回合唯一可见
+   出口;红族沿用停止键(.gg-stop);存活到下一成功拍(boot/①settle 揭幕)。 ── */
+.gg-err { display: none; margin: 0 0 10px; padding: 7px 12px;
+  background: rgba(56,16,14,.72); border: 1px solid rgba(196,84,78,.5); border-radius: 10px;
+  color: #e58c86; font: 12.5px/1.7 -apple-system, "PingFang SC", sans-serif;
+  word-break: break-word; }
+
 /* ▼(右下贴底;仅存在下一段时)── */
 .gg-next { position: absolute; right: 18px; bottom: 12px;
   color: #f0d28a; font-size: 15px; opacity: 0; transition: opacity .3s; }

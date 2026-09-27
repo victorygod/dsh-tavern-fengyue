@@ -100,6 +100,27 @@ export interface TavernFilesFace {
   subscribe(listener: (hint: FilesHint) => void): () => void
 }
 
+/** * The turn-failure face (回合失败通道, 2026-09-27 批): the host pushes the
+ * chat view's live turn failures — the same text the transcript `.errMsg` row
+ * renders, LIVE ONLY (remount replays do not re-deliver; the transcript
+ * history row stays the durable record). Exists for cards that hide the
+ * transcript (galgame 形态「转写区恒隐」): they could never see the red row,
+ * which turned every failed turn into a silent spin. Pure addition — cards
+ * that never subscribe are untouched.
+ */
+export interface TavernTurnErrorFace {
+  /** Notified on every live turn failure; returns the unsubscribe. */
+  subscribe(listener: (error: { seq?: number | undefined; code?: string | undefined; message: string }) => void): () => void
+}
+
+/** One live turn-failure fact: `{ code?, message, seq? }` — mirror of the
+ * durable `turn/end` reason the transcript row renders. */
+export interface TurnErrorFact {
+  readonly seq?: number | undefined
+  readonly code?: string | undefined
+  readonly message: string
+}
+
 /** The composer-dock read face (G3, 2026-09-25): the card-registered dock slot
  *  element (null = render the composer at its default in-flow position).
  *  Change-notified; cleared on registration rollback and on handle dispose —
@@ -183,6 +204,8 @@ export interface CardUiHandle {
   readonly assistantLive: AssistantLiveFace
   /** The workspace file-change face mounted through `tavern.files`. */
   readonly files: TavernFilesFace
+  /** The turn-failure face mounted through `tavern.turnError`. */
+  readonly turnError: TavernTurnErrorFace
   /** Authoritative opening-surface truth; TavernChatView pushes it on every change. */
   setOpeningActive(active: boolean): void
   /** Push the chat view's accumulated live assistant text to the card's stream subscribers. */
@@ -191,6 +214,8 @@ export interface CardUiHandle {
   feedLiveReasoning(reasoning: string): void
   /** Push a workspace file-change hint to the card's files subscribers. */
   feedFileEvents(hint: FilesHint): void
+  /** Push a live turn failure to the card's turnError subscribers. */
+  feedTurnError(error: TurnErrorFact): void
   /** The composer-dock read face (G3): the card's registered slot element, or null. */
   readonly composerDock: ComposerDockFace
   dispose(): void
@@ -483,6 +508,18 @@ export async function loadCardUi(
   const feedFileEvents = (hint: FilesHint): void => {
     for (const listener of [...fileListeners]) listener(hint)
   }
+  // 回合失败面(2026-09-27 通道批):同 files 家族的纯事件面——不去重不缓存,
+  // 活到的失败拍即广播;门在 TavernChatView 侧(primed 门槛,重放不投)。
+  const turnErrorListeners = new Set<(error: TurnErrorFact) => void>()
+  const turnError: TavernTurnErrorFace = {
+    subscribe(listener: (error: TurnErrorFact) => void): () => void {
+      turnErrorListeners.add(listener)
+      return () => { turnErrorListeners.delete(listener) }
+    },
+  }
+  const feedTurnError = (error: TurnErrorFact): void => {
+    for (const listener of [...turnErrorListeners]) listener(error)
+  }
 
   let unmount: (() => void) | undefined
   if (indexCode !== null && indexCode.trim() !== '') {
@@ -515,6 +552,9 @@ export async function loadCardUi(
         // 文件变更信号:宿主单例(已按本会话过滤)把"工作区文件动了"推进来,卡
         // 收到即触发自己既有的 rev 门拉取(2026-09-25 通道批;纯加法,不订阅零影响)。
         files,
+        // 回合失败信号(2026-09-27 通道批):活到的 turn 失败与转写 .errMsg 行
+        // 同源同文——转写区恒隐的卡(旁态:galgame)在这里收到唯一可见的失败拍。
+        turnError,
         // 停靠面(G3,2026-09-25):声明 dock:["composer"] 的卡注册槽元素,宿主
         // 把自己的 composer 子树 portal 进去——卡零接触宿主 DOM。未声明即调用
         // = fail-visible 拒绝(console 响亮留痕),绝不静默。
@@ -540,16 +580,19 @@ export async function loadCardUi(
     opening,
     assistantLive,
     files,
+    turnError,
     composerDock: dockVault.composerDock,
     setOpeningActive,    feedAssistantLive,
     feedLiveReasoning,
     feedFileEvents,
+    feedTurnError,
     dispose(): void {
       try { unmount?.() } catch (error) { console.warn('[tavern] card ui: unmount failed —', error) }
       openingListeners.clear()
       liveListeners.clear()
       reasoningListeners.clear()
       fileListeners.clear()
+      turnErrorListeners.clear()
       dockVault.clear()
       setStyleElement(CHAT_STYLE_ID, null)
       setStyleElement(UI_STYLE_ID, null)

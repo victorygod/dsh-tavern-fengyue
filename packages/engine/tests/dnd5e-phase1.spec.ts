@@ -27,8 +27,10 @@ function rig(player = PLAYER) {
   return { cwd, base }
 }
 
-function runTool(runtime: string, tool: string, args: Record<string, unknown>) {
-  const code = `globalThis.argv=${JSON.stringify(args)};await import(${JSON.stringify(join(CARD, 'tools', `${tool}.mjs`))})`
+function runTool(runtime: string, tool: string, args: Record<string, unknown>, seed?: number) {
+  // seed 可选：core.mjs 的 setSeed 固定 LCG 流——未播种时 rnd 走 Math.random，nat1 等随缘分支让断言 1/20 概率翻红。
+  const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(join(CARD, 'lib', 'core.mjs'))})).setSeed(${seed});`
+  const code = `globalThis.argv=${JSON.stringify(args)};${prelude}await import(${JSON.stringify(join(CARD, 'tools', `${tool}.mjs`))})`
   return spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
 }
 const j = (rt: string, f: string) => JSON.parse(readFileSync(join(rt, 'characters', f), 'utf8'))
@@ -204,7 +206,8 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   it('attack 命中→hp 落盘+0HP 分叉(怪)', () => {
     const { cwd: rt, base } = rig()
     runTool(rt, 'spawn_npc', { context: 'x', name: '哥布林甲', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 })
-    const r = runTool(rt, 'attack', { context: '必中一击', who: '梅西雅', target: '哥布林甲', modifier: 20, dice: '1d6+50', type: 'piercing' })
+    // 播种（seed 2 → d20=8 非 nat1）：core.mjs 的 LCG 每进程全新，不播种则 1/20 概率 nat1 必失、测试随缘红。
+    const r = runTool(rt, 'attack', { context: '必中一击', who: '梅西雅', target: '哥布林甲', modifier: 20, dice: '1d6+50', type: 'piercing' }, 2)
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/落盘: 哥布林甲 hp 7→0 \[characters\/哥布林甲\.json\]/)
     expect(r.stdout).toContain('0HP——怪:RAW 默认即死,死活你判')
