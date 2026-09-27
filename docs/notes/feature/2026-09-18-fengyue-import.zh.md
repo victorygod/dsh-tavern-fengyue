@@ -31,17 +31,26 @@ Status: implemented
 | `cover` | 远端 URL，导入时浏览器抓取（已核对 catai.wiki 现网回 `access-control-allow-origin: *` + `image/jpeg`）；魔数嗅探定扩展名（引擎资产白名单按扩展名定 MIME）；任何失败不拦导入——报告行 + 身份头手动上传兜底 |
 | persona 脚手架、maintenancePrompt | 与 ST 折叠同款标准种子（`persona.mjs` + `setup/persona.md`、maintenance 空） |
 
-**lorebook.mjs v1.5 双匹配面**：带 `scan.kinds` 的条目（风月）取该种类集合
-最近一条消息做键匹配；无 `scan` 的条目（ST）沿用最近 N 行（argv[0] 可调，
-默认 12）拼合窗口。`value_region`（注入位）用户拍板**不另设位**——值内容一律
-注入 postPrompt 的 `{{lorebook()}}` 座，仅体量行记一句。
+**lorebook.mjs v1.6 双匹配面**：带 `scan.kinds` 的条目（风月）取该种类集合
+最近一条消息做键匹配，kinds 空数组（key_region 缺位/非数）视为**不触发**；
+无 `scan` 的条目（ST）沿用最近 N 行（argv[0] 可调，默认 12）拼合窗口。
+`_and_` 组合键按**全含**命中（风月正主 chat_core 的 and 模式，2026-09-27 裁定）；
+`value_region`（注入位）用户拍板**不另设位**——值内容一律注入 postPrompt 的
+`{{lorebook()}}` 座，仅体量行记一句。
 
 **无对位字段进导入报告**（`preset/st-import/README.md`，风月版）：system 位
-（快照无 system 行恒不命中）、`key_region` 缺落回默认 user+assistant、`_and_`
-AND 组合键（按 OR 落，报 degradation）、`group` 分组、`banned_words`、`cg_book`、
-`shortcut_commands`、`preset_chats`、无键/无内容被滤掉的条目数。风月映射全机械，
-无翻译待办清单——报告即全部，删除本目录即视为已阅。同步折叠路径
-（`importFromJson` 直呼）不发起网络请求，带 URL 无二进制时记报告行说明封面未落地。
+（快照无 system 行恒不命中；2026-09-27 裁定：**先不支持重建**）、`key_region`
+缺位（视为不触发）、`group` 分组、`banned_words`、`cg_book`（远期方向：CSS
+承载 + LLM 产出带类 HTML，见 getvar note）、`shortcut_commands`、`preset_chats`、
+`builtInCss`、`bg_image`/`bg_mobile`、`suggested_questions_after_answer`、
+无键/无内容被滤掉的条目数。风月映射全机械，无翻译待办清单——报告即全部，
+删除本目录即视为已阅。同步折叠路径（`importFromJson` 直呼）不发起网络请求，
+带 URL 无二进制时记报告行说明封面未落地。
+
+**方言识别（2026-09-27 收紧）**：`isFengyueCard` 要求 `pre_prompt` 与
+`pre_text`/`post_text`/`world_book` **同时**在场——只认后三个会误劫持带顶层
+`world_book` 的 ST 社区卡（真实战测坐实，见 getvar note 战测一节）；风月卡必有
+`pre_prompt`，ST 生态无此字段，旧 DSH 卡则三特征全无。
 
 ## 备选方案的取舍
 

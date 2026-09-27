@@ -106,3 +106,16 @@ Status: draft — 方案已对齐,待实现。不改渲染器语法契约;导入
 - 不做完整 ST 宏引擎:函数宏(random/roll/setvar/getvar)、`<BOT>`/`<USER>` 旧标记一律不迁;`{{random}}` 归脚本(`$RANDOM` 语义已存在),setvar 类拒绝。
 - 不给用户暴露「导入时把 {{char}} 烘成名字」之类选项(导入时玩家未知,语义上不可能)。
 - greeting 预览不做 RPC 渲染(锁一档客户端只读契约)。
+
+## 2026-09-27 战测与裁定(docs\test_cards 九份真实样本)
+
+用户在仓库根放入 `docs\test_cards\*` 九份真实样本(带字面反斜杠的散文件)战测:四张 ST 卡(PNG×3+JSON×1,折叠结果 json 与 png 全等)、一张真风月卡、两包正则脚本、一份 ST 设置导出。裁定与落地:
+
+1. **system 位重建 → 先不支持**(维持恒不命中+报告行);
+2. **AND 组合键 → 支持**:`foldFengyueCard` 落 `mode:"and"`,`lorebook.mjs` v1.6 全含判定,撤「AND 未迁移」报告行;
+3. **kinds 集合>1 只扫最近一条 → 维持我们的逻辑**(与风月正主的高保真合并行为差异接受);
+4. **key_region 缺位 → 不触发**(对齐 chat_core `_parse_region(0)` 空集语义,不再是默认 user+assistant);
+5. **value_region 塌缩 postPrompt → 维持**;
+6. **CG(cg_book)远期方向记档**:我们不适合照搬"[图片: url]"后缀——更贴项目的是 **CSS 承载**:图进 CSS,LLM 产出带对应 CSS 类标签的 HTML。档在本文,暂不建机制。
+7. **双方言并存确认有效**:`.json` 单入口特征分流 已实证(Rappa.json=ST 路、fengyue.json=风月路、双折叠结果正确);为兼容性收紧 `isFengyueCard`=pre_prompt ∧ 三特征任一(WT 社区顶层 world_book 卡不被劫持)。
+8. **空壳与正则包防线落地**:设置/预设导出(只名零内容)拒收;正则包(数组/ Marinara)专属文案。九卡复跑全部符合预期(4+1 OK、2 拒、1 拒)。
