@@ -9,7 +9,7 @@
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-495a7a)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-3da639)](./LICENSE)
 
-**DSH酒馆风月** —— 跑在 [dsh](https://github.com/deepseek-ai/deepseek-harness) 宿主上的 RPG 世界设定卡引擎，支持直接导入 SillyTavern 等预设卡。
+**DSH酒馆风月** —— 跑在 [dsh](https://github.com/deepseek-ai/deepseek-harness) 宿主上的 RPG 世界设定卡引擎，支持直接导入 SillyTavern 角色卡（`.png` 内嵌数据或 `.json`）与风月卡。
 
 本项目旨在引导新时代酒馆类 agent 的开发范式：agent 技术已然成熟，酒馆类应用应建立在主流 agent 架构之上，而非自造一套专有配置体系。
 
@@ -19,7 +19,7 @@
 - [特性](#特性)
 - [快速开始](#快速开始)
 - [工作空间](#工作空间)
-- [SillyTavern 卡导入](#silleytavern-卡导入)
+- [SillyTavern 角色卡与风月卡导入](#sillytavern-角色卡与风月卡导入)
 - [文档](#文档)
 - [参与贡献](#参与贡献)
 - [许可](#许可)
@@ -54,7 +54,7 @@ SillyTavern 同时抬高了使用者和卡作者的理解成本——用户不�
 ## 特性
 
 - **极简界面**——用户只需要选卡 + 对话，理解成本极低；高级用户的自定义配置靠内置 agent 协助
-- **SillyTavern 卡 / Fengyue 卡直接导入**——`.json` / `.png`；世界书自动转为 `lorebook.mjs`，正则自动转脚本，复杂逻辑交由 agent 翻译并附工作单报告，绝不静默丢弃
+- **SillyTavern 角色卡与 Fengyue 卡直接导入**——角色卡 `.png`（内嵌数据）或 `.json` 皆可；世界书自动转为 `lorebook.mjs`，正则自动转脚本，复杂逻辑交由 agent 翻译并附工作单报告，绝不静默丢弃
 - **回合尾代理（tail agent）**——叙事回合结束后自动把状态变更写入 `runtime/`，前端直读文件渲染面板，不让模型把 token 花在重复输出的状态块上
 - **自动 / 手动存档**——自动保留最近 10 次输入后的世界状态（聊天历史 + 模型上下文 + 本地文件），随时回退
 - **跨平台**——一切脚本由 Node.js 执行，跨平台
@@ -104,7 +104,7 @@ $env:DSH_HOME="$HOME\.dsh-tavern-fengyue"; dsh --profile tavern-fengyue   # Powe
 ### 首次游玩
 
 1. 侧栏「API Key」→ 填入模型 Key（或通过 `DEEPSEEK_BASE_URL` / `DEEPSEEK_API_KEY` 环境变量指定自建 endpoint）
-2. 点「＋ 开启酒馆会话」→ 三选一：从卡库选卡 / 导入 ST 卡 / 从空白骨架让 AI Agent 帮你写一张新卡
+2. 点「＋ 开启酒馆会话」→ 三选一：从卡库选卡 / 导入 ST 角色卡或风月卡 / 从空白骨架让 AI Agent 帮你写一张新卡
 3. 每回合：模型叙事 → 尾代理记账 → 面板自主刷新
 4. 头部「保存 / 加载 / 清空」随时冻结 / 恢复这个世界
 
@@ -131,9 +131,9 @@ $env:DSH_HOME="$HOME\.dsh-tavern-fengyue"; dsh --profile tavern-fengyue   # Powe
 
 进入模型上下文的一切都来自这些可打开审查的文件——这是整个项目的记忆系统。
 
-## SillyTavern 卡导入
+## SillyTavern 角色卡与风月卡导入
 
-导入 ST 卡时，世界书自动归约为 `lorebook.mjs`；正则、STScript，以及社区衍生扩展（如 MVU 变量更新体系）等无官方对应机制的源料进入 `preset/st-import/` 翻译工作单并附导入报告——能力保留，概念归一。完整机制对照见 [sillytavern-mechanics-and-import.zh.md](docs/cards/sillytavern-mechanics-and-import.zh.md)。
+导入 ST 角色卡 / 风月卡时，世界书自动归约为 `lorebook.mjs`；正则、STScript，以及社区衍生扩展（如 MVU 变量更新体系）等无官方对应机制的源料进入 `preset/st-import/` 翻译工作单并附导入报告——能力保留，概念归一。完整机制对照见 [sillytavern-mechanics-and-import.zh.md](docs/cards/sillytavern-mechanics-and-import.zh.md)。
 
 **关于 MVU**：本框架完全支持 MVU 范式，但更推荐用 `preset/tools/` 的主代理工具替代——工具调用可以「边叙事边改状态、随轮返回更新后的值」，一条叙事流内自然完成状态读写。如果不想让 tool call 打断叙事流、确需使用 MVU 的「叙事正文内嵌变量更新指令」范式，本框架下的 hook 脚本 + 前端 JS 展示层也完全支持这条路径。
 

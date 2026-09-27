@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-495a7a)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-3da639)](./LICENSE)
 
-**Tavern Fengyue (DSH)** — an RPG character-card engine running on the [dsh](https://github.com/deepseek-ai/deepseek-harness) host, with direct support for importing SillyTavern preset cards.
+**Tavern Fengyue (DSH)** — an RPG character-card engine running on the [dsh](https://github.com/deepseek-ai/deepseek-harness) host, with direct import of SillyTavern character cards (`.png` with embedded data, or `.json`) and Fengyue cards.
 
 This project aims to guide the development paradigm for tavern-style agents in the agent era: tavern-like applications should stand on mainstream agent infrastructure, not on a bespoke DSL stack.
 
@@ -19,7 +19,7 @@ This project aims to guide the development paradigm for tavern-style agents in t
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [Workspace Layout](#workspace-layout)
-- [SillyTavern Card Import](#sillytavern-card-import)
+- [SillyTavern and Fengyue Card Import](#sillytavern-and-fengyue-card-import)
 - [Docs](#docs)
 - [Contributing](#contributing)
 - [License](#license)
@@ -54,7 +54,7 @@ SillyTavern raises the learning curve for both players and card authors — play
 ## Features
 
 - **Minimalist UI** — pick a card + chat, that's it; advanced customization relies on the built-in agent
-- **Direct SillyTavern / Fengyue card import** — `.json` / `.png`; world info auto-converts to `lorebook.mjs`, regex to scripts, complex logic translated by the agent with a full report — nothing silently dropped
+- **Direct import of SillyTavern character cards (`.png` with embedded data, or `.json`) and Fengyue cards** — world info auto-converts to `lorebook.mjs`, regex to scripts, complex logic translated by the agent with a full report — nothing silently dropped
 - **Tail agent** — after each narrative turn, state changes are written to `runtime/` so the frontend renders panels directly, without the model burning output tokens repeating static state
 - **Auto/manual save** — keeps last 10 world snapshots (chat history + model context + local files) on every send, roll back anytime
 - **Cross-platform** — all scripts run on Node.js
@@ -117,7 +117,7 @@ $env:DSH_HOME="$HOME\.dsh-tavern-fengyue"; dsh --profile tavern-fengyue   # Powe
 ### First Play
 
 1. Set your API Key in the sidebar "API Key" (or set `DEEPSEEK_BASE_URL` / `DEEPSEEK_API_KEY` for a self-hosted / proxied endpoint)
-2. Click "＋ New Tavern Session" → pick a card / import an ST card / start from a blank skeleton with the AI writing agent
+2. Click "＋ New Tavern Session" → pick a card / import an ST character card / Fengyue card / start from a blank skeleton with the AI writing agent
 3. Each turn: model narrates → tail agent bookkeeps → panel refreshes itself
 4. Header "Save / Load / Reset" freezes or restores this world at any point
 
@@ -142,7 +142,7 @@ Each session creates `tavern_workspace/<timestamp>/`:
 
 Everything that enters the model's context is a local file you can open and audit — this IS the memory system of the whole project.
 
-## SillyTavern Card Import
+## SillyTavern and Fengyue Card Import
 
 On import, world info folds into `lorebook.mjs`; regex, STScript, and community-derived extensions (such as the MVU variable-update convention) land in `preset/st-import/` with a translation report — capabilities preserved, concepts consolidated. Full mapping: [sillytavern-mechanics-and-import.zh.md](docs/cards/sillytavern-mechanics-and-import.zh.md).
 
