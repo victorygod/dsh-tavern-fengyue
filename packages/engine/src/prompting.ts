@@ -499,7 +499,8 @@ export function registerWriterGuide(agentCtx: Context, root: string): void {
  * The writer-guide document: `prompts/writer-guide.md` inside this package,
  * loaded fresh at every assembly (a small file; reads keep the
  * "provider text is always current" contract) with the card's identity
- * substituted for the three placeholder slots. The template must never carry
+ * substituted for the three placeholder slots and the live workspace
+ * inventory appended as the Live card inventory block. The template must never carry
  * literal `{{…}}` sequences — writer-guide output joins the harness's strict
  * prompt-interpolation layer, and unknown names there throw.
  */
@@ -520,10 +521,97 @@ function loadWriterGuideTemplate(): string {
 function writerGuide(root: string): string {
   const meta = readCardMeta(root)
   const maintenance = readMaintenancePrompt(root) !== '' ? 'enabled (maintenancePrompt non-empty)' : 'off (maintenancePrompt empty)'
-  return loadWriterGuideTemplate()
+  const body = loadWriterGuideTemplate()
     .replaceAll('__CARD_TITLE__', meta?.title === undefined || meta.title === '' ? '(unset)' : meta.title)
     .replaceAll('__CARD_DESC__', meta?.desc === undefined || meta.desc === '' ? '(unset)' : meta.desc)
     .replaceAll('__TAIL_MODE__', maintenance)
+  return `${body}\n\n# Live card inventory (engine-generated from the workspace at every assembly; when it contradicts this guide, it and the files win)\n${writerInventory(root)}`
+}
+
+/**
+ * The per-card live inventory printed under the guide's Live card inventory
+ * heading: meta fields, prompt-file status, tools with their `agents`
+ * attribution, the hook registry, and the layout's surface declarations — all
+ * read fresh from the workspace on every assembly. Fail-soft by contract: an
+ * unreadable piece degrades to its marker line, never a throw (the guide must
+ * render for the writer even on a half-broken card). This block is the
+ * writer's ground truth against stale guide sentences and stale card-internal
+ * docs.
+ */
+function writerInventory(root: string): string {
+  const lines: string[] = []
+  const meta = readCardMeta(root)
+  if (meta === null) {
+    lines.push('- meta: preset/meta.json missing or unparseable')
+  } else {
+    const extras: string[] = []
+    if (meta.creator !== undefined && meta.creator !== '') extras.push(`creator=${meta.creator}`)
+    if (meta.version !== undefined && meta.version !== '') extras.push(`version=${meta.version}`)
+    if (meta.tags !== undefined && meta.tags.length > 0) extras.push(`tags=[${meta.tags.join(',')}]`)
+    extras.push(meta.narratorTools === false ? 'narratorTools=off (narrator ships without the read pair)' : 'narratorTools=on')
+    lines.push(`- meta: title=${meta.title === '' ? '(unset)' : meta.title}; cover=${meta.cover === '' ? '(none)' : meta.cover}; ${extras.join('; ')}`)
+  }
+  const system = readCardPrompt(root, 'systemPrompt').trim()
+  const post = readCardPrompt(root, 'postPrompt').trim()
+  lines.push(`- prompts: systemPrompt ${system === '' ? 'empty (publish rejected)' : `non-empty (${system.length} chars)`}; postPrompt ${post === '' ? 'empty' : `non-empty (${post.length} chars)`}`)
+
+  const tools: string[] = []
+  const toolsDir = join(root, PRESET_DIR, 'tools')
+  if (existsSync(toolsDir)) {
+    for (const file of readdirSync(toolsDir)) {
+      if (!file.endsWith('.mjs')) continue
+      const path = join(toolsDir, file)
+      let agents: string
+      try {
+        const schema = cardToolSchema(path, statSync(path).mtimeMs)
+        agents = schema === null ? ' (no schema, main generic)' : ` [${schema.agents.join(',')}]`
+      } catch {
+        agents = ' (schema unparseable)'
+      }
+      tools.push(`${file.slice(0, -'.mjs'.length)}${agents}`)
+    }
+  }
+  lines.push(`- tools: ${tools.length === 0 ? '(none)' : tools.join(', ')}`)
+
+  const hooksPath = join(root, PRESET_DIR, 'hooks.json')
+  let hookLine = '- hooks: (no hooks.json)'
+  if (existsSync(hooksPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(hooksPath, 'utf8')) as { hooks?: Record<string, unknown> }
+      const entries = Object.entries(parsed.hooks ?? {})
+        .filter((entry): entry is [string, unknown[]] => Array.isArray(entry[1]))
+        .map(([event, files]) => `${event}=[${files.map(String).join(',')}]`)
+      hookLine = entries.length === 0 ? '- hooks: (registry empty)' : `- hooks: ${entries.join('; ')}`
+    } catch {
+      hookLine = '- hooks: (hooks.json unparseable)'
+    }
+  }
+  lines.push(hookLine)
+
+  const layoutPath = join(root, PRESET_DIR, 'ui', 'layout.json')
+  let layoutLine = '- layout: (no layout.json — a pure conversation card is legal)'
+  if (existsSync(layoutPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(layoutPath, 'utf8')) as Record<string, unknown>
+      const parts: string[] = []
+      if (Array.isArray(parsed['modules'])) parts.push(`modules=[${parsed['modules'].map(String).join(',')}]`)
+      if (Array.isArray(parsed['dock'])) parts.push(`dock=[${parsed['dock'].map(String).join(',')}]`)
+      if (Array.isArray(parsed['suppress'])) parts.push(`suppress=[${parsed['suppress'].map(String).join(',')}]`)
+      if (Array.isArray(parsed['panels'])) {
+        const names = parsed['panels'].map(entry => (
+          typeof entry === 'object' && entry !== null && typeof (entry as { name?: unknown }).name === 'string'
+            ? (entry as { name: string }).name
+            : '?'
+        ))
+        parts.push(`panels=[${names.join(',')}]`)
+      }
+      layoutLine = parts.length === 0 ? '- layout: (base fields only)' : `- layout: ${parts.join('; ')}`
+    } catch {
+      layoutLine = '- layout: (layout.json unparseable)'
+    }
+  }
+  lines.push(layoutLine)
+  return lines.join('\n')
 }
 export /* oxlint-enable @stylistic/max-len, typescript/no-unnecessary-type-conversion, typescript/no-unnecessary-condition */
 function registerCardSections(agentCtx: Context, root: string): void {

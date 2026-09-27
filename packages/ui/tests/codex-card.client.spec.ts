@@ -9,8 +9,10 @@
 //   ④ 容器后置落地:MutationObserver 事件化补拍;
 //   ⑤ unmount 清理纪律。
 // 设计:docs/notes/feature/2026-09-25-cards-zero-poll-migration.zh.md。
+// 2026-09-27 dnd 卡本体迁出仓库（~/Desktop/dnd）；被测资产 ui/index.js 原样
+// fixture 化于 ./fixtures/dnd-codex/——本 spec 从此只钉宿主面行为，不跟卡走。
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '../../../tavern_presets/dnd/preset/ui/index.js'
+import { mount } from './fixtures/dnd-codex/index.js'
 
 afterEach(() => {
   vi.useRealTimers()

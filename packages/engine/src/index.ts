@@ -1353,10 +1353,10 @@ export class TavernRuntime extends Service {
   /**
    * Run one preset script on behalf of the card's frontend: the prompt face's
    * spawn contract (cwd = `runtime/`, timeout, abort) applied to explicit
-   * argv, so `runScript('read.sh', 'state.md')` and the prompt's
+   * argv, so `runScript('read', 'state.md')` and the prompt's
    * `{{read('state.md')}}` behave byte-for-byte the same.
    * @param sessionId - session identity.
-   * @param name - `preset/scripts/` base name (with or without `.sh`); no separators.
+   * @param name - `preset/scripts/` base name (with or without `.mjs`); no separators.
    * @param args - string arguments, one quoted argv each (16KB cap per argument).
    * @param signal - the caller's abort signal.
    * @returns the script's stdout, trimmed, plus the structured failure when the

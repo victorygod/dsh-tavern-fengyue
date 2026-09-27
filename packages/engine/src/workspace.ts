@@ -142,12 +142,13 @@ export function writeCardSkeleton(root: string): void {
     '',
   ].join('\n'))
   writeCardDirReadme(root, 'tools', [
-    '# tools/ — 主代理工具脚本',
+    '# tools/ — 代理工具脚本',
     '',
     '每个 .mjs 即一个独立工具（node 模块，stdout 即回执）。头部 /** @tavern-schema … */',
-    '注释块（JSON：description + parameters）注册为具名参数工具，参数对象在全局 `args`；',
-    '无标记脚本自动获得 {args} 泛化条目，参数收作字符串数组 `argv`。',
-    '本目录只服务主代理；尾代理的 runtime* 工具由引擎写死。',
+    '注释块（JSON：description + parameters + 可选 agents）注册为具名参数工具，参数对象在全局 `args`；',
+    '归属声明制：agents 缺省 ["main"]；声明 ["tail"] 或 ["main","tail"] 进尾代理面。',
+    '无标记脚本自动获得 {args} 泛化条目，参数收作字符串数组 `argv`；写盘须在 description 里写明落点文件。',
+    '尾代理的 runtime* 固定工具（读对＋写对＋删除）由引擎提供，不落本目录。',
   ].join('\n'))
   mkdirSync(join(root, RUNTIME_DIR), { recursive: true })
   mkdirSync(join(root, SAVINGS_DIR), { recursive: true })

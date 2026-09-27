@@ -1,7 +1,0 @@
-{
-  "transcript": { "window": "all" },
-  "panels": [
-    { "name": "codex", "slot": "right", "size": "320px" }
-  ],
-  "html": true
-}
