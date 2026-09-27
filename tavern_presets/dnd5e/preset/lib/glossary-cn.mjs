@@ -151,36 +151,6 @@ export const FEATURE_CN = {
   uncanny_dodge: '直觉闪避', vanish: '消隐', wild_shape: '荒野变形',
 }
 
-// ── 括注轻译（机械数值不译：dice/CR/环位；只译 prose 词；复合词先于单词） ──
-const PAREN_CN = [
-  [/\(([^()]*)\)/g, '（$1）'],
-  [/no flying or swim speed/g, '无飞行或游泳速度'], [/no flying speed/g, '无飞行速度'],
-  [/terrain types?/g, '地形类型'], [/terrains?/g, '地形'],
-  [/\btypes?\b/g, '类'], [/\buses?\b/g, '次'], [/\bdice\b/g, '骰'], [/\bdie\b/g, '骰'],
-  [/or below/g, '或以下'], [/or lower/g, '或以下'],
-  [/\brest\b/g, '休'], [/\blevels?\b/g, '环'], [/\benem(y|ies)\b/g, '敌人'],
-]
-
-// 特征单条名译（输入=features 行首段，如 "Spellcasting: Bard"、"Bardic Inspiration (d6)"）。
-export function featureNameCn(name) {
-  const s = String(name ?? '').trim()
-  if (!s) return s
-  // Spellcasting: X → 施法（X中文）
-  const sc = /^Spellcasting:\s*(.+)$/i.exec(s)
-  if (sc) return `施法（${cn(CLS_CN, sc[1])}）`
-  const m = /^(.*?)\s*(\([^)]*\))?$/.exec(s)
-  const base = (m?.[1] ?? s).trim()
-  let out = cn(FEATURE_CN, base)
-  if (out === base) {   // 未命中→泛化 "Base: Sub"（如 Channel Divinity: X）——译前半,后半原样
-    const c2 = /^([^:]+):\s*(.+)$/.exec(base)
-    if (c2) { const b = cn(FEATURE_CN, c2[1]); if (b !== c2[1]) out = `${b}：${c2[2]}` }
-  }
-  if (m?.[2]) { let p = m[2]; for (const [re, rep] of PAREN_CN) p = p.replace(re, rep); out += p }
-  return out
-}
-
-// ── 便捷出口（泵/表单统一调用，避免各自拼 cn） ──
+// ── 便捷出口（泵/表单统一调用，避免各自拼 cn）。特征/武器/语言/子职的消费在 view 展示层
+//    （浏览器裸串加载不能 import，自带同源副本+同名 featureNameCn）——正本只留数据表。 ──
 export const spellCn = n => cn(SPELL_CN, n)
-export const subclassCn = n => cn(SUBCLASS_CN, n)
-export const languageCn = n => cn(LANGUAGE_CN, n)
-export const weaponCn = n => cn(WEAPON_CN, n)

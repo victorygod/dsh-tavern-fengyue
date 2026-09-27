@@ -1,4 +1,8 @@
-* text=auto
+# 文本统一 LF 落盘(eol=lf 管到 checkout 工作树):Windows CI 的 autocrlf 会把
+# 无显式 eol 的文本转成 CRLF,preset/lib 的 frontmatter 解析(readFM)与多份语料
+# 逐行匹配对 \r 不耐受——2026-09-27 CI cleric 子职丢失即此根因。who 谁跑在哪都拿 LF。
+* text=auto eol=lf
 *.sh text eol=lf
 *.ps1 text eol=lf
 *.mjs text eol=lf
+*.bat text eol=crlf

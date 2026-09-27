@@ -9,11 +9,6 @@ export function rnd(max) { // 1..max
   if (_seed !== null) { _seed = (1103515245 * _seed + 12345) % 2147483648; return (_seed % max) + 1 }
   return randomInt(1, max + 1)
 }
-export function d20(mode) {
-  if (mode === 'adv') return Math.max(rnd(20), rnd(20))
-  if (mode === 'dis') return Math.min(rnd(20), rnd(20))
-  return rnd(20)
-}
 export function rollExpr(expr) { // '2d6+3' → {dice:[..], mod, total}
   const m = /^(\d+)d(\d+)([+-]\d+)?$/.exec(String(expr).replace(/\s/g, ''))
   if (!m) return null
@@ -22,7 +17,6 @@ export function rollExpr(expr) { // '2d6+3' → {dice:[..], mod, total}
   return { dice, mod, total: dice.reduce((a, b) => a + b, 0) + mod }
 }
 export const mod = (stat) => Math.floor((stat - 10) / 2)
-export const pb = (level) => 2 + Math.floor((Math.min(level, 20) - 1) / 4)  // 旧式(消费点迁 pbOf 后退役)
 // 单键统一律(2026-09-26):level 一键承载双语义——成长者=等级,怪=CR(0.25 小数合法)。
 // pbOf 两端 clamp(1,30):旧 pb 的 min(,20) 双端皆错(0.25 算 +1 虚低;CR21+ 封顶 +6 错杀 +7..+9)。
 export const pbOf = (lv) => 2 + Math.floor((Math.min(Math.max(Number(lv) || 1, 1), 30) - 1) / 4)
@@ -45,7 +39,6 @@ export function readChar(who) {
   if (!f) err(`!角色不存在:${who}`)
   return JSON.parse(readFileSync(f, 'utf8'))
 }
-export function charFileOf(who) { return findCharFile(who) ?? err(`!角色不存在:${who}`) }
 
 // ── 战斗节（state.md「## 战斗」——combat.json 已废,2026-09-20 定案战斗入 state.md）──
 // 行语法(2026-09-26 敌行瘦身)：- 回合：N ／ - 先攻：名:init > 名:init ／ - 敌行|友行：名 | path:lorebook相对路径 | 状态文本
@@ -80,7 +73,6 @@ export function parseCombat() {
   const names = new Set(foes.map(f => f.name))
   return { round: rd ? +rd[1] : null, order: ord.map(o => ({ ...o, side: names.has(o.who) ? 'enemy' : 'pc' })), enemies: foes, allies }
 }
-export const combatFoe = (target) => parseCombat()?.enemies.find(e => e.name === target) ?? null
 
 // ── 附近 NPC 三态名单(v4,2026-09-25 用户定案复活 state 节——推翻 v3「零名单」案)──
 // state.md「## 附近 NPC」节,行式 `- 名 | 同伴/中立/敌对`;名单=唯一在场真源:
@@ -109,10 +101,11 @@ export function presence() {
 
 export function readFM(rel) { // lorebook frontmatter 简易解析（key: value / 二级 list）
   const raw = readFileSync(`dnd5e-srd-lorebook/${String(rel).replace(/^dnd5e-srd-lorebook\//, '')}`, 'utf8')  // 容错全路径（combat path 曾存全前缀→双拼 ENOENT）
-  const m = /^---\n([\s\S]*?)\n---/.exec(raw)
+  // \r? 容忍 CRLF 语料（Windows CI checkout 曾把 .md autocrlf 化 → 前导 ---\n 不匹配 → fm 全丢）
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(raw)
   if (!m) return {}
   const fm = {}; let cur = null
-  for (const line of m[1].split('\n')) {
+  for (const line of m[1].split(/\r?\n/)) {
     const li = /^  - (.*)$/.exec(line)
     if (li && cur) { fm[cur] = [...(fm[cur] ?? []), coerce(li[1])]; continue }
     const kv = /^([a-z_]+):\s*(.*)$/.exec(line)
@@ -157,10 +150,6 @@ export function equipmentFM(name) {
 // ── 目标结算解析咽喉(2026-09-25:attack/cast 共一,斩静默默值——事故:梅西雅存 player.json,
 //    attack 手写 existsSync('characters/梅西雅.json') 落空 → AC 静默留 10)──
 // 失败策略归调用方:此处一律返回 null,由工具 err() 逼 DM 补敌行/建档/转写,绝不涂默认值。
-export const combatRow = (name) => {  // 敌行∪友行(挨打的可能是任意一侧)
-  const c = parseCombat()
-  return c ? (c.enemies.find(e => e.name === name) ?? c.allies.find(e => e.name === name) ?? null) : null
-}
 export function deriveAC(j) {
   // AC 律单源(原 ui_data 与 attack 各持一份「同律」注释,分叉即 bug 温床):
   // ac_dex_bonus:true=加敏(带 cap 取 min);键缺席=重甲定值。dex 缺席且需敏 → null

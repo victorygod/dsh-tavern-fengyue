@@ -29,7 +29,11 @@ function rig(player = PLAYER) {
 
 function runTool(runtime: string, tool: string, args: Record<string, unknown>, seed?: number) {
   // seed 可选：core.mjs 的 setSeed 固定 LCG 流——未播种时 rnd 走 Math.random，nat1 等随缘分支让断言 1/20 概率翻红。
-  const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(pathToFileURL(join(CARD, 'lib', 'core.mjs')).href)})).setSeed(${seed});`
+  // URL 必须与工具侧 import 完全同路（工具= process.cwd()+'/../preset/lib'，即 base/preset 拷贝件）：
+  // 同文件才同 URL 才同模块实例，seed 才打得进工具用的 LCG——此前 prelude 引仓库原件，seed 打在
+  // 没人用的实例上，CI mac 2026-09-27 掷出 nat1 即此根因。
+  const TOOL_CORE = join(dirname(runtime), 'preset', 'lib', 'core.mjs')
+  const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(pathToFileURL(TOOL_CORE).href)})).setSeed(${seed});`
   const code = `globalThis.argv=${JSON.stringify(args)};${prelude}await import(${JSON.stringify(pathToFileURL(join(CARD, 'tools', `${tool}.mjs`)).href)})`
   return spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
 }
