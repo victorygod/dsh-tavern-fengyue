@@ -2,7 +2,12 @@
 
 [English](README.md) | 中文
 
+[![CI](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml/badge.svg)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
 [![dsh-plugin](https://img.shields.io/badge/dsh--plugin-plugin-2b6cb0)](https://github.com/topics/dsh-plugin)
+[![dsh](https://img.shields.io/badge/dsh-0.1.7--rc.2-2b6cb0)](https://www.npmjs.com/package/@deepseek-ai/dsh)
+[![node](https://img.shields.io/badge/node-%E2%89%A522.19%20%7C%7C%20%E2%89%A524-339933)](https://nodejs.org)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-495a7a)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-3da639)](./LICENSE)
 
 **DSH酒馆风月** —— 跑在 [dsh](https://github.com/deepseek-ai/deepseek-harness) 宿主上的 RPG 世界设定卡引擎，支持直接导入 SillyTavern 等预设卡。
 
@@ -58,7 +63,7 @@ SillyTavern 同时抬高了使用者和卡作者的理解成本——用户不�
 
 **前置**：Node.js ≥ 22.19 或 ≥ 24，pnpm（`npm i -g pnpm` 或 `corepack enable`）。
 
-**兼容性**：已在 `@deepseek-ai/dsh` **0.1.5-rc.1 / 0.1.5-rc.2 / 0.1.7-rc.2（next）** 上验证（0.1.7 迁移定案见 [docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md](docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md)）——清单列在 [`config/dsh-compatibility.json`](config/dsh-compatibility.json)，`pnpm bootstrap` 会把最新的已验证版本装进 profile。上游 dsh 处于 developer preview(内核明示会有破坏性变更)；新版 dsh 若破坏 tavern profile，重跑 `pnpm bootstrap` 恢复已验证版本，或按 [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md) 的外装回退路径操作。
+**兼容性**：已在 `@deepseek-ai/dsh` **0.1.7-rc.2（npm `next`）** 上验证——清单列在 [`config/dsh-compatibility.json`](config/dsh-compatibility.json)，`pnpm bootstrap` 会把最新的已验证版本装进 profile。0.1.7 迁移（2026-09-27，适配六个宿主破坏面，定案见 [docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md](docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md)）**退役了 0.1.5 支持**——0.1.5 宿主已无法装配本 profile，开发工具链对已验证清单 fail loud。上游 dsh 处于 developer preview(内核明示会有破坏性变更)；新版 dsh 若破坏 tavern profile，重跑 `pnpm bootstrap` 恢复已验证版本，或按 [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md) 的外装回退路径操作。
 
 ### 本项目的分发形态
 
@@ -83,9 +88,11 @@ pnpm tavern        # 前台启动宿主；Ctrl-C 结束
 
 ### 日常运行
 
-在本检出里再跑 `pnpm tavern` 即可。profile 的包与宿主都来自本检出（`link:` 依赖），所以改完源码 `pnpm build` 就够——profile 会实时重新应用 bundle 层。
+日常就在本检出里跑 `pnpm tavern`——**不需要任何环境变量**：dev 编排器自己注入。profile 的包与宿主都来自本检出（`link:` 依赖），所以改完源码 `pnpm build` 就够——profile 会实时重新应用 bundle 层。
 
-若想用全局安装的 `dsh` 驱动同一个 profile，那个宿主必须读到 profile 所在的家目录：
+独立家目录的存在理由：profile 写进自己的 harness home（`~/.dsh-tavern-fengyue`），宿主真实的 `~/.dsh` 与其中的既有 profile 永不被触碰——酒馆可以和你其余的 dsh 环境并存。
+
+唯一需要手写 `DSH_HOME` 的场合：用**全局安装的 `dsh`** 驱动同一个 profile。那是另一个宿主二进制，默认只看 `~/.dsh`，找不到本 profile，所以要指到 profile 所在的家——而且它的版本必须与上方已验证线一致（`pnpm tavern` 保证的正是 pin 在 devDependency 里的那个版本）：
 
 ```sh
 DSH_HOME=~/.dsh-tavern-fengyue dsh --profile tavern-fengyue               # bash / zsh

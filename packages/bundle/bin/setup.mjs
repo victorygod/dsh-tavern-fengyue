@@ -176,7 +176,7 @@ async function main() {
     const probe = runNode(join(PKG_DIR, 'bin', 'compat-probe.mjs'), { stdio: 'inherit' })
     if (probe.status !== 0) {
       console.error('setup: 现场探测未通过——当前宿主与插件不匹配。')
-      console.error(`  回到已验证版本: npm i -g @deepseek-ai/dsh@${VERIFIED[VERIFIED.length - 1] ?? '0.1.5-rc.1'}`)
+      console.error(`  回到已验证版本: npm i -g @deepseek-ai/dsh@${VERIFIED[VERIFIED.length - 1] ?? '0.1.7-rc.2'}`)
       console.error(`  卸载本插件: dsh plugin --profile ${PROFILE} remove ${PLUGIN_PACKAGE}`)
       process.exit(1)
     }

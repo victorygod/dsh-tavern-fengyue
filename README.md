@@ -2,7 +2,12 @@
 
 English | [中文](README.zh.md)
 
+[![CI](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml/badge.svg)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
 [![dsh-plugin](https://img.shields.io/badge/dsh--plugin-plugin-2b6cb0)](https://github.com/topics/dsh-plugin)
+[![dsh](https://img.shields.io/badge/dsh-0.1.7--rc.2-2b6cb0)](https://www.npmjs.com/package/@deepseek-ai/dsh)
+[![node](https://img.shields.io/badge/node-%E2%89%A522.19%20%7C%7C%20%E2%89%A524-339933)](https://nodejs.org)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-495a7a)](https://github.com/victorygod/dsh-tavern-fengyue/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-3da639)](./LICENSE)
 
 **Tavern Fengyue (DSH)** — an RPG character-card engine running on the [dsh](https://github.com/deepseek-ai/deepseek-harness) host, with direct support for importing SillyTavern preset cards.
 
@@ -58,7 +63,7 @@ SillyTavern raises the learning curve for both players and card authors — play
 
 **Prerequisites**: Node.js ≥ 22.19 or ≥ 24, pnpm (`npm i -g pnpm` or `corepack enable`).
 
-**Compatibility**: verified against `@deepseek-ai/dsh` **0.1.5-rc.1 / 0.1.5-rc.2 / 0.1.7-rc.2 (next)** — the list lives in [`config/dsh-compatibility.json`](config/dsh-compatibility.json), and `pnpm bootstrap` installs the newest verified version into the profile. Upstream dsh is in developer preview with breaking changes expected; if a newer dsh breaks the tavern profile, re-run `pnpm bootstrap` to restore the verified profile, or follow the external-install fallback in [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md).
+**Compatibility**: verified against `@deepseek-ai/dsh` **0.1.7-rc.2 (npm `next`)** — the list lives in [`config/dsh-compatibility.json`](config/dsh-compatibility.json), and `pnpm bootstrap` installs the newest verified version into the profile. The 0.1.7 migration (2026-09-27; six breaking host surfaces adapted, see [the decision note](docs/notes/architecture/2026-09-27-dsh-017-migration.zh.md)) **retired 0.1.5 support** — the profile no longer assembles on a 0.1.5 host, and the dev tooling asserts the verified list fail-loud. Upstream dsh is in developer preview with breaking changes expected; if a newer dsh breaks the tavern profile, re-run `pnpm bootstrap` to restore the verified profile, or follow the external-install fallback in [docs/release/independence-and-release.zh.md](docs/release/independence-and-release.zh.md).
 
 ### How this is distributed
 
@@ -83,20 +88,24 @@ prints its full URL (with a login token) on boot. `--port` overrides it:
 `pnpm tavern --port 3099`.
 
 `pnpm tavern` runs the host this repo pins as its own devDependency
-(`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required**. Unless
-`DSH_HOME` is already exported, it keeps its own harness home (`~/.dsh-tavern-fengyue`) and
-leaves an existing `~/.dsh` untouched — **an exported `DSH_HOME` wins**, and then the profile
-lands there instead. Set `DSH_HOME` to relocate the home, and re-run `pnpm bootstrap` after
-changing it.
+(`node_modules/@deepseek-ai/dsh`), so **a globally installed `dsh` is not required** — and no
+`DSH_HOME` in your shell either: the dev orchestrator injects it. The profile lives in its own
+harness home (`~/.dsh-tavern-fengyue`), leaving an existing `~/.dsh` untouched; an exported
+`DSH_HOME` wins and relocates the home (re-run `pnpm bootstrap` after changing it).
 
 ### Daily Use
 
-Run `pnpm tavern` again from this checkout. Both the profile's packages and the host come from
-here (they are `link:` dependencies), so after a source edit `pnpm build` is all it takes — the
-profile re-applies the bundle layer live.
+Day to day, `pnpm tavern` from this checkout is all it takes — **no env vars needed**. Both the
+profile's packages and the host come from here (they are `link:` dependencies), so after a source
+edit `pnpm build` is all it takes — the profile re-applies the bundle layer live.
 
-To drive the same profile with a globally installed `dsh` instead, that host has to read the
-home the profile was written into:
+The separate harness home exists so the host's real `~/.dsh` — and any profile you already keep
+there — is never touched; the tavern profile can sit alongside the rest of your dsh setups.
+
+The one case where you set `DSH_HOME` by hand is driving the same profile with a **globally
+installed `dsh`**: a different host binary, which would otherwise look in its default
+`~/.dsh` and miss the profile — and whose version then has to match the verified line above
+(the pinned devDependency is what `pnpm tavern` guarantees):
 
 ```sh
 DSH_HOME=~/.dsh-tavern-fengyue dsh --profile tavern-fengyue               # bash / zsh
