@@ -26,6 +26,8 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     /** The tavern root view's own current-session retain source. */
     'tavern': unknown
+    /** The tail-live module's one-shot subagent follow (tail-live.ts 直跟尾子会话). */
+    'tavern-tail': unknown
   }
 }
 

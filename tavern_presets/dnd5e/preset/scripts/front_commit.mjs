@@ -4,6 +4,9 @@
 // 每笔成功在 .front-ops.jsonl 落一行「做了什么·产生什么效果」——{{get_player_ops()}} 注给 DM(玩家操作
 // 不进 transcript,面板只体现结果现值,行为事件由此单独到桌;tail 无权此文件,maintenancePrompt 未提)。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
+const { materializeSpellDetails } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-build.mjs').href)
 const inp = JSON.parse(globalThis.argv?.[0] ?? globalThis.argv ?? '{}')
 const who = inp.who
 const file = `characters/${who}.json`
@@ -35,7 +38,7 @@ if (inp.op === 'asi') {
     const cur = j[st] ?? 10; cur + v <= 20 || fail(`${st} 超上限(现${cur})`)
     j[st] = cur + v
     eff.push(`${STAT_CN[st] ?? st} +${v}（${cur}→${j[st]}）`)
-    if (st === 'con') { j.hp_max += (j.level ?? 1) * v; j.hp += (j.level ?? 1) * v; eff.push(`HP 上限追溯 +${(j.level ?? 1) * v}（现 ${j.hp}/${j.hp_max}）`) }
+    if (st === 'con') { const d = Math.floor((cur + v - 10) / 2) - Math.floor((cur - 10) / 2); if (d > 0) { j.hp_max += (j.level ?? 1) * d; j.hp += (j.level ?? 1) * d; eff.push(`HP 上限追溯 +${(j.level ?? 1) * d}（CON 调整值 ${Math.floor((cur - 10) / 2)}→${Math.floor((cur + v - 10) / 2)}）`) } }
   }
   j.pending.splice(j.pending.findIndex(p => String(p).includes('ASI')), 1)
   writeFileSync(file, JSON.stringify(j, null, 1))
@@ -48,10 +51,23 @@ if (inp.op === 'asi') {
   learned.length === 2 || fail(`每档恰学 2 个新法术(现 ${learned.length})——学不满请整档悬置`)
   for (const s of learned) {
     const slug = s.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    existsSync(`dnd5e-srd-lorebook/spells/${slug}.md`) || fail(`法术不存在:${s}`)
+    // 法术纯数据(SPELL_CORE 快照,2026-09-30——学法术零 lorebook 零回退);查无即拒
+    const fm = SPELL_CORE[slug]?.fm
+    fm || fail(`法术不存在:${s}`)
+    // L3 三检:①本职业表 ②非戏法 ③环位≤可施
+    const cls = String(j.class ?? '').toLowerCase()
+    const classes = (Array.isArray(fm.classes) ? fm.classes : typeof fm.classes === 'string' ? fm.classes.split(',').map(c => c.trim()) : []).map(c => String(c).toLowerCase())
+    classes.length && classes.includes(cls) || fail(`法术非本职业表:${s}`)
+    const lvl = +fm.level
+    lvl >= 1 || fail(`戏法不占新术配额:${s} 是 0 环`)
+    const maxSlot = Math.max(0, ...Array.from({ length: 9 }, (_, i) => +(j[`slots_l${i + 1}`] ?? 0)).filter(v => v > 0))
+    lvl <= maxSlot || fail(`环位超可施:${s}(${lvl} 环 > 可施 ${maxSlot} 环)`)
     known.push(s)
   }
   j.spells_known = known
+  // 档案自含(2026-09-30):学进的新法术详情 append——spell_details 与名单双写,注入卡语义自足
+  const details = materializeSpellDetails(learned)
+  j.spell_details = [...(Array.isArray(j.spell_details) ? j.spell_details : []), ...details]
   j.pending.splice(j.pending.findIndex(p => String(p).includes('新法术')), 1)
   writeFileSync(file, JSON.stringify(j, null, 1))
   logOp(`学习新法术：${learned.join('、')}`)

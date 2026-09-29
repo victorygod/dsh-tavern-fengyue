@@ -9,8 +9,8 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 分区 | 文件 | 格式 | 主要读者 | 内容域 |
 |---|---|---|---|---|
 | 人物 | `characters/player.json`（固定名）/ `<名>.json` | JSON | roll/trade/ui_data/尾代/前端 | 机件（六维/hp/熟练/施法位/资源池/装备引用/钱包）+ 叙事（persona/biography 行数组） |
-| 战斗 | `state.md`「## 战斗」节（combat.json 已废 2026-09-20） | md 行 | roll/尾代/前端/attack·cast 工具 | `- 回合：N`/`- 先攻：名:值 > …`/`- 敌行：名 | HP 现值/上限 | AC n | path:… | 状态`/`- 友行：` 同语法——解析归 core.parseCombat |
-| 世界 | `state.md` | md | 尾代/泵/DM | frontmatter time_* + 六节（篇章/主线/支线/伏笔/所在/时间）+ 队伍 + 附近 NPC（三态名单,v4）+ 战斗节 |
+| 战斗 | `state.md`「## 战斗」节（combat.json 已废 2026-09-20） | md 行 | roll/尾代/前端/attack·cast 工具 | `- 回合：N`/`- 先攻：名:值 > …`/`- 参战行：名 | 状态`(2026-09-29b 敌我退役:参战名单即战斗名单,HP/AC 走档案)`——旧 敌行/友行 行式兼容读;解析归 core.parseCombat |
+| 世界 | `state.md` | md | 尾代/泵/DM | frontmatter time_* + 任务/伏笔 + 玩家所在（五级）+ 时间敏感项登记表 + 队伍 + 附近 NPC（三态名单,2026-09-30 stance 回锅——`- 名 | 同伴/中立/敌对`,在场关系快照）+ 战斗节（篇章/主线/支线/上回合变化 2026-09-28 退役——任务单节、开局不立项；变化不再另行登记＝注入快照+回执落盘行） |
 | 规则 | `dnd5e-srd-lorebook/` | md | runtimeRead/工具 join（书本 UI 已删） | 静态只读（1164 篇） |
 
 ## 二 · 可变中间变量（值的四种居所）
@@ -19,7 +19,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 
 | 变量 | 居所 | 写者/更新时机 | 读者 |
 |---|---|---|---|
-| `hp / hp_max / temp_hp` | **存储** player | 尾代每回合照正文数字落账 | 全体 |
+| `hp / hp_max` | **存储** player | attack/cast/damage/heal/hp_change 当拍写（2026-09-26 直写批；temp_hp 已退役见 audit-fixes §6） | 全体 |
 | `death_success / death_fail`（v8.1 起字段已删） | **参数中继 + transcript** | death 工具入参:DM 传当前计数,回执给判定;濒死序列由 transcript 承载,零落盘 | death 结算、DM 口头中继 |
 | `exhaustion` | **存储** player | 尾代（长休−1 须 rest 铁轨校验） | roll（力竭劣势）、前端 |
 | `slots_l1…l9`（现量） | **存储** player | roll 施法闸回执建议 → 尾代落 | roll 闸、前端位条 |
@@ -47,10 +47,10 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 - **时间推移检查清单（2026-09-19 总集，逐项有 SRD/BR 出处）**——按流逝时钟分档：
   - **每轮**（combat.round）：轮单位 statuses −1；怪 per-round 特性（lorebook 查）；
   - **每小时**（time_hour）：分/时单位 statuses 折算 −1；强行军（日行军>8h 部分，每小时 CON DC10+超出时数，失败力竭+1 [BR p.67]）；短休窗口（正文声明→HD 掷骰走 damage）；
-  - **每日**（time_day）：日单位 statuses −1；**绝食**（无食超 3+CON 天→每日末自动力竭+1 [BR p.70]）；**缺水**（减半→每日 CON DC15 失败力竭+1；更少自动 +1 [BR p.70]）；生活方式日费（驻留城镇，gain_money）；downtime 进度（+1 天）；**法师奥法回复 1/日重置**；疾病/长效毒按条目时间轴（sewer plague 1d4 天发作类）；长休窗口（声明+last_long_rest≥24h→落账细则）；冒险日预算重置（长休完成）；
+  - **每日**（time_day）：日单位 statuses −1；**绝食**（无食超 3+CON 天→每日末自动力竭+1 [BR p.70]）；**缺水**（减半→每日 CON DC15 失败力竭+1；更少自动 +1 [BR p.70]）；生活方式日费（驻留城镇，gain_money）；downtime 进度（+1 天）；**法师奥法回复 1/日重置**；疾病/长效毒按条目时间轴（sewer plague 1d4 天发作类）；长休窗口（声明+last_long_rest≥24h→落账细则）；遭遇预算重置（长休完成）；
   - **通用扫尾**：statuses 全表按单位折算；"场景"单位地点切换清除；pending 未决提示。
   - 主代理侧（非转录清单）：强行军/疾病/HD 掷骰（check/damage）；流逝声明可结算；旅行遭遇机会（DMG 口径叙事裁量）。
-- **「时间敏感项」登记表（2026-09-19 落 state.md）**：清单的活实例——队伍/世界级时间账（绝食/缺水计数、生活方式、downtime、奥法回复日旗、长休窗口、疾病进程、冒险日预算消耗）；角色 buff 类不进登记表（在各 character statuses，避免双真值）。尾代=逐项结算者，主代理=照表叙事（紧迫感：断粮第几天/能否长休）。
+- **「时间敏感项」登记表（2026-09-19 落 state.md）**：清单的活实例——队伍/世界级时间账（绝食/缺水计数、生活方式、downtime、奥法回复日旗、长休窗口、疾病进程、遭遇预算消耗）；角色 buff 类不进登记表（在各 character statuses，避免双真值）。尾代=逐项结算者，主代理=照表叙事（紧迫感：断粮第几天/能否长休）。
 - **状态到期不是玩家决策点**——机械事件直接落账（HUD 可见）；是否叙述到期=DM 叙事裁量。玩家决策点只有既有机制类（ASI 前端点选/休整提议/HD 花费对话声明）。
 - 依据：语料 319 法术时长实测分布（瞬时 87/1分钟 61/10分钟 30/1小时 26/8h 15/24h 12/1轮 9/10天 5）——时长是跨战斗内外的真实机械轴，单单位递减必错。
 
@@ -63,7 +63,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 面 | 覆盖 | 归宿/定案 |
 |---|---|---|
 | **A 生存成长**（peer 统一） | 等级线/体质线/防护线/熟练线/施法线/资产线 | 全员同 schema 同规则链；**键能力裁剪律**：『没有什么能力，就没有相关字段』，对所有角色（玩家同律）——能力族见下 |
-| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 五件 / biography / 活状态（statuses·exhaustion·concentrating） / 位置 | **biography 双职能：出生段=背景，运行时追加行=记忆**——不设 memory 键（避免双真值）；位置不落盘（state.md「## 附近 NPC」三态名单路由,v4——在场与敌友态皆以行为准）；**秘密=biography 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
+| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 五件 / biography / 活状态（statuses·exhaustion·concentrating） / 位置 | **biography 双职能：出生段=背景，运行时追加行=记忆**——不设 memory 键（避免双真值）；位置不落盘（state.md「## 附近 NPC」三态名单路由——在场与敌我快照皆以行为准,尾代随剧情改列）；**秘密=biography 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
 | **C 交互**（工具链已跨 who） | gear/weapons/三币/languages/技能对抗/施法对冲 | 无新增键 |
 
 **键能力裁剪律（2026-09-19 定案，取代两档制；对所有角色含玩家）**——字段存在性跟随能力：无某能力/机制参与 → 对应键族**整族不出生**（不留 0/空壳）：
@@ -76,7 +76,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 训练参与 | save_prof / skill_prof / expertise / armor_prof / weapon_prof / tool_prof | 不出生，检定/对抗按裸属性解析 |
 
 - **已整机制删除（非裁剪，与能力无关）**：inspiration（灵感=扮演奖励归 DM 叙事）/ resources（并入 features 行内池状态）/ origin / death_success·fail（濒死=参数中继+transcript）。
-- **核心键永不裁**：身份（class/level/race/background/subclass）/ 六维 / hp 族 / 防护（armor·shield·speed·darkvision·resist·immune）/ 资产三币 / gear / weapons / persona / biography / statuses·exhaustion·temp_hp / languages。
+- **核心键永不裁**：身份（class/level/race/background/subclass）/ 六维 / hp 族 / 防护（armor·shield·speed·darkvision·resist·immune）/ 资产三币 / gear / weapons / persona / biography / statuses·exhaustion / languages。
 - 叙事示例：战士玩家天生无施法族，酒馆掌柜无训练面——与场景 NPC 同律（这正是『玩家=peer』的字段表达）；剧情需要时补族，schema 始终一份。
 - 工具侧：读缺席键=结构化报错（tools 一·可选键律），不得 NaN 崩读。
 
@@ -109,7 +109,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 
 | 内容 | 语料? | 出处与我们的去处 |
 |---|---|---|
-| 冒险日节奏(6~8 场+两短休) | ❌ | DMG·创造遭遇章 → systemPrompt 点睛(声明"DMG 口径非 SRD") |
+| 长休周期节奏(6~8 场+两短休) | ❌ | DMG·创造遭遇章 → systemPrompt 点睛(声明"DMG 口径非 SRD") |
 | 灵感规则(授予/消耗) | ❌(仅优劣势章一句顺带提及) | PHB → **房规采纳声明**(panel 字段+roll 参数保留,systemPrompt 记一句"SRD 无此章,按 PHB 惯例自定授予时机") |
 | XP 升级阈值表 | ❌ | advance.mjs 内置常量(唯一载体,既定设计) |
 | 遭遇预算(CR×XP×系数) | ❌ | DMG → DM 心算口径( encounter 工具已撤;数字源=联网核验非语料) |
@@ -144,13 +144,13 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
        └ 奖励: XP(参战均分)/loot → 短休或推进
 ```
 
-### 4.6 冒险日节奏(口径声明:DMG 非 SRD)
-长休之间的冒险日=6~8 场中/难+两口短休,榨 HP/HD/位至近竭——5e 职业平衡的隐含前提。我们 PC+同伴=四人队数学原生适用;落位=systemPrompt 点睛。
+### 4.6 长休周期节奏(口径声明:DMG 非 SRD)
+两次长休之间=6~8 场中/难+两口短休,榨 HP/HD/位至近竭——5e 职业平衡的隐含前提(即 DMG"The Adventuring Day"口径)。我们 PC+同伴=四人队数学原生适用;落位=systemPrompt 点睛。
 ## 五 · agent 流程映射草案（⟦讨论⟧ 待议——本节是讨论稿非定案）
 
 | SRD 流程步 | 我们的落点 | 悬点 |
 |---|---|---|
-| 4.1 冒险日 | DM 叙事推进+rest/advance 罐头；state.time 由尾代推进 | 时间粒度：小时？战斗轮折算？ |
+| 4.1 长休周期 | DM 叙事推进+rest/advance 罐头；state.time 由尾代推进 | 时间粒度：小时？战斗轮折算？ |
 | 4.2-1 突袭 | DM 判断 → roll（敌方 Stealth vs 面板被动醒觉） | 被突袭者跳过首回合=DM 纪律 |
 | 4.2-3 先攻 | roll 先攻分支（一次全团；同种怪一掷）→ 回执序列 → 尾代誊 combat.order | ⟦讨论⟧ round 推进：DM 正文宣告"新一轮"→尾代+1？还是尾代按 act_index 循环自判？ |
 | 4.3 玩家回合 | 玩家输入驱动（策略→DM 叙事）；NPC/同伴回合=DM 推演 | 同伴是 DM 操还是玩家指挥？⟦讨论⟧ |

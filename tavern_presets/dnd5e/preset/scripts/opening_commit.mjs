@@ -5,14 +5,21 @@
 // 2026-09-25 成长流定案:创角不再"单薄"——技能按语料白名单校验(选数按职业)、施法者出生
 //   即有戏法/首环(缺者服务端 roll 兜底,有者校验)、L1 子职落 subclass、训练面按职业白名单出生、
 //   特征回充时机按表(池类才标,非池 |—)、description/backstory 中文组装。
+// 2026-09-29 class 派生体抽出 lib/class-build.mjs(buildClass/classHpMax)——本件只留玩家特有面:
+//   能力 roll、spells 表单白名单+roll、子职 roll、中文组装、player.json/state.md 写。
+// 2026-09-29b 等级入参(ch.level,缺省 1):buildClass/classHpMax/位表/exp/hd 全按出生等级;
+//   高等级出生**不**机械随机补历史 ASI——按 ASI 档位表挂 pending,玩家在面板册子逐档点选
+//   (front_commit 窄写 + CON 追溯 HP;与 gain_exp 升级挂 pending 同一条闭环)。施法面逐级对表
+//   (opening-meta CANTRIPS_BY_LEVEL/knownSpellsAt;准备数=level+施法调整)。
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const core = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
-const { mod, classRow, stripEmptyArrays } = core
-// readFM 容错壳——core 版缺档/坏档会抛；出生层兜底 {}（race 非法时 speed/languages 走默认不炸）
-const readFM = (rel) => { try { return core.readFM(rel) } catch { return {} } }
-const { OPENING_META, CASTERS, SUBCLASS_LEVEL, CANTRIPS_L1, KNOWN_L1, FEATURES_RECHARGE, EQUIP_BY_CLASS, CLASS_CN, RACE_CN, ALL_SKILL_KEYS, parseSkillChoices } =
-  await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
+const { mod, stripEmptyArrays, XP_THRESHOLDS, ASI_LEVELS } = core
+const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
+const { RACE_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/race-core-data.mjs').href)
+const { materializeSpellDetails } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-build.mjs').href)
+const { CANTRIPS_BY_LEVEL, knownSpellsAt, CLASS_CN, RACE_CN, ALL_SKILL_KEYS } = await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
+const { buildClass, classHpMax } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-build.mjs').href)
 
 const fail = (m, h) => { console.log(JSON.stringify({ ok: false, error: m, hint: h ?? '' })); process.exit(1) }
 const inp = JSON.parse(typeof globalThis.argv?.[0] === 'string' ? globalThis.argv[0] : '{}')
@@ -21,12 +28,14 @@ ch?.name || fail('缺 name')
 ch?.class || fail('缺 class')
 ch?.abilities || fail('缺 abilities')
 const cls = ch.class.toLowerCase()
-if (!(cls in OPENING_META.CLASS_CN)) fail(`未知职业 ${cls}`)
+CLASS_CN[cls] || fail(`未知职业 ${cls}`)
+// 出生等级(缺省 1——旧入参不传 level 行为逐字节不变):1..20 闸,20=XP/位表/职业表长度上限
+const level = ch.level ?? 1
+Number.isInteger(level) && level >= 1 && level <= 20 || fail(`level 不合法:${level}`, '出生等级须为 1..20 的整数(本卡口径:XP 表/位表/职业表都开到 20)')
 const race = (ch.race ?? 'human').toLowerCase()
-const scenarioId = inp.scenario ?? 'border-town'
-const toolsDir = 'dnd5e-srd-lorebook'
+const scenarioId = inp.scenario ?? 'hamlet'
 
-// ── 查表（readFM/classRow 单源 core.mjs——2026-09-26 机械层收拢,本地副本就此退役）──
+// ── 机械层单源:class 派生体走 lib/class-build.mjs(buildClass 出命中骰/豁免小写/技能白名单/施法位/特征/甲武熟练/起装;hp 走 classHpMax)──
 const rnd = () => Math.random()
 const pick = (arr, n) => {
   const pool = [...arr]
@@ -35,49 +44,42 @@ const pick = (arr, n) => {
   return out
 }
 
-// ── 种族/职业查表 ──
-const raceFM = readFM(`races/${race}.md`)
-const classMD = readFileSync(`${toolsDir}/classes/${cls}.md`, 'utf8')
-const classFM = readFM(`classes/${cls}.md`)
-const hitDie = classFM.hit_die ?? 8
-const saves = classFM.saves ?? []
-const parsed = parseSkillChoices(/\*Proficiencies:\*\s*(.+)/.exec(classMD)?.[1] ?? null)
-parsed || fail(`classes/${cls}.md 缺可解析的 Skill Proficiencies 行`, '语料形状坏——不能出生')
-const isCaster = CASTERS.includes(cls)
+// 种族面数据主路(RACE_CORE 快照,2026-09-30 零 lorebook)→ md 断档回退
+const raceFM = RACE_CORE[race]?.fm ?? {}
+const c = buildClass(cls, level)   // 特征 L1..level 正向累积+位表整档(机械层一函数,与 spawn_npc 同源)
+const isCaster = c.isCaster
+const casterAttr = c.caster_attr
 const ab = ch.abilities
-const conM = mod(ab.con ?? 10)
-const casterAttr = ({ wizard: 'int', cleric: 'wis', sorcerer: 'cha', druid: 'wis', bard: 'cha', warlock: 'cha' })[cls] ?? null
-
-// ── HP/HP上限 ──
-const hpMax = hitDie + conM
 
 // ── 技能校验(白名单+选数——表单已按类过滤,此处是机械层最后闸) ──
-// ★ 允许池:anySkill(吟游诗人)=全 18 任选;其余职业=语料白名单
 const chosenSkills = Array.isArray(ch.skills) ? ch.skills : []
-const allowedSkills = parsed.anySkill ? ALL_SKILL_KEYS : parsed.skills
+const allowedSkills = c.anySkill ? ALL_SKILL_KEYS : c.skillWhitelist
 chosenSkills.every(s => allowedSkills.includes(s)) || fail('技能熟练超出职业白名单', `本职业可选:${allowedSkills.join(', ')}`)
-chosenSkills.length === parsed.count || fail(`技能熟练须选 ${parsed.count} 项(本职业技能选数,非法数 ${chosenSkills.length})`)
+chosenSkills.length === c.skillCount || fail(`技能熟练须选 ${c.skillCount} 项(本职业技能选数,非法数 ${chosenSkills.length})`)
 
-// ── 法术:payload 有则校验,无则服务端 roll(表单与机械层双源同表——lorebook 才是白名单) ──
-function readDirSpells(level, out) {
-  try {
-    for (const f of readdirSync(`${toolsDir}/spells`).filter(f => f.endsWith('.md'))) {
-      const fm = readFM(`spells/${f}`)
-      if (!fm.name || fm.level !== level) continue
-      const classes = Array.isArray(fm.classes) ? fm.classes.map(c => String(c).toLowerCase()) : []
-      if (!classes.includes(cls)) continue
-      out.push(String(fm.name))
-    }
-  } catch { }
+// ── 法术:payload 有则校验,无则服务端 roll(表单与机械层双源同表——SPELL_CORE 单源,零 lorebook fs) ──
+// 逐级对表:戏法数=CANTRIPS_BY_LEVEL[cls][level-1],已知数=knownSpellsAt(wizard 进书线/cleric·druid 准备制无已知);
+// known/prepared 池=本职业 1..maxSlot 联合(SRD:「须为可施环位的法术」;maxSlot 由位表派生)。
+function readDirSpells(ring, out) {
+  for (const [, e] of Object.entries(SPELL_CORE)) {
+    const fm = e.fm ?? e
+    if (!fm.name || fm.level !== ring) continue
+    const classes = Array.isArray(fm.classes) ? fm.classes.map(c2 => String(c2).toLowerCase()) : []
+    if (!classes.includes(cls)) continue
+    out.push(String(fm.name))
+  }
   return [...new Set(out)].sort()
 }
 const pool0 = isCaster ? readDirSpells(0, []) : []
-const pool1 = isCaster ? readDirSpells(1, []) : []
+const maxSlot = Math.max(0, ...(c.slots ?? []).map((v, i) => (v > 0 ? i + 1 : 0)))
+const poolKRaw = []
+if (isCaster) for (let l = 1; l <= maxSlot; l++) readDirSpells(l, poolKRaw)
+const poolK = [...new Set(poolKRaw)].sort()
 const rollFrom = (arr, n) => (arr.length <= n ? [...arr] : pick(arr, n))
 let cantrips = [], learned = [], prepared = []
 if (isCaster) {
-  const wantC = CANTRIPS_L1[cls] ?? 0
-  const wantK = KNOWN_L1[cls] ?? 0
+  const wantC = CANTRIPS_BY_LEVEL[cls]?.[level - 1] ?? 0
+  const wantK = knownSpellsAt(cls, level) ?? 0
   const inC = Array.isArray(ch.spells?.cantrips) ? ch.spells.cantrips : []
   const inK = Array.isArray(ch.spells?.spells) ? ch.spells.spells : []
   const inP = Array.isArray(ch.spells?.prepared) ? ch.spells.prepared : []
@@ -87,61 +89,55 @@ if (isCaster) {
     cantrips = inC.length ? [...inC] : rollFrom(pool0, wantC)
   }
   if (wantK > 0) {
-    inK.length ? (inK.length === wantK || fail(`首环法术须 ${wantK} 个(得 ${inK.length})`), inK.every(s => pool1.includes(s)) || fail('首环法术超出职业表'))
-      : (pool1.length || fail(`语料无 ${cls} 的 1 环卡——不能出生施法族`))
-    learned = inK.length ? [...inK] : rollFrom(pool1, wantK)
+    inK.length ? (inK.length === wantK || fail(`已知法术须 ${wantK} 个(得 ${inK.length})`), inK.every(s => poolK.includes(s)) || fail('已知法术超出职业表或环位超可施'))
+      : (poolK.length || fail(`语料无 ${cls} 的 1..${maxSlot} 环卡——不能出生施法族`))
+    learned = inK.length ? [...inK] : rollFrom(poolK, wantK)
   }
   if (cls === 'cleric' || cls === 'druid') {
-    // 准备制:整表备选,准备数=职业等级(1)+施法属性调整值——roll 满额给出默认表,长休后整表可换
-    const wantP = 1 + Math.max(mod(ab[casterAttr] ?? 10), 0)
-    prepared = inP.length ? inP : rollFrom(pool1, Math.min(wantP, pool1.length))
+    // 准备制:整表备选,准备数=职业等级+施法属性调整值(SRD;1 级=1+调整与旧口径一致)——roll 满额默认表,长休整表可换
+    const wantP = level + Math.max(mod(ab[casterAttr] ?? 10), 0)
+    const pEff = Math.min(wantP, poolK.length)
+    inP.length ? (inP.length === pEff || fail(`已准备须 ${pEff} 个(等级+施法调整,受语料池上限)、得 ${inP.length}`), inP.every(s => poolK.includes(s)) || fail('已准备超出本职业语料或环位超可施'))
+      : (poolK.length || fail(`语料无 ${cls} 的 1..${maxSlot} 环卡——不能出生准备制`))
+    prepared = inP.length ? [...inP] : rollFrom(poolK, pEff)
   }
 }
 
-// ── 子职业:1 级分岔者必落(表单给出/服务端 roll),其余 null ──
-const subAt = SUBCLASS_LEVEL[cls] ?? 99
-const subList = Array.isArray(classFM.subclass) ? classFM.subclass.map(String).filter(Boolean) : []
+// ── 子职业:已到分岔级者必落(表单给出/服务端 roll),未分岔 null(classHpMax 的子职加成依赖此解)──
+const subAt = c.subclass_level
+const subList = c.subclass_list
 let subclass = null
-if (subAt === 1) {
+if (subAt <= level) {
   const inSub = typeof ch.subclass === 'string' && ch.subclass ? ch.subclass : null
   if (inSub !== null) (subList.includes(inSub) || fail(`子职业 ${inSub} 不在本职业语料清单`))
   subclass = inSub ?? (subList.length ? pick(subList, 1)[0] : null)
 }
 
-// ── 装备(12 职业全表;slug 与语料 equipment 对齐) ──
-const eq = EQUIP_BY_CLASS[cls] ?? fail(`起装表缺 ${cls}`)
+// ── HP/HP上限(class 公式;Draconic Resilience 每级 +1 在 classHpMax 内;**基础 con**——
+//    历史 ASI 由玩家点选,front_commit 的 CON 追溯按 level×调整增量补齐,与 classHpMax 逐级线性严格一致) ──
+const hpMax = classHpMax(cls, c.hit_die, ab.con, level, subclass)
 
-// ── 施法族(仅施法职业;warlock Pact Magic L1=1 位) ──
-const slots = isCaster ? { slots_l1: cls === 'warlock' ? 1 : 2 } : {}
+// ── 装备(12 职业全表) ──
+const eq = c.equipment ?? fail(`起装表缺 ${cls}`)
+
+// ── 施法族(仅施法职业;位表整档按等级直落;spell_details=档案自含全文) ──
+const slots = Object.fromEntries((c.slots ?? []).map((v, i) => [`slots_l${i + 1}`, v]))
+const spellDetails = materializeSpellDetails([...learned, ...prepared])
 const casterFields = isCaster
-  ? { caster_attr: casterAttr, spells_known: learned, spells_prepared: prepared, concentrating: null, ...slots }
+  ? {
+      caster_attr: casterAttr,
+      spells_known: learned, spells_prepared: prepared,
+      ...(spellDetails.length ? { spell_details: spellDetails } : {}),
+      concentrating: null, ...slots,
+    }
   : {}
 
-// ── features(职业 L1 特征行)——回充时机按表,非池 |— 不造伪池 ──
-const row1 = classRow(cls, 1)
-const features = (row1.features ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  .map(f => {
-    const key = Object.keys(FEATURES_RECHARGE).find(k => f.toLowerCase().includes(k.toLowerCase()))
-    const recharge = key ? FEATURES_RECHARGE[key] : '—'
-    return `${f}|${recharge}|已用0`
-  })
+// ── 特征(职业 L1 特征行)——回充时机按表,非池 |— 不造伪池 ──
+const features = c.features
 
-// ── 训练面(职业 Proficiencies 行是白给的——此前空数组出生=整族被裁) ──
-const PROF_ARMOR = {
-  barbarian: ['轻甲', '中甲', '盾牌'], bard: ['轻甲'], cleric: ['轻甲', '中甲', '盾牌'], druid: ['轻甲', '中甲', '盾牌'],
-  fighter: ['轻甲', '中甲', '重甲', '盾牌'], monk: [], paladin: ['轻甲', '中甲', '重甲', '盾牌'], ranger: ['轻甲', '中甲', '盾牌'],
-  rogue: ['轻甲'], sorcerer: [], warlock: ['轻甲'], wizard: [],
-}
-const PROF_WEAPON = {
-  barbarian: ['简易武器', '军用武器'], bard: ['简易武器', '手弩', '长剑', '细剑', '短剑'], cleric: ['简易武器'],
-  druid: ['木棍', '匕首', '飞镖', '矛', '弯刀(语料键对齐)', '镰刀', '投石索'], fighter: ['简易武器', '军用武器'],
-  monk: ['简易武器', '短剑'], paladin: ['简易武器', '军用武器'], ranger: ['简易武器', '军用武器'],
-  rogue: ['简易武器', '手弩', '长剑', '细剑', '短剑'], sorcerer: ['匕首', '飞镖', '轻弩', '长杖'], warlock: ['简易武器'],
-  wizard: ['匕首', '飞镖', '轻弩', '长杖'],
-}
-const armors = Array.isArray(profArmor(cls)) ? profArmor(cls) : []
-function profArmor(c) { return PROF_ARMOR[c] ?? [] }
-const weaponsArr = PROF_WEAPON[cls] ?? []
+// ── 训练面(职业 Proficiencies 白给的) ──
+const armors = c.armor_prof
+const weaponsArr = c.weapon_prof
 
 // ── 组装面板(全字段骨架→裁剪) ──
 const clsCn = CLASS_CN[cls] ?? cls
@@ -152,27 +148,33 @@ const biography0 = ch.backstory?.trim() ||
   `${ch.background ?? '无名'}出身,一脚踏进了${clsCn}这行。${persona.personality ? personalityPhrase(persona.personality) : ''}${persona.bonds ? `心里搁着「${persona.bonds}」。` : ''}${persona.ideals ? `认 ${persona.ideals} 这两个字。` : ''}`.trim()
 function personalityPhrase(p) { return `一来一往都是${p}的做派。` }
 
+// ── 历史 ASI pending(2026-09-29b):高等级出生该有的属性提升不机械随机补——逐档挂待办,
+//    玩家在面板册子 Ability Scores 节逐档点选(恰 2 点/上限 20/CON 追溯——front_commit 既有闸全适用);
+//    字符串与 gain_exp 升级 pending 严格同格式(LVn·ASI 点选)。 ──
+const asiPend = (ASI_LEVELS[cls] ?? ASI_LEVELS.default).filter(l => l <= level).map(l => `LV${l}·ASI 点选`)
+
 const panel = {
   name: ch.name,
   gender: ['male', 'female', 'unknown'].includes(ch.gender ?? '') ? ch.gender : 'unknown',
   description,
   role: 'pc',
-  class: cls, subclass, level: 1, exp: 0,
+  class: cls, subclass, level, exp: XP_THRESHOLDS[level - 1] ?? 0,
   race: race, background: ch.background ?? '',
-  hp: hpMax, hp_max: hpMax,
-  hd_available: 1, temp_hp: 0, exhaustion: 0,
+  hp: hpMax, hp_max: hpMax, temp_hp: 0,
+  hd_available: level, exhaustion: 0,
   gp: eq.gp, sp: eq.sp, cp: eq.cp,
   armor: eq.armor ?? '', shield: eq.shield === true,
   speed: raceFM.speed ?? 30, darkvision: raceFM.darkvision ?? null,
   str: ab.str ?? 10, dex: ab.dex ?? 10, con: ab.con ?? 10, int: ab.int ?? 10, wis: ab.wis ?? 10, cha: ab.cha ?? 8,
-  save_prof: saves,
+  save_prof: c.save_prof,
   skill_prof: chosenSkills,
   expertise: [], armor_prof: armors, weapon_prof: weaponsArr, tool_prof: [],
   languages: raceFM.languages ?? ['Common'],
   resist: raceFM.resist ?? [], immune: [],
   ...casterFields,
   features: features,
-  pending: [], statuses: [],
+  ...(c.feature_details?.length ? { feature_details: c.feature_details } : {}),
+  pending: asiPend, statuses: {},
   persona: persona,
   biography: [biography0],
   weapons: [eq.weapon], gear: eq.gear,
@@ -181,12 +183,9 @@ const panel = {
 // ── 写玩家面板 ──
 mkdirSync('characters', { recursive: true })  // 种子无此目录（角色未出生时 runtime/ 无 characters/）——t0 首建
 // ── 裁剪律落地（模板 _tpl：没有什么能力就没有相关字段；stripEmptyArrays 单源 core.mjs）──
-// 空数组键整族删除，注入面板(玩家/NPC 原样 stringify)不再带 [] 占位；
-// null(无子职/无暗视)与空字符串(无甲)仍有语义，保留。
 writeFileSync(`characters/player.json`, JSON.stringify(stripEmptyArrays(panel), null, 1))
 
 // ── patch state.md ──
-// openings.json：种子把它复制在 runtime 根（与 state.md 同层）；旧布局（preset/setup/）兜底。
 let OPENINGS
 try { OPENINGS = JSON.parse(readFileSync('openings.json', 'utf8')) } catch { }
 if (!OPENINGS) { try { OPENINGS = JSON.parse(readFileSync('../preset/setup/openings.json', 'utf8')) } catch { } }
@@ -196,21 +195,21 @@ const st = scenario.state ?? {}
 let stateMd = existsSync('state.md') ? readFileSync('state.md', 'utf8') : ''
 stateMd = stateMd.replace(/^(## 时间敏感项\n[\s\S]*?)(^- 当前时间：).*$/m, `$1$2第1日·18时`)
 stateMd = stateMd.replace(/(## 玩家所在\n)[\s\S]*?(?=\n## |$)/, `$1`
-  + `- 大区：${st.大区 ?? '边境边地'}\n`
-  + `- 区域：${st.区域 ?? '灰鸦丘陵'}\n`
-  + `- 地点：${st.地点 ?? st.所在 ?? '边境小镇·北门'}\n`
-  + `- 地形：${st.地形 ?? '温带丘陵'}\n`
-  + `- 天气：${st.天气 ?? '小雨'}`)
-// 节标题与 setup/state.md 对齐（模板曾叫「当前篇章」,现是「篇章进度」——沿用旧名等于静默 no-op)
-stateMd = stateMd.replace(/(## 篇章进度\n- 当前篇章：).*/, `$1${st.篇章 ?? '序章'}`)
-stateMd = stateMd.replace(/(## 主线\n- ).*/, `$1${st.主线 ?? '（待定）'}`)
-stateMd = stateMd.replace(/(## 队伍\n(?:[^\n]*\n)?- 平均等级：).*/, '$11')
+  + `- 大区：${st.大区 ?? '碧野丘陵'}\n`
+  + `- 区域：${st.区域 ?? '酒桶镇'}\n`
+  + `- 地点：${st.地点 ?? st.所在 ?? '酒桶镇'}\n`
+  + `- 地形：${st.地形 ?? '缓丘'}\n`
+  + `- 天气：${st.天气 ?? '晨雾'}`)
+// 造访过的地点：起点即首访（累积日志，尾代理后续追加；生成式地名同样可入列）
+const 首访 = `${st.地点 ?? st.所在 ?? '酒桶镇'}|${st.大区 ?? '碧野丘陵'}·${st.区域 ?? '酒桶镇'}|首访第1日·18时`
+stateMd = stateMd.replace(/(## 造访过的地点\n)[\s\S]*?(?=\n## |$)/, `$1- ${首访}`)
+stateMd = stateMd.replace(/(## 队伍\n(?:[^\n]*\n)?- 平均等级：).*/, '$1' + level)
 writeFileSync('state.md', stateMd)
 
 // ── 返回开场白 ──
 const narration = inp.narration ?? scenario.narration ?? '冒险开始了。'
 okR({
   narration, scenario: scenarioId, who: ch.name,
-  rolled: { cantrips, spells: learned, prepared, subclass, skills: chosenSkills },   // 回执可考——开场白之外的 roll 全透明
+  rolled: { level, asi_pend: asiPend.length, cantrips, spells: learned, prepared, subclass, skills: chosenSkills },   // 回执可考——开场白之外的 roll 全透明
 })
 function okR(r) { console.log(JSON.stringify({ ok: true, ...r })) }

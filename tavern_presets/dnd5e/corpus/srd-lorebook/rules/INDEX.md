@@ -1,4 +1,4 @@
-# rules — 33 entries
+# rules — 34 entries
 
 - [The Order of Combat](the-order-of-combat.md) — ## The Order of Combat A typical combat encounter is a clash between t
 - [Movement and Position](movement-and-position.md) — ## Movement and Position In combat, characters and monsters are in con
@@ -33,3 +33,4 @@
 - [Traps](traps.md) — ## Traps Traps can be found almost anywhere. One wrong step in an anci
 - [Diseases](diseases.md) — ## Diseases A plague ravages the kingdom, setting the adventurers on a
 - [Madness](madness.md) — ## Madness In a typical campaign, characters aren't driven mad by the 
+- [Conditions and Statuses](conditions.md) — ## Conditions and Statuses 状态词表正本——15 条件(BR 附录 A)+数值修正法术 buff+职业能力状态 

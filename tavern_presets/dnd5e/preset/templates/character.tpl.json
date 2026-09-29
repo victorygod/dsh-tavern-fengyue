@@ -14,8 +14,8 @@
   "background": "{{background}}",
   "hp": {{hp}},
   "hp_max": {{hp_max}},
+  "temp_hp": 0,   // 临时生命(RAW 独立缓冲池):受伤先扣本键再由 injure 落到 hp;治疗不回填;取高不叠;耗尽/到期归零
   "hd_available": {{hd_available}},
-  "temp_hp": 0,
   "exhaustion": 0,
   "concentrating": null,
   "gp": {{gp}},
@@ -57,7 +57,7 @@
   "slots_l9": 0,
   "features": {{features}},
   "pending": [],
-  "statuses": [],
+  "statuses": {},  // 临时状态(唯一家,对象表):key=状态名,value={applied_at, effect?, mods?:[{stat,magnitude}], temp?}——覆盖式更新(同名 key 覆盖);mods=机械修正(白名单 ac/attack/save/attack_save/damage);temp=临时生命数额(组合池三写,取高不叠,到期 recoverTemp 回收);effect 文本带效果+持续+解除;applied_at=施加时游戏时间(agent 手写);cast 自动写/update_status 工具写
   "persona": { "personality": "{{personality}}", "ideals": "{{ideals}}", "bonds": "{{bonds}}", "flaws": "{{flaws}}", "alignment": "{{alignment}}" },
   "biography": {{biography}},
   "weapons": {{weapons}},

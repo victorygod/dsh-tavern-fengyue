@@ -94,7 +94,9 @@ summary { cursor: pointer; }
         <input type="text" id="name" placeholder="姓名（如：洛克）" maxlength="12">
         <select id="race"></select>
         <select id="cls"></select>
+        <select id="lv" style="flex:0 0 80px" title="出生等级——>1 时自动补经验/HP/特征/位表成长；ASI 加点出生后在面板册子里点选"></select>
       </div>
+      <div class="hint" id="lvhint"></div>
       <div class="row2">
         <div class="gcol">
           <div class="lbl" style="margin-top:0">性别</div>
@@ -177,14 +179,12 @@ const SKILLS = [['athletics','运动'],['acrobatics','杂技'],['sleight_of_hand
 const ARRAY = [15, 14, 13, 12, 10, 8]
 const ATTRS = [['力','str'],['敏','dex'],['体','con'],['智','int'],['感','wis'],['魅','cha']]
 const SCENARIOS = [
-  { id: 'border-town', title: '边境小镇', tagline: '文明尽头的泥泞街道，酒馆里传闻山林有异动',
-    narration: '薄雾散去，石板路的尽头浮现出猎猎作响的旗幡——边境小镇的轮廓。你踏着暮色迈过门槛，身后山林的窸窣声似乎仍在追索着你的踪迹。酒馆灯火在石壁上投射出巨大的摇曳光影，麦酒的酸气与湿柴的烟味混杂在一起。镇上的人行色匆匆，没人主动搭话——直到你推开门，柜台后的独眼老者抬起头，目光在你身上的武器上停了一瞬。「生面孔。」他说，「要么过路，要么来找活干的。前者喝酒走人，后者……坐下聊聊。」' },
-  { id: 'abandoned-mine', title: '废弃矿坑', tagline: '矿坑口的铁门虚掩着，里面的黑暗比夜更深',
-    narration: '矿坑口的铁门锈迹斑斑，虚掩着——像是有人匆忙离开，又像是……不想让里面的东西出来。你举起火把，光焰在潮湿的石壁上跳动，照亮了铁轨延伸进黑暗的方向。空气里弥漫着铁锈与腐水的气味。远处，一滴水落在金属上的回声在隧道里反复弹跳。你握紧武器，迈出了第一步。' },
-  { id: 'wilderness-road', title: '荒野古道', tagline: '商队的车轮在泥泞中碾出深辙，远处的山林沉默不语',
-    narration: '商队的车轮在泥泞中碾出深辙，马匹喷着白气，步伐迟缓。你在队伍末端，手不离武器——这段路太安静了。带队的老商人策马靠近，压低声音：「三天前前面那支队伍就是在这儿没的。连车带人，什么都没剩下。」他顿了顿，「今晚你守后半夜。」暮色降临，营火在风中摇曳。远处的树林像一堵沉默的墙。' },
-  { id: 'port-tavern', title: '海港酒馆', tagline: '盐腥的风吹过码头的灯柱，酒杯里晃着别人的秘密',
-    narration: '海风裹挟着盐腥与鱼腥扑面而来，码头的灯柱在夜色中摇晃，像一排醉汉。你推开「歪桅杆」酒馆的门，嘈杂声浪几乎将你顶回去——水手、佣兵、走私贩子和几个你判断不出来的角色挤在昏暗的灯光下。吧台后的半身人擦着酒杯，头也不抬：「想喝的排队，想打听事的买 bottle，想找人的——」他终于抬眼打量你，「那得看你找的是谁了。」' },
+  { id: 'hamlet', title: '酒桶镇', tagline: '小镇攒起的第一个铜板，也攒得起一个英雄',
+    narration: '碧野丘陵的酒桶镇，西境地图上没人费心标注的一个小地方：一座磨坊、半身人的客栈、逢集才热闹的市口，和一群做梦都想出远门的年轻人。你就是其中一个。镇子口的告示板贴了三张单子，三天没人揭——荒坡有哥布林抢羊，磨坊主丢了祖传的账本，北口商路的邮差要个跑腿的。老镇长在井边叹气：「世道要乱喽，谷地的仗眼看要打过来，可这镇子连个撑门面的都没有。」没人指望你，也没人拦你。你的传奇，从井边这第一桩小活计开始。' },
+  { id: 'dragon', title: '屠龙道', tagline: '一条老龙盘踞雪巅，龙头运下山抵一座矿',
+    narration: '磐岩山脉积了千年的雪里，盘着一条老龙。「屠龙道」——矮人给上山朝圣的那条崖道起的名——溪水冻成乌黑，山坳里半个村的人都搬空了。铁锤堡的锻炉连日不熄，矮人在城门口挂出告示：谁把龙头运下山，抵一座矿。你已经站在崖道半腰，怀里是一张不知转过多少手的龙巢旧图，风从雪线上刮下来，带着硫磺味。往上，是那畜生的巢；往下，是回头还来得及的尘世。同路的猎龙队只剩你一个——其余的，都在山腰竖了碑。' },
+  { id: 'intrigue', title: '白堡', tagline: '王位、异端、银钱与刀，都在抢一个没有立场的人',
+    narration: '白堡的高台下，没有一个人是清白的。王位空悬，圣殿的正统派与革新派在告示墙上轮流撕对方的榜；革新派被正统唤作异端、被线人叫作邪教，夜里在剁手巷聚会；商行联盟雇人往北押镖，盗贼公会在码头收起「过路钱」；法师塔替两边算账，灰衣军的探子混在难民里进了城。而你，是个谁都不沾的自由人——也正因如此，谁都想把你拽进自己的局里。烛光昏暗的告示墙前，三张条子几乎同时塞进你手里：圣殿要个「清白的手」，商行要个「嘴严的镖头」，还有个披斗篷的，约你半夜到剁手巷见一面。' },
 ]
 
 // ── 随机分配池（一键 roll 全套,可再手动微调）──
@@ -220,6 +220,7 @@ const cn = (map, key) => { const k = norm(key); return (map && map[k] != null) ?
 const fill = (sel, list, ph) => { sel.innerHTML = (ph ? `<option value="">${ph}</option>` : '') + list.map(([v, n]) => `<option value="${v}">${n}</option>`).join('') }
 fill($('race'), RACES, '种族')
 fill($('cls'), CLASSES, '职业')
+fill($('lv'), Array.from({ length: 20 }, (_, i) => [String(i + 1), 'Lv ' + (i + 1)]))
 
 const abSel = {}
 for (const [cn, key] of ATTRS) {
@@ -232,6 +233,7 @@ for (const [cn, key] of ATTRS) {
     if (v !== '') for (const other of Object.values(abSel)) {
       if (other !== s && other.value === v) other.value = ''  // 互斥：撞值者清空
     }
+    if (typeof refreshGrowthFaces === 'function') refreshGrowthFaces()   // 六维改动→准备数按施法调整重演(wis 即改即生效)
   }
   abSel[key] = s; wrap.append(s); $('abilities').append(wrap)
 }
@@ -263,31 +265,58 @@ function buildSkills() {
   $('skhint').textContent = ''
 }
 let rolledSpells = { cantrips: [], spells: [], prepared: [] }
+// 出生等级(表单选 1..20,>1 时成绩族出生——机械层 opening_commit 是最终闸)
+const levelNow = () => Math.max(1, Math.min(20, Number($('lv').value) || 1))
+// 期望施法面(等级感知;SRD 逐级列;桥缺席时降级 L1 表——机械层最终闸):
+// cantrips=逐级戏法数;known=逐级已知数(wizard 走 4+2·L 进书线=gain_exp 每级新法术×2 同一曲线);
+// prepared=施法属性调整值+等级(SRD Preparing and Casting Spells;仅准备制 cleric/druid)。
+function wantCounts(cls, lv) {
+  const cN = (META?.cantripsBy ?? META?.CANTRIPS_BY_LEVEL)?.[cls]?.[lv - 1] ?? META?.cantripsL1?.[cls] ?? META?.CANTRIPS_L1?.[cls] ?? 0
+  const kN = cls === 'wizard'
+    ? 4 + 2 * lv
+    : (META?.knownBy ?? META?.KNOWN_BY_LEVEL)?.[cls]?.[lv - 1] ?? META?.knownL1?.[cls] ?? META?.KNOWN_L1?.[cls] ?? 0
+  const wisM = Math.floor(((Number($('abilities')?.querySelector('[data-attr=wis]')?.value) || 10) - 10) / 2)
+  const pN = (cls === 'cleric' || cls === 'druid') ? lv + Math.max(wisM, 0) : 0
+  return { cN, kN, pN }
+}
+// 本职业 1..最高可施环位 的联合法术池(SRD:「known 须为可施环位的法术」);slotMax 由 opening_data 三族位表派生
+function wholePool(cls, lv) {
+  const maxRing = META?.slotMax?.[cls]?.[lv - 1] ?? 1
+  const pool = []
+  for (let l = 1; l <= maxRing; l++) {
+    const bucket = META?.pools?.byLevel?.[cls]?.[l] ?? (l === 1 ? META?.pools?.lv1?.[cls] : null)
+    if (bucket) pool.push(...bucket)
+  }
+  return [...new Set(pool)].sort()
+}
 function rebuildClass() {
   const cls = $('cls').value
   curSpec = classSpec(cls)
   buildSkills()
-  // 子职业卡:L1 分岔才现身
-  const subAt = META?.subclassLevel?.[cls] ?? META?.SUBCLASS_LEVEL?.[cls] ?? 99
-  const subs = curSpec.subclasses
-  $('subcard').style.display = subAt === 1 && subs.length ? '' : 'none'
-  $('subclass').innerHTML = `<option value="">子职业（自动 roll 可改）</option>` + subs.map(s => `<option value="${esc(s)}">${esc(cn(META?.subclassCN, s))}</option>`).join('')
-  // 施法卡:L1 有施法者现身(casters 名单)
+  // 子职选项清单照语料重建(现身与否在 refreshGrowthFaces 按分岔级判)
+  $('subclass').innerHTML = `<option value="">子职业（自动 roll 可改）</option>` + curSpec.subclasses.map(s => `<option value="${esc(s)}">${esc(cn(META?.subclassCN, s))}</option>`).join('')
+  // 施法卡按 casters 名单现身
   $('spellcard').style.display = curSpec.spellCaster ? '' : 'none'
+  $('lvhint').textContent = '高等级出生自动补经验/HP/特征/位表——ASI 点数出生后在面板册子里选'
+  refreshGrowthFaces()
+}
+// 成长面刷新:子职卡「分岔级 ≤ 出生等级」现身后施法成套按等级重掷;改职业/等级/六维都会走这里(不碰已选技能)
+function refreshGrowthFaces() {
+  const cls = $('cls').value
+  const subAt = META?.subclassLevel?.[cls] ?? META?.SUBCLASS_LEVEL?.[cls] ?? 99
+  $('subcard').style.display = levelNow() >= subAt && curSpec.subclasses.length ? '' : 'none'
+  $('subcard').querySelector('.lbl').textContent = `子职业（${subAt} 级分岔）`
   rerollSpells()
 }
 function rerollSpells() {
-  const cls = $('cls').value
-  const spec = META?.classes?.[cls]
-  const pools = META?.pools
-  if (!spec || !pools) { rolledSpells = { cantrips: [], spells: [], prepared: [] }; renderSp(); return }
-  const cN = META?.cantripsL1?.[cls] ?? META?.CANTRIPS_L1?.[cls] ?? 0
-  const kN = META?.knownL1?.[cls] ?? META?.KNOWN_L1?.[cls] ?? 0
-  const cantrips = cN ? (pools.cantrips[cls]?.length ? shuffle(pools.cantrips[cls]).slice(0, cN) : []) : []
-  const spells = kN ? (pools.lv1[cls]?.length ? shuffle(pools.lv1[cls]).slice(0, kN) : []) : []
-  const wisM = Math.floor(((Number($('abilities')?.querySelector('[data-attr=wis]')?.value) || 10) - 10) / 2)
-  const needP = (cls === 'cleric' || cls === 'druid') && spells.length ? Math.min(1 + Math.max(wisM, 0), spells.length) : 0
-  const prepared = needP ? spells.slice(0, needP) : []
+  const cls = $('cls').value, lv = levelNow()
+  if (!$('cls').value || !META?.pools) { rolledSpells = { cantrips: [], spells: [], prepared: [] }; renderSp(); return }
+  const { cN, kN, pN } = wantCounts(cls, lv)
+  const cantrips = cN ? (META.pools.cantrips[cls]?.length ? shuffle(META.pools.cantrips[cls]).slice(0, cN) : []) : []
+  const source = wholePool(cls, lv)
+  const spells = kN && source.length ? shuffle(source).slice(0, kN) : []
+  const pEff = Math.min(pN, source.length)
+  const prepared = pEff ? shuffle(source).slice(0, pEff) : []
   rolledSpells = { cantrips, spells, prepared }
   renderSp()
 }
@@ -302,6 +331,7 @@ function renderSp() {
 }
 $('sp-reroll').onclick = rerollSpells
 $('cls').addEventListener('change', rebuildClass)
+$('lv').addEventListener('change', refreshGrowthFaces)
 buildSkills()
 
 // ── 性别（male/female 两选一——opening 不出 unknown;头像预览经宿主桥，宿主缺席静默隐藏）──
@@ -459,11 +489,21 @@ $('go').onclick = () => {
   if (!$('bg').value.trim()) return flash('写一句出身背景')
   if (Object.keys(abilities).length < 6) return flash('六维属性分配未完成')
   if (skState.size !== curSpec.count) return flash(`技能熟练须选 ${curSpec.count} 项(本职业白名单)`)
-  if (spellCaster && rolledSpells.cantrips.length && rolledSpells.cantrips.length !== (META?.cantripsL1?.[cls] ?? 0))
-    return flash(`戏法成套不符(须 ${META?.cantripsL1?.[cls]} 个)——重掷一次`)
+  const birthLevel = levelNow()
+  if (spellCaster) {
+    // 成套校验也按出生等级对表(表单只是第一道——机械层 opening_commit 同表复核)
+    const { cN, kN, pN } = wantCounts(cls, birthLevel)
+    const pEff = Math.min(pN, wholePool(cls, birthLevel).length)
+    if (rolledSpells.cantrips.length && rolledSpells.cantrips.length !== cN)
+      return flash(`戏法成套不符(须 ${cN} 个)——重掷一次`)
+    if (rolledSpells.spells.length && rolledSpells.spells.length !== kN)
+      return flash(`已知法术成套不符(须 ${kN} 个)——重掷一次`)
+    if (pN && wholePool(cls, birthLevel).length && rolledSpells.prepared.length !== pEff)
+      return flash(`已准备成套不符(须 ${pEff} 个)——重掷一次`)
+  }
   const payload = {
     character: {
-      name, race, class: cls, gender,
+      name, race, class: cls, gender, level: birthLevel,
       background: $('bg').value.trim(),
       abilities,
       skills: Array.from(skState),

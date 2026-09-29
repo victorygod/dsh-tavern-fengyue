@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "经验入账与升级级联器——一切 XP 变动必经本工具。什么情况调：两通道二选一——①直值：非战斗成就或你裁定数额（说服化解危机、探索发现）传 exp（每人增量）；②战果：遭遇取胜的**当回合**传 foes（被击败者名单，杀死/击倒/劝降都算、逃跑不算，你判断）——工具查表求和、按名单均分、逐人跑升级级联，乘数不进发放。怎么填：who=分账名单（逗号分隔，活着参战者，你判断；单人直传）；exp 与 foes 二选一。预期效果：回执给战果算式或直值+逐人落盘行；升级时级联衍射（PB/HP/HD/位表/pending）一并落盘并列升级块。",
+  "description": "经验结算器——一切 XP 变动必经本工具。何时调：遭遇取胜的当回合走战果通道（传 foes），非战斗成就走直值通道（传 exp）。怎么调：who=活着参战名单；exp 与 foes 二选一。细则见各参数。",
   "agents": ["main", "tail"],
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
@@ -13,12 +13,11 @@
 */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { readFM, findCharFile, saveChar, classRow, xpOf, pbOf, rollExpr, XP_THRESHOLDS, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { findCharFile, saveChar, classRow, xpOf, pbOf, rollExpr, XP_THRESHOLDS, ASI_LEVELS, slotsFor, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { CLASS_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-core-data.mjs').href)
 
 const THRESH = XP_THRESHOLDS  // 单一事实源:lib/core.mjs(PHB p.13;dm-loop §6.1 校对锚)
-const FULL_CASTER = { wizard: true, cleric: true, sorcerer: true, druid: true, bard: true }
-const SLOTS = { 1:[2], 2:[3], 3:[4,2], 4:[4,3], 5:[4,3,2], 6:[4,3,3], 7:[4,3,3,1], 8:[4,3,3,2], 9:[4,3,3,3,1], 10:[4,3,3,3,2], 11:[4,3,3,3,2,1], 12:[4,3,3,3,2,1], 13:[4,3,3,3,2,1,1], 14:[4,3,3,3,2,1,1], 15:[4,3,3,3,2,1,1,1], 16:[4,3,3,3,2,1,1,1], 17:[4,3,3,3,2,1,1,1,1], 18:[4,3,3,3,3,1,1,1,1], 19:[4,3,3,3,3,2,1,1,1], 20:[4,3,3,3,3,2,2,1,1] }
-const ASI = { fighter: [4, 6, 8, 12, 14, 16, 19], rogue: [4, 6, 8, 10, 12, 16, 19], default: [4, 8, 12, 16, 19] }
+const ASI = ASI_LEVELS        // ASI 档位表(2026-09-29 迁 core 单源;class-build.applyAsiGrowth 同源)
 
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context')
@@ -69,7 +68,8 @@ for (const name of names) {
       j.hd_available = (j.hd_available ?? 0) + 1
       const hpGain = (a.hp_mode === 'roll' ? (rollExpr(`1d${hd}`)?.total ?? Math.floor(hd / 2)) : Math.floor(hd / 2) + 1) + conM
       j.hp_max = (j.hp_max ?? 0) + Math.max(1, hpGain); j.hp = (j.hp ?? 0) + Math.max(1, hpGain)
-      if (FULL_CASTER[cls]) { const st = SLOTS[L] ?? []; for (let k = 1; k <= 9; k++) j['slots_l' + k] = st[k - 1] ?? (j['slots_l' + k] ?? 0) }
+      const st = slotsFor(cls, L)
+      if (st && st.length) for (let k = 1; k <= 9; k++) j['slots_l' + k] = st[k - 1] ?? (j['slots_l' + k] ?? 0)
       const asi = (ASI[cls] ?? ASI.default).includes(L)
       if (asi) (j.pending ??= []).push(`LV${L}·ASI 点选`)
       if (cls === 'wizard') (j.pending ??= []).push(`LV${L}·新法术×2`)
@@ -97,5 +97,5 @@ console.log(`  ◇ 梗概: ${a.context}`)
 console.log(`  ◇ 铁则: 后续剧情必须遵守梗概与结果，不得篡改！`)
 
 function readClassHitDie(cls) {
-  try { return readFM(`classes/${cls}.md`).hit_die } catch { return 8 }
+  return CLASS_CORE[cls]?.fm?.hit_die ?? 8
 }

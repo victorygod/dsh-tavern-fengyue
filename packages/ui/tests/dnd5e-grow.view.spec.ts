@@ -1,6 +1,7 @@
 // dnd5e 成长流 view 层回归钉（2026-09-24/25 定案,原型 docs/hud-proto-grow.html 为视觉正本）:
-// 英文节标题+中文 data-tip、版面重排（Vitals 左移/Proficiencies 节首 PB/戏法拆行）、
+// 版面重排（Vitals 左移/Proficiencies 节首 PB/戏法拆行）、
 // 呼吸标题(g-pend+有待分配+data-act=grow)、空数「无」版面常驻、头像内裁层、待办 chip 非按钮化。
+// 2026-09-29 翻案:节标题收编 hud-proto-v8 中文正本(六维/豁免/速览/…),SRD 英文标题退役;状态签短名化(effect 全句进 data-tip)。
 import { describe, expect, it } from 'vitest'
 import { bookHtml, heroPanel } from '../../../tavern_presets/dnd5e/preset/ui/view.mjs'
 
@@ -15,7 +16,7 @@ const WIZ = {
   spells_known: ['火焰箭', '魔法飞弹', '护盾术'], spells_prepared: ['魔法飞弹'],
   spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'] },
   pending: ['LV4·ASI 点选', 'LV4·新法术×2'], hd_available: 4, features: ['奥法回复|短休回环位|—'],
-  gear: ['法术书'], resist: [], immune: [], statuses: [],
+  gear: ['法术书'], resist: [], immune: [], statuses: {},
   persona: { alignment: '中立善良' }, background: '佣兵',
   derived: {
     hpPct: 77, pb: 2, dc: 13, atk: 4, passive: 11, ac: null, expBar: null, slotsNow: 7, slotsTotal: 7,
@@ -30,7 +31,7 @@ const WIZ = {
 const FIGHTER = {
   ...WIZ, _who: 'iron', name: '老铁', class: 'fighter', role: 'npc', caster_attr: null, slots_l1: null,
   spells_known: [], spells_prepared: [], spellSplit: { cantrips: [], known: [] }, pending: [],
-  armor: 'chain_mail', shield: true, resist: [], statuses: [], descriptor: '',
+  armor: 'chain_mail', shield: true, resist: [], statuses: {}, descriptor: '',
   derived: { ...WIZ.derived, slotsLv: [], slotsNow: 0, slotsTotal: null, dc: null, atk: null },
 }
 
@@ -54,12 +55,12 @@ describe('heroPanel · 待办 chip 非按钮化', () => {
 
 describe('bookHtml · 版面与术语锚', () => {
   const html = bookHtml(WIZ, {})
-  it('节标题=SRD 英文,顺序=左[AbilityScores→SavingThrows→Vitals→Skills→Proficiencies]右[Spellcasting→Conditions→…]', () => {
-    const caps = ['Ability Scores', 'Saving Throws', 'Vitals', 'Skills', 'Proficiencies', 'Spellcasting', 'Conditions', 'Equipment', 'Gear', 'Features', 'Resistances / Immunities']
+  it('节标题=中文(v8 正本),顺序=左[六维→豁免→速览→技能→训练与语言]右[施法→状态→…]', () => {
+    const caps = ['六维', '豁免', '速览', '技能', '训练与语言', '施法', '状态', '装备', '背包', '特征', '抗性 / 免疫']
     let last = -1
     for (const cap of caps) { const i = html.indexOf('>' + cap + '<'); expect(i).toBeGreaterThan(last); last = i }
-    expect(html).not.toContain('>六维<'); expect(html).not.toContain('>速览<')
-    expect(html).not.toContain('>技能<'); expect(html).not.toContain('训练与语言')
+    expect(html).not.toContain('>Ability Scores<'); expect(html).not.toContain('>Saving Throws<')
+    expect(html).not.toContain('>Spellcasting<'); expect(html).not.toContain('>Conditions<')
   })
   it('全 data-tip 不留原生 title 属性', () => {
     expect(html).not.toMatch(/\stitle="/)
@@ -77,19 +78,19 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(bookHtml(FIGHTER, {})).not.toContain('g-pend')
   })
   it('Proficiencies:PB 单值居节首+组名中文+逐项 data-tip;缺族组照裁剪', () => {
-    expect(html).toContain('Proficiency Bonus<b>+2</b>')
+    expect(html).toContain('熟练加值<b>+2</b>')
     expect(html).toContain('>武器熟练</span>')
     expect(html).toContain('>工具熟练</span>')
     expect(html).toContain('>语言掌握</span>')
     expect(html).not.toContain('>护甲熟练')   // 法师无护甲熟练组
     expect(html).toContain('data-tip="Weapons——攻检加熟练加值')
   })
-  it('施法三行=戏法(level0)/已知(环术)/已备——空行「无」;非施法者整节「无」', () => {
+  it('施法三行=戏法(level0)/法术(环术)/已备——空行「无」;非施法者整节「无」', () => {
     expect(html).toContain('>戏法</span><span class="nms">火焰箭</span>')
-    expect(html).toContain('>已知</span><span class="nms">魔法飞弹 · 护盾术</span>')
+    expect(html).toContain('>法术</span><span class="nms">魔法飞弹 · 护盾术</span>')
     expect(html).toContain('>已备</span><span class="nms">魔法飞弹</span>')
     const noSplit = bookHtml({ ...WIZ, spellSplit: undefined }, {})
-    expect(noSplit).toContain('>已知</span><span class="nms">火焰箭 · 魔法飞弹 · 护盾术</span>')   // 泵缺席回退=已知行
+    expect(noSplit).toContain('>法术</span><span class="nms">火焰箭 · 魔法飞弹 · 护盾术</span>')   // 泵缺席回退=法术行全列
     const f = bookHtml(FIGHTER, {})
     expect(f).toContain('<span class="bk-empty">无</span>')
     expect(f).not.toContain('bk-slot')

@@ -65,7 +65,7 @@ function writeFixture() {
     spells_known: ['火焰箭', '魔法飞弹', '护盾术'], spells_prepared: ['魔法飞弹'],
     spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'] },
     pending: ['LV4·ASI 点选', 'LV4·新法术×2'], exp: 6100, expMin: 2700, expNext: 6500,
-    features: ['奥法回复|短休回环位|—'], statuses: [], weapons: [], gear: [], resist: [], immune: [],
+    features: ['奥法回复|短休回环位|—'], statuses: {}, weapons: [], gear: [], resist: [], immune: [],
     gp: 21, sp: 4, cp: 9, persona: { alignment: '中立善良' }, background: '佣兵',
     derived: {
       hpPct: 77, pb: 2, dc: 13, atk: 4, passive: 11, ac: 12, expBar: { exp: 6100, min: 2700, next: 6500 },
@@ -148,11 +148,11 @@ describe.runIf(hasChrome && hasPw)('dnd5e 成长流浏览器层(playwright 无�
     expect((await chip.textContent())!.trim()).toContain('未分配成长·2')
     expect(await chipsActAttr()).toBe('')       // 无 data-act
     await openBook()
-    // 悬浮件走 body 挂册——英文标题与次序
+    // 悬浮件走 body 挂册——中文标题与次序（2026-09-29 收编 v8 中文正本）
     const caps = await page.$$eval('.book .bk-cap', els => els.map(e => e.textContent!.trim()))
-    for (const t of ['Ability Scores', 'Saving Throws', 'Vitals', 'Proficiencies', 'Spellcasting', 'Conditions', 'Equipment', 'Features'])
+    for (const t of ['六维', '豁免', '速览', '训练与语言', '施法', '状态', '装备', '特征'])
       expect(caps.some(c => c.startsWith(t))).toBe(true)
-    expect(await page.locator('.book', { hasText: 'Proficiency Bonus' }).count()).toBe(1)
+    expect(await page.locator('.book', { hasText: '熟练加值' }).count()).toBe(1)
     // 头像 138%:img 宽 ≈ 裁层宽 ×1.38(±px 取整余差)
     const ratio = await page.evaluate(() => {
       const img = document.querySelector('.book .av-img') as HTMLImageElement
@@ -226,8 +226,8 @@ describe.runIf(hasChrome && hasPw)('dnd5e 成长流浏览器层(playwright 无�
     await page.click('.book.open .bk-x')
     await openBook()
     expect(await page.$$eval('.book.open [data-act="grow"]', els => els.length)).toBe(0)
-    const knownRow = await page.$$eval('.book.open .bk-sp-row', els => els.map(e => e.textContent!.trim()).find(t => t.startsWith('已知'))!)
-    expect(knownRow).toContain('护盾术')   // Shield——值中文化(2026-09-27):已知行显示中文译名
+    const knownRow = await page.$$eval('.book.open .bk-sp-row', els => els.map(e => e.textContent!.trim()).find(t => t.startsWith('法术'))!)
+    expect(knownRow).toContain('护盾术')   // Shield——值中文化(2026-09-27):法术行显示中文译名
     expect(knownRow).toContain('蛛网术')   // Web
   })
 

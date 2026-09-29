@@ -1,4 +1,4 @@
-// dnd5e 一期直写工具钉(2026-09-26):spawn_npc(完备律/同名/from 镜像/count/presence)、
+// dnd5e 一期直写工具钉(2026-09-26):spawn_monster(完备律/同名/查无 statblock/count/presence)、
 // damage/heal/hp_change(落盘/钳上限/苏醒双清/0HP 分叉/0HP 受击落败)、death(计数读写)、
 // initiative(物化+未建档报错)、gain_exp(foes 战果通道/直值)、check(save/dc 缺省/专注 damage)、pbOf 边界。
 import { spawnSync } from 'node:child_process'
@@ -14,7 +14,7 @@ const CARD = join(ROOT, 'tavern_presets', 'dnd5e', 'preset')
 
 const PLAYER = { name: '梅西雅', role: 'pc', class: 'wizard', level: 3, exp: 816, hp: 10, hp_max: 22, hd_available: 3, str: 10, dex: 12, con: 12, int: 16, wis: 10, cha: 10, save_prof: ['dex', 'con'], hit_die: 6 }
 const GOBLIN_FM = '---\nname: Goblin\ncr: 0.25\nac: 15\nhp: 7\nstr: 8\ndex: 14\ncon: 10\nint: 10\nwis: 8\ncha: 8\n---\n\n正文'
-const STATE = ['# 世界状态', '', '## 附近 NPC', '', '## 战斗（宣战物化）', '- （无战斗）', '', '## 上回合变化', '- （无）', ''].join('\n')
+const STATE = ['# 世界状态', '', '## 附近 NPC', '', '## 战斗（宣战物化）', '- （无战斗）', ''].join('\n')
 
 function rig(player = PLAYER) {
   const base = mkdtempSync(join(tmpdir(), 'dnd5e-p1-'))
@@ -23,7 +23,10 @@ function rig(player = PLAYER) {
   cpSync(join(CARD, 'lib'), join(base, 'preset', 'lib'), { recursive: true })
   writeFileSync(join(cwd, 'characters', 'player.json'), JSON.stringify(player))
   writeFileSync(join(cwd, 'state.md'), STATE)
-  writeFileSync(join(cwd, 'dnd5e-srd-lorebook', 'monsters', 'goblin.md'), GOBLIN_FM)
+  // fixture 专名入 MONSTER_CORE(数据核注入——语料无 grexling,hp 卡值 7 确定性)
+  const goblinFake = JSON.parse(JSON.stringify(JSON.parse(readFileSync(join(dirname(cwd), 'preset', 'lib', 'monster-core-data.mjs'), 'utf8').split('export const MONSTER_CORE = ')[1].trim()).goblin))
+  goblinFake.cr = 0.25; goblinFake.hp = 7; goblinFake.hp_roll = null; goblinFake.ac = 15
+  injectMonsterCore(join(dirname(cwd), 'preset'), 'grexling', goblinFake)
   return { cwd, base }
 }
 
@@ -35,35 +38,35 @@ function runTool(runtime: string, tool: string, args: Record<string, unknown>, s
   const TOOL_CORE = join(dirname(runtime), 'preset', 'lib', 'core.mjs')
   const prelude = seed === undefined ? '' : `(await import(${JSON.stringify(pathToFileURL(TOOL_CORE).href)})).setSeed(${seed});`
   const code = `globalThis.argv=${JSON.stringify(args)};${prelude}await import(${JSON.stringify(pathToFileURL(join(CARD, 'tools', `${tool}.mjs`)).href)})`
-  return spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
+  const rr = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: runtime, encoding: 'utf8' })
+  if (rr.status !== 0) console.error('[tool-fail]', rr.stdout)
+  return rr
 }
 const j = (rt: string, f: string) => JSON.parse(readFileSync(join(rt, 'characters', f), 'utf8'))
+// 卡内夹具助手(2026-09-30 批3:数据核注入,卡片测试工具住卡片)
+const { injectMonsterCore, injectSpellCore } = await import(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'scripts', 'test-fixtures.mjs')).href)
 
-describe('spawn_npc 角色创建(真实脚本)', () => {
-  it('完备律:建档+presence 行+派生摘要;count 天干批量', () => {
+describe('spawn_monster 怪物创建(真实脚本)', () => {
+  it('完备律:读卡自动填+presence 行+派生摘要;count 天干批量', () => {
     const { cwd: rt, base } = rig()
-    const r = runTool(rt, 'spawn_npc', { context: '哥布林小队现身', name: '哥布林', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8, count: 2, from: 'monsters/goblin.md' })
+    const r = runTool(rt, 'spawn_monster', { context: '哥布林小队现身', name: '哥布林', count: 2, stance: '敌对', monster_kind: 'grexling' })
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('[创建 · 哥布林甲 · 敌对]')
-    expect(r.stdout).toMatch(/落盘: characters\/哥布林甲\.json 已建档\(level 0\.25 · ac 15 · hp 7\)/)
+    expect(r.stdout).toMatch(/落盘: characters\/哥布林甲\.json 已建档\(kind grexling · level 0\.25 · ac 15 · hp 7/)   // 断档回退:fixture 无 hp_roll=卡值平均
     expect(r.stdout).toMatch(/◇ level 0\.25 → XP 50 · pb \+2/)
     expect(existsSync(join(rt, 'characters', '哥布林甲.json'))).toBe(true)
-    expect(j(rt, '哥布林甲.json')).toMatchObject({ name: '哥布林甲', role: 'npc', level: 0.25, ac: 15, hp: 7, hp_max: 7, dex: 14, path: 'monsters/goblin.md' })
-    expect(readFileSync(join(rt, 'state.md'), 'utf8')).toMatch(/- 哥布林甲 \| 敌对/)
+    expect(j(rt, '哥布林甲.json')).toMatchObject({ name: '哥布林甲', role: 'npc', level: 0.25, ac: 15, hp: 7, hp_max: 7, dex: 14, monster_kind: 'grexling' })
+    expect(readFileSync(join(rt, 'state.md'), 'utf8')).toMatch(/- 哥布林乙 \| 敌对\n- 哥布林甲 \| 敌对/)   // 三态行(新登场插节首)
     rmSync(base, { recursive: true, force: true })
   })
-  it('同名冲突报错不覆盖;必填缺失报错;from 镜像不符列差异', () => {
+  it('同名冲突报错不覆盖;查无 statblock 报错;出生即满血(hp=卡值,无覆盖后门)', () => {
     const { cwd: rt, base } = rig()
-    const dup = runTool(rt, 'spawn_npc', { context: 'x', name: '梅西雅', stance: '中立', level: 1, ac: 10, hp: 4, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 })
+    const dup = runTool(rt, 'spawn_monster', { context: 'x', name: '梅西雅', stance: '敌对', monster_kind: 'goblin'  })
     expect(dup.status).toBe(1)
     expect(dup.stdout).toContain('!同名已存在:梅西雅')
-    const miss = runTool(rt, 'spawn_npc', { context: 'x', name: '路人', stance: '中立', ac: 10, hp: 4, str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 })
+    const miss = runTool(rt, 'spawn_monster', { context: 'x', name: '幻影', stance: '敌对', monster_kind: 'nonexistent'  })
     expect(miss.status).toBe(1)
-    expect(miss.stdout).toContain('缺必填 level')
-    const bad = runTool(rt, 'spawn_npc', { context: 'x', name: '畸变体', stance: '敌对', level: 0.25, ac: 12, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8, from: 'monsters/goblin.md' })
-    expect(bad.status).toBe(1)
-    expect(bad.stdout).toContain('!from 校验不符')
-    expect(bad.stdout).toContain('ac 卡=15≠传12')
+    expect(miss.stdout).toContain('!查无 statblock:monsters/nonexistent.md')
     rmSync(base, { recursive: true, force: true })
   })
 })
@@ -74,7 +77,7 @@ describe('damage/heal/hp_change 生命直改三件套(真实脚本)', () => {
     const r = runTool(rt, 'damage', { context: '陷阱激射', dice: '2d6+99', target: '梅西雅', type: 'piercing' })
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/落盘: hp 10→0 \[characters\/player\.json\]/)
-    expect(r.stdout).toContain('0HP——PC/同伴:濒死计数起算')
+    expect(r.stdout).toContain('0HP——濒死计数起算')
     expect(j(rt, 'player.json').hp).toBe(0)
     rmSync(base, { recursive: true, force: true })
   })
@@ -84,6 +87,22 @@ describe('damage/heal/hp_change 生命直改三件套(真实脚本)', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/death_fail 1→2/)
     expect(j(rt, 'player.json').death_fail).toBe(2)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('hp_change 0HP 负改=受伤同律:败+1(修复静默 no-op)', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
+    const r = runTool(rt, 'hp_change', { context: '旧伤崩裂', target: '梅西雅', amount: -1 })
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/death_fail 1→2/)
+    expect(j(rt, 'player.json').death_fail).toBe(2)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('稳定者挨打=稳定打破重开濒死(success 双清,败+1)', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_success: 3 })
+    const r = runTool(rt, 'damage', { context: '落石再砸', dice: '1d6+50', target: '梅西雅' })
+    expect(r.status).toBe(0)
+    expect(r.stdout).toContain('稳定打破(重开濒死)')
+    expect(j(rt, 'player.json')).toMatchObject({ death_success: 0, death_fail: 1 })
     rmSync(base, { recursive: true, force: true })
   })
   it('heal 钳上限;0HP 苏醒+濒死计数双清', () => {
@@ -128,15 +147,16 @@ describe('death 濒死计数读写(真实脚本)', () => {
 })
 
 describe('initiative 开战物化(真实脚本)', () => {
-  it('掷全团+战斗节落盘(敌行从 presence 敌对∩参战物化)', () => {
+  it('掷全团+战斗节落盘(参战名单化,不滤敌我)', () => {
     const { cwd: rt, base } = rig()
-    runTool(rt, 'spawn_npc', { context: 'x', name: '哥布林甲', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8, from: 'monsters/goblin.md' })
+    runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林甲', stance: '敌对', monster_kind: 'goblin'  })
     const r = runTool(rt, 'initiative', { context: '接战', combatants: '梅西雅,哥布林甲' })
     expect(r.status).toBe(0)
     const md = readFileSync(join(rt, 'state.md'), 'utf8')
     expect(md).toMatch(/- 回合：1/)
     expect(md).toMatch(/- 先攻：(梅西雅|哥布林甲):\d+ > (梅西雅|哥布林甲):\d+/)
-    expect(md).toMatch(/- 敌行：哥布林甲 \| path:monsters\/goblin\.md/)
+    expect(md).toMatch(/- 参战行：哥布林甲/)
+    expect(md).toMatch(/- 参战行：梅西雅/)
     rmSync(base, { recursive: true, force: true })
   })
   it('未建档报错逼 spawn(临时单位转写通道已废)', () => {
@@ -151,7 +171,7 @@ describe('initiative 开战物化(真实脚本)', () => {
 describe('gain_exp 战果通道(真实脚本)', () => {
   it('foes 查表求和均分+落盘(乘数不进发放);直值通道', () => {
     const { cwd: rt, base } = rig()
-    runTool(rt, 'spawn_npc', { context: 'x', name: '哥布林', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8, count: 2 })
+    runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林', count: 2, stance: '敌对', monster_kind: 'goblin' })
     const r = runTool(rt, 'gain_exp', { context: '战毕结算', who: '梅西雅', foes: '哥布林甲,哥布林乙' })
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/战果: 50\+50 = 100 XP ÷ 1 人 → 100\/人（乘数不进发放）/)
@@ -171,6 +191,20 @@ describe('gain_exp 战果通道(真实脚本)', () => {
     expect(ghost.status).toBe(1)
     expect(ghost.stdout).toContain('!查无被击败者档案:已删的怪')
     rmSync(base, { recursive: true, force: true })
+  })
+  it('级联 L1/L5 执行:rogue 6 级无 ASI;paladin 半施法位表;warlock 魔契整池上移', () => {
+    const r1 = rig({ ...PLAYER, class: 'rogue', level: 5, exp: 6500, hit_die: 8 })
+    runTool(r1.cwd, 'gain_exp', { context: 'x', who: '梅西雅', exp: 7500 })
+    expect(j(r1.cwd, 'player.json').pending ?? []).not.toContain('LV6·ASI 点选')
+    rmSync(r1.base, { recursive: true, force: true })
+    const r2 = rig({ ...PLAYER, class: 'paladin', level: 1, exp: 300, hit_die: 10 })
+    runTool(r2.cwd, 'gain_exp', { context: 'x', who: '梅西雅', exp: 6200 })
+    expect(j(r2.cwd, 'player.json')).toMatchObject({ slots_l1: 4, slots_l2: 2 })
+    rmSync(r2.base, { recursive: true, force: true })
+    const r3 = rig({ ...PLAYER, class: 'warlock', level: 2, exp: 300, hit_die: 8 })
+    runTool(r3.cwd, 'gain_exp', { context: 'x', who: '梅西雅', exp: 600 })
+    expect(j(r3.cwd, 'player.json')).toMatchObject({ slots_l2: 2 })
+    rmSync(r3.base, { recursive: true, force: true })
   })
 })
 
@@ -200,27 +234,74 @@ describe('check 判定件(真实脚本)', () => {
 
 describe('attack/cast 当拍写盘(真实脚本)', () => {
   const HEX = '---\nname: Test Hex\nlevel: 1\nsave: dex\ndamage: 1d6\nconcentration: true\n---\n\n正文'
-  const MISSILE = '---\nname: Test Missile\nlevel: 1\n---\n\n正文'
+  const MISSILE = '---\nname: Test Missile\nlevel: 1\ndamage: 3d4+90\n---\n\n正文'
+  const HEALFM = '---\nname: Test Heal\nlevel: 1\nheal: 1d8+40\n---\n\n正文'
+  const TOUCH = '---\nname: Test Touch\nlevel: 1\nattack_type: melee\ndamage: 1d6\n---\n\n正文'
   function rigCaster() {
-    const r = rig({ ...PLAYER, caster_attr: 'int', slots_l1: 4, concentrating: 'bless' })
-    writeFileSync(join(r.cwd, 'dnd5e-srd-lorebook', 'spells', 'test-hex.md'), HEX)
-    writeFileSync(join(r.cwd, 'dnd5e-srd-lorebook', 'spells', 'test-missile.md'), MISSILE)
+    const r = rig({ ...PLAYER, caster_attr: 'int', slots_l1: 4, concentrating: 'bless', spells_known: ['test-hex', 'test-heal', 'test-missile'] })
+    const parseFm = (md: string) => { const m = /^---\n([\s\S]*?)\n---/.exec(md)!; const fm: Record<string, unknown> = {}; let cur: string | null = null
+      for (const line of m[1].split('\n')) { const li = /^  - (.*)$/.exec(line); const kv = /^([a-z_]+):\s*(.*)$/.exec(line)
+        if (li && cur) { fm[cur] = [...(fm[cur] as unknown[] ?? []), li[1]]; continue }
+        if (kv) { cur = kv[1]; const v = kv[2]; fm[kv[1]] = v === 'true' ? true : v === 'false' ? false : (/^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v) } } return fm }
+    injectSpellCore(join(dirname(r.cwd), 'preset'), 'test-hex', parseFm(HEX))
+    injectSpellCore(join(dirname(r.cwd), 'preset'), 'test-missile', parseFm(MISSILE))
+    injectSpellCore(join(dirname(r.cwd), 'preset'), 'test-heal', parseFm(HEALFM))
     return r
   }
-  it('attack 命中→hp 落盘+0HP 分叉(怪)', () => {
+  it('attack 语料表路径:怪照攻击名取骰(哥布林乙砍玩家)', () => {
     const { cwd: rt, base } = rig()
-    runTool(rt, 'spawn_npc', { context: 'x', name: '哥布林甲', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 })
-    // 播种（seed 2 → d20=8 非 nat1）：core.mjs 的 LCG 每进程全新，不播种则 1/20 概率 nat1 必失、测试随缘红。
-    const r = runTool(rt, 'attack', { context: '必中一击', who: '梅西雅', target: '哥布林甲', modifier: 20, dice: '1d6+50', type: 'piercing' }, 2)
+    runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林', count: 2, stance: '敌对', monster_kind: 'goblin' })
+    // seed 2 → d20=8: scimitar +4 → 12 vs AC 11 命中;1d6+2 ∈ 3..8,玩家 hp 10 不至 0
+    const r = runTool(rt, 'attack', { context: '夜袭', who: '哥布林乙', target: '梅西雅', attack: 'scimitar' }, 2)
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/落盘: 哥布林甲 hp 7→0 \[characters\/哥布林甲\.json\]/)
-    expect(r.stdout).toContain('0HP——怪:RAW 默认即死,死活你判')
-    expect(j(rt, '哥布林甲.json').hp).toBe(0)
+    expect(r.stdout).toMatch(/伤害判定: 1d6\+2=\d+ = \d+ slashing/)
+    expect(r.stdout).toMatch(/落盘: 梅西雅 hp 10→[2-7] \[characters\/player\.json\]/)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('attack 濒死自动暴击(表路径):reach5 咬击 2d4+2 翻 4d4+2,败+2,三败判词', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
+    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'wolf.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'wolf.md'))
+    runTool(rt, 'spawn_monster', { context: 'x', name: '狼', stance: '敌对', monster_kind: 'wolf'  })
+    const r = runTool(rt, 'attack', { context: '狼牙锁喉', who: '狼', target: '梅西雅', attack: 'bite' }, 2)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toContain('4d4+2')
+    expect(r.stdout).toContain('濒死败+2(濒死·5尺自动暴击)')
+    expect(r.stdout).toContain('death_fail 1→3')
+    expect(r.stdout).toContain('三败——死亡(终局)')
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('attack 出生登记+长触及 beyond_5ft:5 尺外不自动暴击,败+1', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
+    runTool(rt, 'spawn_monster', { context: 'x', name: '大蜥蜴', stance: '敌对', monster_kind: 'goblin', attacks: ['bite|melee|+4|2d4+2|piercing|10'] })
+    const r = runTool(rt, 'attack', { context: '十尺外甩尾', who: '大蜥蜴', target: '梅西雅', attack: 'bite', beyond_5ft: true }, 2)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toContain('濒死败+1')
+    expect(r.stdout).toContain('death_fail 1→2')
+    expect(r.stdout).not.toContain('濒死·5尺自动暴击')
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('attack 出生定伤必落:怪 0HP 即死', () => {
+    const { cwd: rt, base } = rig()
+    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'commoner.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'commoner.md'))
+    runTool(rt, 'spawn_monster', { context: 'x', name: '蜥蜴人', stance: '敌对', monster_kind: 'goblin', attacks: ['bite|melee|+4|1d10+9|piercing|5'] })
+    runTool(rt, 'spawn_monster', { context: 'x', name: '路人甲', stance: '敌对', monster_kind: 'commoner'  })
+    const r = runTool(rt, 'attack', { context: '一口定音', who: '蜥蜴人', target: '路人甲', attack: 'bite' }, 2)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/落盘: 路人甲 hp \d→0 \[characters\/路人甲\.json\]/)   // commoner hp=1d8-4 掷,上限 4
+    expect(r.stdout).toContain('0HP——即死')
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('attack 表外攻击名响亮报错', () => {
+    const { cwd: rt, base } = rig()
+    runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林甲', stance: '敌对', monster_kind: 'goblin'  })
+    const r = runTool(rt, 'attack', { context: 'x', who: '哥布林甲', target: '梅西雅', attack: 'nope' })
+    expect(r.status).toBe(1)
+    expect(r.stdout).toContain('!攻击名查不到:nope')
     rmSync(base, { recursive: true, force: true })
   })
   it('cast 豁免型:位检落盘+专注 RAW 覆写(顶替 bless)', () => {
     const { cwd: rt, base } = rigCaster()
-    runTool(rt, 'spawn_npc', { context: 'x', name: '哥布林甲', stance: '敌对', level: 0.25, ac: 15, hp: 7, str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 })
+    runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林甲', stance: '敌对', monster_kind: 'goblin'  })
     const r = runTool(rt, 'cast', { context: '诅咒之链', spell: 'test-hex', targets: '哥布林甲' })
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('位检:✓(slots_l1 剩 4)')
@@ -231,17 +312,51 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
     expect(j(rt, 'player.json')).toMatchObject({ slots_l1: 3, concentrating: 'Test Hex' })
     rmSync(base, { recursive: true, force: true })
   })
-  it('cast 治疗型内联(restore:钳上限+苏醒双清)与自动型(dice 直落,路由律禁接龙)', () => {
+  it('cast 治疗型内联(钳上限+苏醒双清)与 FM-only 伤害面的收窄(2026-09-28 审计批:自动伤害仅表内显式 bolts)', () => {
     const { cwd: rt, base } = rigCaster()
     runTool(rt, 'hp_change', { context: 'x', target: '梅西雅', amount: -99 })
-    const cure = runTool(rt, 'cast', { context: '疗伤术', spell: 'test-missile', restore: true, dice: '1d8+50', targets: '梅西雅' })
+    const cure = runTool(rt, 'cast', { context: '疗伤术', spell: 'test-heal', targets: '梅西雅' })
     expect(cure.status).toBe(0)
+    expect(cure.stdout).toMatch(/治疗判定: 梅西雅 1d8\+40/)
     expect(cure.stdout).toMatch(/落盘: 梅西雅 hp 0→22\(钳上限\) · 濒死计数双清/)
-    const bolt = runTool(rt, 'cast', { context: '飞弹齐射', spell: 'test-missile', dice: '3d4+90', targets: '梅西雅' })
+    // test-missile 仅 FM.damage 无表内 bolts——旧实现走自动伤害(fm 兜底),现为「无掷效果」显式回执(位仍耗)
+    const bolt = runTool(rt, 'cast', { context: '飞弹齐射', spell: 'test-missile', targets: '梅西雅' })
     expect(bolt.status).toBe(0)
-    expect(bolt.stdout).toMatch(/伤害判定: 梅西雅 3d4\+90 = \d+\(自动命中\)/)
-    expect(bolt.stdout).toMatch(/落盘: 梅西雅 hp 22→0/)
-    expect(j(rt, 'player.json').hp).toBe(0)
+    expect(bolt.stdout).toContain('◇ 无掷效果——效果归叙事/状态工具')
+    expect(bolt.stdout).not.toMatch(/伤害判定/)
+    expect(bolt.stdout).toMatch(/落盘: slots_l1 3→2/)
+    expect(j(rt, 'player.json').hp).toBe(22)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('cast 攻击型(触及)打濒死目标=自动暴击:骰翻倍+败+2+三败判词', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1, caster_attr: 'int', slots_l1: 4, spells_known: ['test-touch'] })
+    injectSpellCore(join(dirname(rt), 'preset'), 'test-touch', { name: 'Test Touch', level: 1, attack_type: 'melee', damage: '1d6' })
+    const r = runTool(rt, 'cast', { context: '失能之触', spell: 'test-touch', targets: '梅西雅' }, 2)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/2d6 = \d+ \(濒死自动暴击·翻骰\)/)
+    expect(r.stdout).toContain('death_fail 1→3')
+    expect(r.stdout).toContain('三败——死亡(终局)')
+    expect(j(rt, 'player.json').death_fail).toBe(3)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('选骰语料表:火球升环自动(8d6+Δ)/治疗属性内算/飞弹弹数展开;dice=逃生舱', () => {
+    const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, caster_attr: 'int', slots_l1: 4, slots_l5: 1, spells_known: ['fireball', 'cure-wounds', 'magic-missile'] })
+    for (const n of ['fireball.md', 'cure-wounds.md', 'magic-missile.md']) cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'spells', n), join(rt, 'dnd5e-srd-lorebook', 'spells', n))
+    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'ogre.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'ogre.md'))
+    runTool(rt, 'spawn_monster', { context: 'x', name: '食人魔', stance: '敌对', monster_kind: 'ogre'  })
+    const ogreHp0 = j(rt, '食人魔.json').hp   // spawn hp=语料骰式掷(hp_roll),相对断言
+    const fb = runTool(rt, 'cast', { context: '五环火球', spell: 'fireball', targets: '食人魔', as_level: 5 })
+    expect(fb.status).toBe(0)
+    expect(fb.stdout).toContain('10d6')
+    expect(fb.stdout).toMatch(/slots_l5 1→0/)
+    const cw = runTool(rt, 'cast', { context: '疗伤', spell: 'cure-wounds', targets: '梅西雅' })
+    expect(cw.status).toBe(0)
+    expect(cw.stdout).toMatch(/治疗判定: 梅西雅 1d8 掷 \d+ \+ 3 = \d+/)
+    expect(cw.stdout).toContain('已苏醒')
+    const mm = runTool(rt, 'cast', { context: '飞弹', spell: 'magic-missile', targets: '食人魔,食人魔,食人魔' })
+    expect(mm.status).toBe(0)
+    expect(mm.stdout.match(/1d4\+1 = \d+\(自动命中\)/g)?.length).toBe(3)
+    expect(j(rt, '食人魔.json').hp).toBeLessThan(ogreHp0)
     rmSync(base, { recursive: true, force: true })
   })
 })

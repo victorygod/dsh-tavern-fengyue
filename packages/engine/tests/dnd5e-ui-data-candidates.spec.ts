@@ -19,8 +19,28 @@ function rig(player: Record<string, unknown>, spells: Record<string, string>) {
   mkdirSync(join(cwd, 'dnd5e-srd-lorebook', 'spells'), { recursive: true })
   writeFileSync(join(cwd, 'characters', 'player.json'), JSON.stringify(player))
   cpSync(join(ROOT, 'tavern_presets', 'dnd5e', 'preset', 'lib'), join(base, 'preset', 'lib'), { recursive: true })
+  miniSpellCore(spells, base)   // 数据主路(2026-09-30)下 candidates 走 SPELL_CORE 快照——rig 覆写为夹具域
   for (const [slug, md] of Object.entries(spells)) writeFileSync(join(cwd, 'dnd5e-srd-lorebook', 'spells', `${slug}.md`), md)
   return { cwd, base }
+}
+
+/** 迷你 SPELL_CORE(fixture 域)——同 dnd5e-opening.spec 律。 */
+function miniSpellCore(spells: Record<string, string>, base: string) {
+  const core: Record<string, { fm: Record<string, unknown>; effect: string }> = {}
+  for (const [slug, md] of Object.entries(spells)) {
+    const m = /^---\n([\s\S]*?)\n---/.exec(md) ?? { 1: '' }
+    const fm: Record<string, unknown> = {}
+    let cur: string | null = null
+    const coerce = (v: string) => /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : (v === 'true' ? true : v === 'false' ? false : v.replace(/^"|"$/g, ''))
+    for (const line of m[1].split('\n')) {
+      const li = /^  - (.*)$/.exec(line)
+      const kv = /^([a-z_]+):\s*(.*)$/.exec(line)
+      if (li && cur) { fm[cur] = [...(fm[cur] as unknown[] ?? []), coerce(li[1])]; continue }
+      if (kv) { cur = kv[1]; fm[kv[1]] = kv[2].trim() === '' ? [] : coerce(kv[2].trim()) }
+    }
+    core[slug] = { fm, effect: '' }
+  }
+  writeFileSync(join(base, 'preset', 'lib', 'spell-core-data.mjs'), `export const SPELL_CORE = ${JSON.stringify(core)}\n`)
 }
 
 const spell = (name: string, level: number, classes: string[], ritual = false) =>

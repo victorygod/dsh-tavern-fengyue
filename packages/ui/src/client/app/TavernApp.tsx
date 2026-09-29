@@ -37,7 +37,7 @@ import { subscribeFileEvents } from '../file-events.ts'
 import css from './App.module.css'
 import {
   ChatComposer, ChatLines, MISSING_CREDENTIAL, TranscriptErrorRow, TranscriptPulse, capResultText, reasoningOf, textBlocksOf,
-  TAIL_UNAVAILABLE, type TailRunDetail, type TailStep,
+  TAIL_UNAVAILABLE, type TailRunDetail,
   useProjectionValue, useSessionSurface,
   type ChatLine, type ConversationFace, type TurnError,
 } from '../chat-view.tsx'
@@ -48,6 +48,7 @@ import { TavernView, type TavernViewProps } from '../TavernView.tsx'
 import { tavernRpc, type TavernRpc, type TavernSaveWire, type TavernWorkspaceWire } from '../rpc.ts'
 import { stripInstructions } from '../wrap-markers.ts'
 import { useDialogs } from '../dialog.tsx'
+import { useTailLiveFolds, type StreamChunkLike } from '../tail-live.ts'
 import { NS } from '../locales.ts'
 
 export type { ConversationFace } from '../chat-view.tsx'
@@ -90,68 +91,12 @@ interface AppFaces {
 
 /**
  * AttemptId prefix the engine's stream transposer stamps onto tail-child
- * frames (TANDEM with the engine's TAIL_STREAM_PREFIX): the parent stream's
- * transient chunks route into the tail row by this marker, the childId rides
- * the attemptId body.
+ * frames. 2026-09-29 透流改道退役后引擎不再发这种帧；本文件保留了裸前缀护栏，
+ * 只为双端版本差的窗口（旧引擎+新前端）：混在父流里的透流帧必须原路吸收，
+ * 否则尾代 text-delta 会漏进主代理的 live 正文聚合被误渲成叙事。
+ * 直跟通道见 ../tail-live.ts。
  */
 const TAIL_STREAM_PREFIX = 'tavern-tail:'
-
-/** The stream-chunk slice the fold reads (dsh-llm StreamChunk, structurally). */
-interface StreamChunkLike {
-  type?: string
-  index?: number
-  text?: string
-  blockType?: string
-  name?: string
-  argumentsDelta?: string
-  arguments?: string
-  block?: { name?: string; arguments?: string }
-}
-
-/** Live fold of one tail child's transposed stream, rebuilt per transcript read. */
-interface TailLiveFold {
-  /** Open tool-call buckets: chunk index → name/args accumulated so far. */
-  readonly open: Map<number, { name: string; args: string }>
-  readonly steps: TailStep[]
-  reply: string
-}
-
-/**
- * Fold one transposed stream chunk into the tail row's live body: tool-call
- * blocks build their arguments per delta and finalize at block-end (the end
- * block is canonical — name/arguments win over the deltas); text deltas are
- * the closing reply.
- */
-function foldTailStreamChunk(fold: TailLiveFold, chunk: StreamChunkLike): void {
-  switch (chunk.type) {
-    case 'block-start':
-      if (chunk.blockType === 'tool-call') fold.open.set(chunk.index ?? -1, { name: '', args: '' })
-      return
-    case 'tool-call-delta': {
-      const index = chunk.index ?? -1
-      const slot = fold.open.get(index) ?? { name: '', args: '' }
-      fold.open.set(index, slot)
-      if (typeof chunk.name === 'string' && chunk.name !== '') slot.name = chunk.name
-      slot.args += chunk.argumentsDelta ?? ''
-      return
-    }
-    case 'block-end': {
-      const index = chunk.index ?? -1
-      const slot = fold.open.get(index)
-      if (slot === undefined) return
-      fold.open.delete(index)
-      const name = typeof chunk.block?.name === 'string' && chunk.block.name !== '' ? chunk.block.name : slot.name
-      const args = typeof chunk.block?.arguments === 'string' ? chunk.block.arguments : slot.args
-      if (name !== '') fold.steps.push({ tool: name, args })
-      return
-    }
-    case 'text-delta':
-      fold.reply += chunk.text ?? ''
-      return
-    default:
-      return
-  }
-}
 
 function faces(ctx: ClientContext): AppFaces | undefined {
   // Every key below is declared in `inject`, so property access is
@@ -937,6 +882,11 @@ function TavernChatView(props: {
   // visible admission failures the event stream never carries.
   const { running, openBroken, promptBroken } = useSessionSurface(binding)
   const [lines, setLines] = useState<readonly ChatLine[]>([])
+  // 尾子会话名单（父日志 subagent/catalog 行的 childId，旧→新）：tail-live
+  // 直跟口的输入。ref 与 state 并行——订阅回执里只做增量去重，重放天然重建。
+  const tailChildrenRef = useRef<readonly string[]>([])
+  const [tailChildren, setTailChildren] = useState<readonly string[]>([])
+  const tailFolds = useTailLiveFolds({ sessions, parent: sessionId, children: tailChildren, running: props.tailRunning })
   // undefined = loading, null = the card ships no opening.html, string = its HTML
   const [opening, setOpening] = useState<string | null | undefined>(undefined)
   const [draft, setDraft] = useState('')
@@ -1170,21 +1120,31 @@ function TavernChatView(props: {
   }, [cardUi])
   const layout = cardUi?.layout
   const windowLast = layout?.windowLast
-  const visibleLines = windowLast === undefined ? lines : lines.slice(Math.max(0, lines.length - windowLast - extraShown))
-  const hiddenOlder = windowLast === undefined ? 0 : Math.max(0, lines.length - windowLast - extraShown)
+  // 尾行直播体后处理：tailFolds 来自尾子会话直跟（../tail-live.ts），注进
+  // tail 行的 steps/reply——只改行体不增删行，下游窗口截断与锚索引语义不变。
+  const filledLines = useMemo(() => {
+    if (tailFolds.size === 0) return lines
+    return lines.map((line) => {
+      if (line.kind !== 'tail') return line
+      const fold = tailFolds.get(line.text)
+      return fold === undefined ? line : { ...line, steps: fold.steps, reply: fold.reply }
+    })
+  }, [lines, tailFolds])
+  const visibleLines = windowLast === undefined ? filledLines : filledLines.slice(Math.max(0, filledLines.length - windowLast - extraShown))
+  const hiddenOlder = windowLast === undefined ? 0 : Math.max(0, filledLines.length - windowLast - extraShown)
   // 重试 ↻ 的渲染位：最后一条 reply 行（narrative/stopped/error）位于最后一条
   // user 行之后（该回复之后玩家未提交过）且会话空闲——与发送按钮状态机同源
   // （停止/报错的回合也算回复完毕）。挂最后一条可见 narrative：windowLast 截断
   // 下可见窗的末尾即最新回复；整个 reply 被截出可见窗时不显示。
   let lastUserAt = -1
   let lastReplyAt = -1
-  for (let index = 0; index < lines.length; index += 1) {
-    const kind = lines[index]?.kind
+  for (let index = 0; index < filledLines.length; index += 1) {
+    const kind = filledLines[index]?.kind
     if (kind === 'user') lastUserAt = index
     if (kind === 'narrative' || kind === 'stopped' || kind === 'error') lastReplyAt = index
   }
   const retryAt = lastReplyAt > lastUserAt && !running && !pending && !props.tailRunning && props.retryable
-    ? lastReplyAt - (lines.length - visibleLines.length)
+    ? lastReplyAt - (filledLines.length - visibleLines.length)
     : -1
   const retryVisibleIndex = retryAt >= 0 ? retryAt : undefined
   const panels = (slot: 'top' | 'bottom' | 'left' | 'right' | 'overlay'): ReactNode[] =>
@@ -1211,6 +1171,12 @@ function TavernChatView(props: {
   // 维护行出现条件：turn/end 收尾时宿主正处尾代理闸门（由轮询的 tailRunning 反映）。
   useEffect(() => {
     if (binding === undefined) return
+    // 换绑即清尾子会话名单：直跟口与行名单都只归属当前父会话，历史行由
+    // durable fetch 渲染——否则旧会话的 childId 会在新会话里稳拍直跟。
+    if (tailChildrenRef.current.length > 0) {
+      tailChildrenRef.current = []
+      setTailChildren(tailChildrenRef.current)
+    }
     const source = binding.eventSource
     // 活到的 turn/end 才触发 onTurnEnd：首次 read()（挂载重放/重订阅）先建立
     // turn/end seq 基线，其后 seq 更大的 turn/end 才是本订阅期内新落定的回合。
@@ -1224,34 +1190,22 @@ function TavernChatView(props: {
       let sawOutput = false
       let liveThink = ''
       let liveBody = ''
-      // Per-pass folds: the tail's transposed stream by childId, and the main
-      // agent's durable callId → paired result for the expanded tool rows.
-      const tailFolds = new Map<string, TailLiveFold>()
+      // Per-pass pairing: the main agent's durable callId → paired result for
+      // the expanded tool rows. 尾行直播体另有供血源（tail-live.ts 的子会话直跟），
+      // 不在父流聚合。skew 护栏：透流残帧原路吸收，绝不入主代理正文。
       const toolResults = new Map<string, string>()
       /* jscpd:ignore-start -- the aggregation loop mirrors the writer column's
          reader by contract (same event shapes); the bodies diverge by design
          (wrap strip, tail rows, sidebar lines live only here). */
       for (const entry of source.getSnapshot().entries) {
         // Live stream frames: reasoning/text deltas feed the turn's live 思考/正文
-        // rows (the durable assistant/message carries neither); frames whose
-        // attemptId carries the tail marker belong to the transposed tail-child
-        // stream — they fold into that maintenance row instead of the transcript.
+        // rows (the durable assistant/message carries neither). attemptId 带
+        // tavern-tail: 前缀的帧只在旧引擎+新前端窗口出现——吸收丢弃，见文件头注。
         if (entry.type === 'transient') {
           const data = (entry.event as { data?: { attemptId?: unknown; chunk?: StreamChunkLike } }).data
           const attemptId = typeof data?.attemptId === 'string' ? data.attemptId : undefined
           const chunk = data?.chunk
-          if (attemptId !== undefined && attemptId.startsWith(TAIL_STREAM_PREFIX)) {
-            const childId = attemptId.slice(TAIL_STREAM_PREFIX.length).split(':')[0] ?? ''
-            if (childId !== '' && chunk !== undefined) {
-              let fold = tailFolds.get(childId)
-              if (fold === undefined) {
-                fold = { open: new Map(), steps: [], reply: '' }
-                tailFolds.set(childId, fold)
-              }
-              foldTailStreamChunk(fold, chunk)
-            }
-            continue
-          }
+          if (attemptId !== undefined && attemptId.startsWith(TAIL_STREAM_PREFIX)) continue
           if (chunk?.type === 'reasoning-delta' && typeof chunk.text === 'string') liveThink += chunk.text
           else if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') liveBody += chunk.text
           continue
@@ -1319,26 +1273,35 @@ function TavernChatView(props: {
             })
           }
         } else if (event.type === 'tool/result') {
-          // 配对 durable 回执 → 展开工具行时参数 + 返回值同显。可见文本在
-          // tool-result 块的 content 里（message.content = [ToolResultBlock]）；
+          // 配对 durable 回执 → 展开工具行时参数 + 返回值同显。0.1.7 会话格式
+          // (v4)：回执文本直接在 message.content 的 text 块里，toolCallId 挂
+          // message（旧形状=tool-result 专用块携 id 与 content，兼容保留）；
           // 错误回执优先标注，客户端截断防长回执挤爆行体。
-          const message = data['message'] as { content?: unknown } | undefined
+          const message = data['message'] as { content?: unknown; toolCallId?: unknown } | undefined
           const failure = data['error'] as { name?: unknown; code?: unknown } | undefined
           const block = Array.isArray(message?.content)
             ? (message!.content as Record<string, unknown>[]).find(item => item !== null && typeof item === 'object' && item['type'] === 'tool-result')
             : undefined
-          const callId = typeof block?.['toolCallId'] === 'string' ? block['toolCallId'] as string : undefined
+          const raw = block !== undefined ? block['content'] : message?.['content']
+          const callId = typeof block?.['toolCallId'] === 'string'
+            ? block['toolCallId'] as string
+            : typeof message?.['toolCallId'] === 'string' ? message['toolCallId'] as string : undefined
           const text = failure !== undefined && failure.name !== undefined
             ? `${String(failure.name)}${failure.code === undefined ? '' : `: ${String(failure.code)}`}`
-            : capResultText(textBlocksOf(block?.['content']).join(''))
+            : capResultText(textBlocksOf(raw).join(''))
           if (callId !== undefined && text !== '') toolResults.set(callId, text)
         } else if (event.type === 'subagent/catalog') {
           // Every tavern-tail fork owns one durable catalog row — the
           // bookkeeping line renders from it, so a refresh or tab
           // switch recovers the line (the maintenancePrompt-per-turn
-          // hint would live only until the next replay).
+          // hint would live only until the next replay). childId 同时
+          // 喂 tail-live 的直跟口（只跟最新在跑的一条,重放天然重新发现）。
           const tail = data as { mode?: unknown; label?: unknown; childId?: unknown }
           if (tail.mode === 'one-shot' && tail.label === 'tavern-tail' && typeof tail.childId === 'string') {
+            if (!tailChildrenRef.current.includes(tail.childId)) {
+              tailChildrenRef.current = [...tailChildrenRef.current, tail.childId]
+              setTailChildren(tailChildrenRef.current)
+            }
             out.push({ kind: 'tail', text: tail.childId, time, args: undefined, live: false, ...(seq === undefined ? {} : { seq }) })
           }
         } else if (event.type === 'command/done') {
@@ -1403,15 +1366,12 @@ function TavernChatView(props: {
         }
       }
       primed = true
-      // Pair the durable results into their call rows, and the live tail folds
-      // into their catalog rows (the fold fills after the catalog entry passes).
+      // Pair the durable results into their call rows. 尾行直播体由 useMemo
+      // 后处理注入（tailFolds 来自子会话直跟,换血不重订父流）。
       for (const line of out) {
         if (line.kind === 'tool' && line.callId !== undefined) {
           const result = toolResults.get(line.callId)
           if (result !== undefined) line.result = result
-        } else if (line.kind === 'tail') {
-          const fold = tailFolds.get(line.text)
-          if (fold !== undefined) { line.steps = fold.steps; line.reply = fold.reply }
         }
       }
       const thinking = liveThink.trim() !== ''
@@ -1640,7 +1600,7 @@ function TavernChatView(props: {
   }
 
   // 开场面事实（face 信号，不依赖 opening.html 拉取态——含加载期）：转写空/清空即开场期。
-  const openingActive = cleared || lines.length === 0
+  const openingActive = cleared || filledLines.length === 0
   // 卡 opening face 的通知口：suppress opening 的卡据此自绘开场/退场（宿主权威
   // 信号，替代三张卡各自轮询 [class*="openingFrame"] 的时代）。
   useEffect(() => { cardUi?.setOpeningActive(openingActive) }, [cardUi, openingActive])
@@ -1667,7 +1627,7 @@ function TavernChatView(props: {
         {panels('left')}
         <div ref={transcriptRef} className={`${css.transcript} tavern-transcript`}>
           <div className={css.col}>
-            {(cleared || lines.length === 0) && opening !== null && opening !== '' && (
+            {(cleared || filledLines.length === 0) && opening !== null && opening !== '' && (
               <div className={css.openingFull}>
                 <iframe className={css.openingFrame} title={t('opening.title')} sandbox="allow-scripts" srcDoc={opening} />
               </div>
@@ -1718,7 +1678,7 @@ function TavernChatView(props: {
             />
             <TranscriptPulse
               running={running} pending={pending} thinking={thinking} texting={texting}
-              empty={lines.length === 0 && opening === undefined && !running && !pending} emptyText={t('view.loading')}
+              empty={filledLines.length === 0 && opening === undefined && !running && !pending} emptyText={t('view.loading')}
             />
             {/* jscpd:ignore-end */}
           </div>

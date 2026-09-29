@@ -62,7 +62,7 @@
 
 ## `runtime/.chat.tail.jsonl`(尾代输出临时文件)
 
-**动机**:尾代理是 fork 子会话,其 children id 不进 `workspaces`,`onSessionEvent` 第一道门 `workspaces.get(child)===undefined → return`(index.ts:1401-1402)——子会话 durable 消息**到不了快照**;其文本流仅以瞬态转投(`transposeTailStream`,index.ts:1474,"no durable event is written")给 UI。钩子和卡脚本因此需要一个文件读到「本轮尾代的叙述」。
+**动机**:尾代理是 fork 子会话,其 children id 不进 `workspaces`,`onSessionEvent` 第一道门 `workspaces.get(child)===undefined → return`(index.ts:1401-1402)——子会话 durable 消息**到不了快照**;钩子和卡脚本因此需要一个文件读到「本轮尾代的叙述」。UI 侧直播另走直跟通道:浏览器以 subagent 地址 retain 子会话、折子流瞬态(`packages/ui/src/client/tail-live.ts`,2026-09-29 透流转投 `transposeTailStream` 退役——子 loop 的 frame.revision 自由计数,转挂父流即混序,必触发客户端 revision 断档撕窗)。
 
 ```
 runtime/.chat.tail.jsonl        ← 与 .chat.snapshot.jsonl 同族;每轮全量替换(临时文件+原子 rename,chat-snapshot.ts:122-124)

@@ -32,7 +32,7 @@
 
 ## 2. SRD Lorebook 装配计划（语料→卡的裁剪表）
 
-**目录定案**：SRD 语料装进 `preset/setup/dnd5e-srd-lorebook/` → 播种为 `runtime/dnd5e-srd-lorebook/`。定位 = **模型与玩家共同可见的共享数据面**——模型经 runtimeRead 按需查原文（书本 UI 已删 2026-09-20，数据面保留）。与叙事实体目录分立：`runtime/lore/`（尾代理登记的 NPC/任务/地点，可增删）管游戏世界，`dnd5e-srd-lorebook/` 管规则原文——**尾代理对后者只读**（maintenancePrompt 明文：禁止 create/update/delete，疏忽即数据损毁）。书本 UI 已删（2026-09-20，见 §6.5），其数据面双方共享不变。
+**目录定案（2026-09-30 批3 迁移）**：SRD 语料住**卡根 `corpus/srd-lorebook/`**（不在 preset/ → 引擎不播种 → runtime 无语料目录）；机械面=七张数据模块（MONSTER/SPELL/EQ/CLASS/RACE/CLS_FEATURES/RULES_CORE，scripts/extract-*.mjs 重抽）。定位 =（2026-09-30 修订）**人与叙事的阅读面**——结构化消费面已全部抽取进 `preset/lib/*-data.mjs` 数据模块(MONSTER_CORE/SPELL_CORE/EQ_CORE/CLS_FEATURES/财宝表),工具运行时零 lorebook 读取;runtimeRead 仅剩「罕见规则原文( rules/ 章)」边缘案件。与叙事实体目录分立：`runtime/lore/`（尾代理登记的 NPC/任务/地点，可增删）管游戏世界，`dnd5e-srd-lorebook/` 管规则原文——**尾代理对后者只读**（maintenancePrompt 明文：禁止 create/update/delete，疏忽即数据损毁）。书本 UI 已删（2026-09-20，见 §6.5），其数据面双方共享不变。
 
 **§2.1 文件双层制（合并的正确粒度）**：卡内构建器 `tavern_presets/dnd5e/assemble.mjs`（卡根、preset/ 之外——引擎开局只复制 preset/，构建面永不进运行时）把源 JSON 的结构化字段升进每个 md 的 frontmatter（法术：level/school/save/damage/damage_type/half_on_save；怪物：CR/XP/AC/HP/六维…），正文保持原文。单文件双消费——索引扫 frontmatter、脚本结算读 frontmatter（原书本 UI 渲染正文一环随 2026-09-20 删 书本 裁定移除）。规则数值零第二副本：改一处，玩家显示与脚本行为同变。上游同步链 = repo 级 `scripts/srd-convert.mjs`（clone 5e-bits/5e-database → 刷 docs/dnd5e-srd 的 .src）→卡内 assemble → 卡 setup。
 
@@ -72,7 +72,7 @@
 
 ### rest（新）— 休整结算器
 - 入参：`kind: short|long`、`hd_spent`（短休花几枚，玩家决策）、`food_water: bool`（长休力竭 −1 的前置）；
-- 长休链条（RAW 核验）：HP 全回 + HD 回总数半数（≥1）+ 法环全回 + 力竭 −1（须饮食）+ 临时 HP 清；**三铁轨前置校验**——起始 HP ≥1、24 小时至多一次（读 state.md 游戏时间；上次长休时刻记 state 队伍节一行）、打断作废；
+- 长休链条（RAW 核验）：HP 全回 + HD 回总数半数（≥1）+ 法环全回 + 力竭 −1（须饮食）（2026-09-28:temp_hp 字段退役,临时生命协议见 audit-fixes §6）；**三铁轨前置校验**——起始 HP ≥1、24 小时至多一次（读 state.md 游戏时间；上次长休时刻记 state 队伍节一行）、打断作废；
 - 短休：逐枚掷 `骰面+CON` 回血 + 职业短休池回充——**池映射是 rest 脚本内私有死规则常量**（唯一消费者,不进 lib；lorebook 无此结构化列）：
   - D3 四职业：战士|行动浪潮+第二风 → 短休；法师|奥法回复 1/日（短休）；牧师|神圣渠道 → 短休；盗贼|无池。
   - 2014 基线禁区：**狂暴/吟游激励/术法点均为长休恢复**（「狂暴短休回 1」是 2024 规则，勿串线）；
@@ -88,7 +88,7 @@
 ### 维护工作全普查（2026-09-19 终版路由——工具 4/脚本钩 5/其余 agent·尾代直做）
 - **主·roll**：判定/伤害/先攻/濒死/专注/施法闸/灵感（全回执制:返回建议新值）——**零写盘**;**主·trade**：合计+跨币找零/新钱包值回执——零写盘。
 - **尾·advance**：XP 均分/升级块/CON 溯/ASI apply;**尾·rest**：全链休整。战末归档=advance+直改（宿敌回写+删 combat）。
-- **尾代直改（零工具）**：HP 落账/敌行/状态增衰/临时HP/力竭/池递减/gear 转录/state 六节时间/新实体建档/殁归档/combat 誊建清零。
+- **尾代直改（零工具）**：HP 落账/参战行状态文本/状态增衰/力竭(temp_hp 已退役 2026-09-28)/池递减/gear 转录/state 六节时间/新实体建档/殁归档/combat 誊建清零。
 - **agent 直做**：叙事/DC 选择/优势来源/目标选择/预算粗查/议价/craft 时机与数值（尾代落账）。
 - **不可感知（触发器）**：player_panel 拼取（回合提交时）/ui_data（rev 心跳+节级拉取）/opening_commit（表单提交）/**front_commit（前端点选:ASI/新法术——机械写道,LLM 零参与,见 tools_zh §六）**/write-guard（runtimeEdit 写 json——已由工具内置：落盘前整档 parse,坏则拒写）。
 
@@ -116,7 +116,7 @@
 // 机件：身份/六维/生存现值/熟练列表/施法/资源池/装备引用/钱包/武器与背包行/pending/statuses
 // 叙事：persona（五短串）/biography（行数组,追加式）/——flat 浅层,深嵌最多一层对象
 // 纪律（唯一的雷规）：叙事字段=单行短串或字符串数组,严禁多行长段——JSON 转义雷即消
-// lore/ 只住非人物；战斗期现值走 state.md 战斗节敌行,战末归档回写本件
+// lore/ 只住非人物；战斗期现值走 state.md 战斗节参战行(2026-09-29b 敌我退役),战末归档回写本件
 ```
 
 ```markdown
@@ -136,7 +136,7 @@
 // 战况记事（地形/记忆点/DM 备注）→ 本地叙事走转写正文与摘要,不入本件
 ```
 
-**数据全景（v7,2026-09-19——lore 子目录上提,目录即类型;v4 名单节 2026-09-25 增补）**：`runtime/` 下——`characters/`（`player.json` 固定名+一切具名人物 `<名>.json`,JSON:机件+persona+biography 行数组）、`locations/ · quests/ · items/ 等`（md,现卡 lore 协议原样上提一格;LLM 主读写零机器消费）、「## 战斗」节（state.md 内,战斗瞬态;先攻后由尾代改写——回合/先攻序/敌行[杂兵带 lorebook path],战毕归档[命名敌终态回写 character 文件]清回「（无战斗）」;combat.json 已废）、`state.md`（根,唯一 md 常驻面板:六节+队伍+**「## 附近 NPC」三态名单元**（v4:行式 `- 名 | 同伴/中立/敌对`,尾代每回合维护,上榜必有档含杂兵,敌对=持久态）;frontmatter time_day/time_hour 两机器行）、`dnd5e-srd-lorebook/`（只读）。特色分界=**characters JSON（机器重）/ locations·quests·items md（LLM 重）**。**postPrompt 每回合加载面（v7 定案:暂时全量原文,不做渲染摘要——用户裁决"暂时不需要"）**：player.json + **附近 NPC 三态名单在册者（v4:名单驱动,注入与前端 HUD 人际三区同源 core.presence;取代 v3 叙事点名算法;列表空=开局占位）**+ state.md 原文（「## 战斗」节随文注入——get_combat_state 已撤,2026-09-20 用户裁定:同一份 state.md 不注入两遍） + 分层索引行;~1.5-2k token/回合;派生值通道=roll 工具照算;**摘要渲染层挂账为日后量测优化项**（注入层≠文件层的分界原则不变,当前选择直给）。拼接脚本退化为拼取器(cat 合集,零格式化）。**引擎 write-guard（~15 行,施工项）**：runtimeUpdate 写 *.json → 写后 JSON.parse → 坏则回滚原文+结构化报错（=「改完自动 lint」;读侧 fail-loud 兜底）。。
+**数据全景（v7,2026-09-19——lore 子目录上提,目录即类型;v4 名单节 2026-09-25 增补）**：`runtime/` 下——`characters/`（`player.json` 固定名+一切具名人物 `<名>.json`,JSON:机件+persona+biography 行数组）、`locations/ · quests/ · items/ 等`（md,现卡 lore 协议原样上提一格;LLM 主读写零机器消费）、「## 战斗」节（state.md 内,战斗瞬态;先攻后由尾代改写——回合/先攻序/参战行[2026-09-29b 敌我退役:参战名单即战斗名单,不分敌我],战毕归档[命名亡者终态回写 character 文件]清回「（无战斗）」;combat.json 已废）、`state.md`（根,唯一 md 常驻面板:六节+队伍+**「## 附近 NPC」三态名单元**（2026-09-30 stance 回锅:行式 `- 名 | 同伴/中立/敌对`——在场关系快照驱动前端分区/注入标注,尾代随剧情改列;上榜必有档含杂兵,敌对=持久态;**战斗节仍=参战名单,不受敌我判**）;frontmatter time_day/time_hour 两机器行）、`dnd5e-srd-lorebook/`（只读）。特色分界=**characters JSON（机器重）/ locations·quests·items md（LLM 重）**。**postPrompt 每回合加载面（v7 定案:暂时全量原文,不做渲染摘要——用户裁决"暂时不需要"）**：player.json + **附近 NPC 三态名单在册者（2026-09-30 stance 回锅:名单驱动,注入与前端 HUD 人际三区同源 core.presence;列表空=开局占位）**+ state.md 原文（「## 战斗」节随文注入——get_combat_state 已撤,2026-09-20 用户裁定:同一份 state.md 不注入两遍） + 分层索引行;~1.5-2k token/回合;派生值通道=roll 工具照算;**摘要渲染层挂账为日后量测优化项**（注入层≠文件层的分界原则不变,当前选择直给）。拼接脚本退化为拼取器(cat 合集,零格式化）。**引擎 write-guard（~15 行,施工项）**：runtimeUpdate 写 *.json → 写后 JSON.parse → 坏则回滚原文+结构化报错（=「改完自动 lint」;读侧 fail-loud 兜底）。。
 **经验账（2026-09-18 定案：按 RAW 标准）**：每人一账（player frontmatter `exp`），遭遇 XP 由**参战角色均分**；升级逐人 advance。新同伴入队按队伍平均等级建档（桌面通行约定，DMG 精神）。
 
 **同步删除记录**（2026-09-18）：`docs/dnd5e-srd/`（md 正文与 .src 一并）已删——卡内语料为唯一正本（5.0M，git 可追踪）；再渲染路径=clone 5e-bits@3b124d8 → `scripts/srd-convert.mjs` → 卡内 assemble（钉版与署名常驻 assemble.mjs 头注释）。
@@ -154,7 +154,7 @@
 - `statuses` 为 JSON 数组（对象四字段：name/effect/source/remaining——effect 如 `"str-2"`，roll 命中属性即计入）
 **lint 面**：面板=出生时 JSON.parse+schema 全检一次；此后尾代理整写偶发坏=下个读者 JSON.parse 当场炸（fail-loud 自愈式发现）+ 尾代施工时配对账工具（schema：必需键=核心集,能力族按**键裁剪律**条件必需(panel-data 二·B)/类型/枚举 role 二值 pc|npc/交叉约束 slots 现≤f(class,level)、hd≤level、concentrating∈spells_prepared）。接口 JSON（ui_data/manifest）由代码构造,免校验。lorebook/lore 的 frontmatter 面继续小 lint（lore_index 消费）。
 
-**players 机器层全清单（v9.1 口径）**：核心键 `name/description/role(class|npc)/class/subclass/level/race/background`；六维 `str…cha`；`hp/hp_max/temp_hp/exhaustion`；`languages[]`（对话门控）；`speed`（基准）；`darkvision`、`resist[]/immune[]`（种族继承，伤害结算 `halve` 参数的依据面）；装备最小引用 `armor/shield`（骰式与 AC 派生 join equipment）；**钱包 `gp/sp/cp` 整型标量**（SRD Standard Exchange Rates 的 10:1 兑换是死规则——商店工具上线时内置；pp/ep 罕见走正文）。**能力族（键裁剪律,panel-data 二·B：没有什么能力就没有相关字段,对所有角色含玩家）**：成长族 `exp/pending/hd_available`；施法族 `caster_attr/spells_known/spells_prepared/slots_l1…l9/concentrating`（现量）；`features`（已获特征行数组,池类特征行内标使用状态(名|回充时机|已用),回充=时间推移检查清单短休/长休/每日档）；训练面 `save_prof/skill_prof/expertise/armor_prof/weapon_prof/tool_prof`（后三件=RAW 惩罚与背景的执行面）。**派生量一概不存**（PB/修正值/先攻/DC/被动醒觉/位表总量）。**已整删机制**：inspiration(灵感=扮演奖励归 DM 叙事)/origin/death_success·fail(濒死=death 工具入参+transcript)。
+**players 机器层全清单（v9.1 口径）**：核心键 `name/description/role(class|npc)/class/subclass/level/race/background`；六维 `str…cha`；`hp/hp_max/exhaustion`；`languages[]`（对话门控）；`speed`（基准）；`darkvision`、`resist[]/immune[]`（种族继承，伤害结算 `halve` 参数的依据面）；装备最小引用 `armor/shield`（骰式与 AC 派生 join equipment）；**钱包 `gp/sp/cp` 整型标量**（SRD Standard Exchange Rates 的 10:1 兑换是死规则——商店工具上线时内置；pp/ep 罕见走正文）。**能力族（键裁剪律,panel-data 二·B：没有什么能力就没有相关字段,对所有角色含玩家）**：成长族 `exp/pending/hd_available`；施法族 `caster_attr/spells_known/spells_prepared/slots_l1…l9/concentrating`（现量）；`features`（已获特征行数组,池类特征行内标使用状态(名|回充时机|已用),回充=时间推移检查清单短休/长休/每日档）；训练面 `save_prof/skill_prof/expertise/armor_prof/weapon_prof/tool_prof`（后三件=RAW 惩罚与背景的执行面）。**派生量一概不存**（PB/修正值/先攻/DC/被动醒觉/位表总量）。**已整删机制**：inspiration(灵感=扮演奖励归 DM 叙事)/origin/death_success·fail(濒死=death 工具入参+transcript)。
 
 **state.md**：无 frontmatter——「时间敏感项」登记表首行「当前时间」=时间唯一真值（原 frontmatter time 字段的消费者 rest 工具已消亡，字段随亡）。**combat.md**：`round/act_index` 进 frontmatter；文件由尾代理建档与删除（roll 先攻分支只返回序列，不写文件——写权限按道分配不破）。
 
@@ -190,7 +190,7 @@
 - **突袭**（2014 RAW）：对潜伏方开战时，敌方潜行检定（roll）对全员被动醒觉（面板现值）；被突袭者首个自己的回合不能移动/动作、该回合结束前不能反应。
 - **非战斗 XP**（RAW：encounter 含社交/探索成就）：重大非战斗进版也可 advance `xp_gain` 记账，注明事由。
 - **死亡二轨**：同伴（按职业构造）走 PC 濒死豁免；无名怪默认 0 HP 即死（RAW 缺省）。
-- **冒险日按 DMG 标准**（6~8 场中/难预算 + 两口短休）：本卡常设 PC+2~3 同伴=四人队数学，遭遇预算原生适用、不再单人折算；强度带偏 easy/medium 适配单人指挥带宽；探索/社交遭遇同样计入预算（RAW encounter 定义）。**规则正本=`docs/dm-loop_zh.md` A 部（v3 合并版：三书规则+卡内落地 B 部）;DC 六档/濒死稳定/卖价半价三处校勘已并入。**
+- **长休周期节奏按 DMG"The Adventuring Day"标准**（6~8 场中/难预算 + 两口短休）：本卡常设 PC+2~3 同伴=四人队数学，遭遇预算原生适用、不再单人折算；强度带偏 easy/medium 适配单人指挥带宽；探索/社交遭遇同样计入预算（RAW encounter 定义）。**规则正本=`docs/dm-loop_zh.md` A 部（v3 合并版：三书规则+卡内落地 B 部）;DC 六档/濒死稳定/卖价半价三处校勘已并入。**
 - 篇章换挡跟 Tiers：1–4 地方强，5–10 一域，11+ 位面（作为篇章设计的心法，写成两行）。
 
 ## 6. user-facing 流程（开局页）
@@ -213,6 +213,8 @@ opening.html 在现卡基础上（姓名/出身/同行者）加：
 **§6.7 游戏化 HUD（2026-09-19 用户愿景入档）**：游戏开始后前端转 RPG 面板形态——左上角头像+HP 条+状态章+同伴小行条、右上角地图区、角落时日/待办旗、战斗期敌人血条 overlay。数据链：players/*.json（固定 schema）→ `scripts/ui_data.mjs`（读 JSON→聚合派生→出一层 JSON 契约）→ `ui/index.js` 自绘 HUD（fixed 定位角件,鼠标按件抢事件,不走 layout.json 面板槽;手簿右栏,书本弹窗已删）。**5e 语义转译**：无 MP——施法者=分环槽条（现/总）、武人=资源池点阵+HD 骰点;状态章=statuses chips（含剩余角标）。`ui_data` 契约基本盘：pc{identity,hp,hd,pools,slots[],statuses[],flags}/mates 简版/party{names,avgLevel}/world{day,hour,place,pending}/combat{round,act,enemies[]};派生量（AC/修正/被动醒觉）ui_data 现算,HUD 零数值逻辑。**两个待决**：①头像=v1 开局上传（writeAsset)+职业圆章兜底,种族默认图库不做;②地图 v1 降格为所在旗（state 玩家所在+面包屑）,真图二期。
 
 **§6.5 规则之书 —— 已删（2026-09-20 用户裁定）**：书本图标按钮、`ui/index.js` 的 mountRulebook()/mdToHtml/CSS 与取文协议 `preset/scripts/rulebook.mjs` 全部移除。**lorebook 数据（`setup/dnd5e-srd-lorebook/`）保留**——它是与模型共享的数据面：模型侧 `{{srd_index()}}` 注入索引、泵 derived 的 AC 装备 join 仍依赖它。原型稿（hud-proto-v6/v7）按「带日期原型不随实现回写」惯例原样保留。
+
+**§6.8 开局高等级出生（2026-09-29 落地）**：opening.html 身份行加**出生等级**选择（1..20，默认 1）——>1 时出生即按等级落成长族：exp=XP 阈值当前级下限、hd_available=level、hp=classHpMax(level,**基础 con**)、特征 L1..level 正向累积（buildClass 与 spawn_npc 同源）、位表整档 slots_l1..lN。施法面逐级对表（opening-meta 新死规则 `CANTRIPS_BY_LEVEL`/`knownSpellsAt`——SRD 5.1 职业表列，双源核对落表；wizard 走 6+2(L−1) 进书线；cleric/druid 准备数=level+施法调整；known/prepared 池=1..maxSlot 联合，opening_data 按环位分桶 `pools.byLevel`+`slotMax` 下发表单）。**历史 ASI 不机械随机补**（NPC 侧 applyAsiGrowth 才随机）——按 ASI 档位表逐档挂 `LVn·ASI 点选` pending，玩家在面板数据册 Ability Scores 节逐档点选（front_commit 既有闸照用：恰 2 点/上限 20/CON 追溯 HP，零新面板与零新校验代码）。子职卡现身条件升为「分岔级 ≤ 出生等级」，已到分岔级者必落子职。level 缺省 1 时落盘与旧版逐字节一致。
 
 ## 7. 风险与开放点
 

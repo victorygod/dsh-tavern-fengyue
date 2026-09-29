@@ -438,7 +438,11 @@ describe('live narrative streaming and the maintenance row', () => {
     expect(document.querySelector('[class*="typing"]')).toBeNull()
   })
 
-  it('数据维护行：转道的子流帧折叠为 live 步骤（可展开看参数），答复流式出现', async () => {
+  it('数据维护行：父流里的透流残帧被吸收（skew 护栏），行走 durable 台账不炸', async () => {
+    // 2026-09-29 透流改道退役：引擎不再发 tavern-tail: 前缀帧；直播体改由
+    // 尾子会话直跟供给（packages/ui/src/client/tail-live.ts，可跑钉在
+    // tests/tail-live.client.spec.tsx）。本文件钉的是双端版本差窗口：旧引擎
+    // + 新前端时父流仍会混入透流帧——护栏原路吸收，绝不漏进主叙事。
     const view = app({
       credentials: credentialFace('sk-test'),
       entries: [PLAYER, {
@@ -455,24 +459,19 @@ describe('live narrative streaming and the maintenance row', () => {
       },
     })
     await screen.findAllByText('小镇酒馆')
-    // The gate runs: the newest tail row shows the waiting copy…
+    // The gate runs; the newest tail row shows the waiting copy from the fetch.
     expect(screen.getByText('数据维护')).toBeTruthy()
     expect(screen.getByText('正在维护数据…')).toBeTruthy()
-    // …then the transposed child stream folds: a tool call accumulates its
-    // arguments across deltas and finalizes at block-end; the summary rides
-    // the newest call (prototype digest rule: the runtime path).
+    // Transposed frames (old-engine shape) are absorbed: no live fold, no
+    // narrative leak, no crash.
     const ATTEMPT = 'tavern-tail:session-tail-1:1'
     view.sessionsFace.push(chunk(ATTEMPT, { type: 'block-start', index: 0, blockType: 'tool-call' }, 0))
     view.sessionsFace.push(chunk(ATTEMPT, { type: 'tool-call-delta', index: 0, id: 'c1', name: 'runtimeUpdate', argumentsDelta: '{"path":"state.md","content":' }, 1))
     view.sessionsFace.push(chunk(ATTEMPT, { type: 'tool-call-delta', index: 0, argumentsDelta: '"酒馆加钱"}' }, 2))
     view.sessionsFace.push(chunk(ATTEMPT, { type: 'block-end', index: 0, block: { type: 'tool-call', id: 'c1', name: 'runtimeUpdate', arguments: '{"path":"state.md","content":"酒馆加钱"}' } }, 3))
-    await screen.findByText('runtimeUpdate state.md')
-    // Expanding the row (think-row parity: expandOnRowClick) shows the raw
-    // arguments, and the closing reply streams in live.
-    fireEvent.click(screen.getByText('数据维护'))
-    await screen.findByText('{"path":"state.md","content":"酒馆加钱"}')
     view.sessionsFace.push(chunk(ATTEMPT, { type: 'text-delta', index: 1, text: '维护完成：钱包落账' }, 4))
-    await screen.findByText('维护完成：钱包落账')
+    expect(screen.queryByText('runtimeUpdate state.md')).toBeNull()
+    expect(screen.queryByText('维护完成：钱包落账')).toBeNull()
   })
 })
 

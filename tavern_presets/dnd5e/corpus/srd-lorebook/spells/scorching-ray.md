@@ -6,6 +6,7 @@ school: evocation
 casting_time: 1 action
 range: 120 feet
 duration: Instantaneous
+attack_type: ranged
 components:
   - V
   - S

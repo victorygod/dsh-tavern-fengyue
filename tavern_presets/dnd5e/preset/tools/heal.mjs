@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "治疗掷骰器——掷骰回血一次走完：掷骰、钳上限、落盘。什么情况调：非法术来源的掷骰治疗——药水、短休生命骰（掷一枚落一枚，想再掷再调）；法术治疗的数值由 cast 一并结算，本工具不与 cast 连用。怎么填：基线只传 dice+target。预期效果：回执给骰值与落盘行，自动钳 hp 上限；治疗 0 HP 者则苏醒并清濒死计数。",
+  "description": "治疗掷骰器——非施法来源的掷骰治疗并落盘（法术治疗由 cast 一并结算，不与它连用）。何时调：药水、短休生命骰等掷骰回血；生命骰一枚一枚掷，想再掷再调。只传 dice+target。细则见各参数。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
     "dice": { "type": "string", "required": true, "description": "骰式，如 2d4+2（药水）；生命骰按职业骰面+CON（如 1d10+2）。" },

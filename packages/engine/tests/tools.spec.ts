@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -332,6 +332,26 @@ describe('runtime tools', () => {
     expect(readFileSync(join(root, 'runtime/player.json'), 'utf8')).toBe('{"hp": 9}')
     await expect(write?.execute({ path: 'bad.json', content: '{"a":' })).rejects.toThrow(/would not be valid JSON/)
     expect(existsSync(join(root, 'runtime/bad.json'))).toBe(false)
+  })
+
+  it('character .json writes check statuses against the card enum; out-of-enum keys refuse (nothing written)', async () => {
+    const root = join(base, 'status-guard')
+    writeCardSkeleton(root)
+    mkdirSync(join(root, 'preset', 'lib'), { recursive: true })
+    writeFileSync(join(root, 'preset', 'lib', 'status.mjs'), "export const STATUS_KEYS = new Set(['poisoned', 'Bless', '临时生命'])\n")
+    const { defs, ctx } = registry()
+    registerTailAgentTools(ctx, root, fakeShell(() => ''))
+    const write = defs.get('runtimeWrite')
+    const edit = defs.get('runtimeEdit')
+    // 枚举内键 → 写成功
+    expect(await write?.execute({ path: 'characters/pc.json', content: JSON.stringify({ name: 'pc', statuses: { poisoned: { effect: '中毒' } } }) })).toContain('created')
+    // 枚举外键(剧情态) → 拒写,盘上保留旧档
+    await expect(write?.execute({ path: 'characters/pc.json', content: JSON.stringify({ name: 'pc', statuses: { 同行: { effect: '同意' } } }) })).rejects.toThrow(/temporary-status enum/)
+    expect(readFileSync(join(root, 'runtime/characters/pc.json'), 'utf8')).toContain('poisoned')
+    // runtimeEdit 把枚举内键换成枚举外键 → 拒写,盘面不变
+    await expect(edit?.execute({ path: 'characters/pc.json', old_str: 'poisoned', new_str: '同行' })).rejects.toThrow(/temporary-status enum/)
+    expect(readFileSync(join(root, 'runtime/characters/pc.json'), 'utf8')).toContain('poisoned')
+    expect(readFileSync(join(root, 'runtime/characters/pc.json'), 'utf8')).not.toContain('同行')
   })
 
   it('runtimeRead lists directories, numbers lines, slices view_range and clips long output; edit refuses directories', async () => {

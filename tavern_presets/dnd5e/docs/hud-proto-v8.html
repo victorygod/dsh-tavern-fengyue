@@ -156,6 +156,11 @@ body {
 .m-card.dying .m-av { border-color: #c94b3e; color: #ff8d7a; animation: dy 1.3s infinite; }
 .m-card.dying .m-nm { color: #ff9d8d; }
 .m-card.dying .m-hp .fl { background: #7c1f1c; animation: hb 1.6s infinite; }
+/* 同伴 EXP 行（成长族同伴——类 NPC 出生即成长族;条体=hero EXP 同款缩小,2026-09-29 收编） */
+.m-exp { display: flex; align-items: center; gap: 5px; margin-top: 4px; }
+.m-exp .bar { flex: 1; height: 4px; border-radius: 99px; background: rgba(0,0,0,.5); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.m-exp .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6f5a2e, #d9b84f); }
+.m-exp .lb { font: 700 7.5px var(--sans); color: var(--ink3); min-width: 58px; text-align: right; white-space: nowrap; }
 
 /* ═══ 右侧环境面板（地点层级 + 时辰钟盘 + 天气/地形 + 昼夜变底）═══ */
 .env { position: fixed; top: 16px; right: 14px; z-index: 60; width: 216px; }
@@ -583,6 +588,9 @@ function derive(c) {
   return {
     ac, pb: P,
     hpPct: c.hp_max ? Math.round((c.hp / c.hp_max) * 100) : 0,
+    expBar: c.exp == null ? null : (   // 成长族（键裁剪律:面板自带 exp 才出条;演示子集,交付版=泵 XP_THRESHOLDS 整表）
+      (() => { const XP = { 1: [0, 300], 2: [300, 900], 3: [900, 2700] }, seg = XP[lv] ?? [0, 300]
+        return { exp: c.exp, min: seg[0], next: lv >= 3 ? null : seg[1] } })()),
     slots,
     dc: caster ? 8 + P + mod(c[c.caster_attr] ?? 10) : null,
     atk: caster ? P + mod(c[c.caster_attr] ?? 10) : null,
@@ -653,6 +661,7 @@ const DATA = {
     },
     { _who: 'shadow', name: '影', gender: 'other', level: 1, race: 'tiefling', class: 'sorcerer', role: 'npc',
       background: 'criminal', alignment: 'chaotic_neutral', description: '兜帽下的面孔只在火光里一闪。说话简短，像付不起多余的音节。',
+      exp: 200,
       hp: 4, hp_max: 8, temp_hp: 0, exhaustion: 0, speed: 30, darkvision: 60, armor: null, shield: false,
       str: 8, dex: 15, con: 13, int: 12, wis: 10, cha: 17,
       skill_prof: ['arcana', 'deception', 'intimidation'], expertise: [],
@@ -716,6 +725,7 @@ function mateCard(c) {
     <div class="m-main">
       <div class="m-top"><span class="m-nm">${esc(c.name)}</span>${g.glyph ? `<span class="m-gd ${g.cls}">${g.glyph}</span>` : ''}</div>
       <div class="m-hp"><span class="tk"><span class="fl" style="width:${c.derived.hpPct}%"></span></span><span class="nn">${esc(hpText(c))}</span></div>
+      ${c.derived.expBar ? `<div class="m-exp" title="EXP ${esc(c.derived.expBar.exp)}${c.derived.expBar.next === null ? '（20 级顶）' : ' / 升至 LV' + (c.level + 1) + ' 需 ' + esc(c.derived.expBar.next)}"><div class="bar"><div class="fill" style="width:${c.derived.expBar.next === null ? 100 : Math.round(((c.derived.expBar.exp - c.derived.expBar.min) / Math.max(1, c.derived.expBar.next - c.derived.expBar.min)) * 100)}%"></div></div><span class="lb">EXP ${esc(c.derived.expBar.exp)}/${c.derived.expBar.next === null ? 'MAX' : esc(c.derived.expBar.next)}</span></div>` : ''}
       ${(c.statuses ?? []).length ? `<div class="m-status">${chipsSmall(c.statuses)}</div>` : ''}
     </div>
   </div>`

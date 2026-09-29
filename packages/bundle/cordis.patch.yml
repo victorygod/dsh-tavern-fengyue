@@ -4,6 +4,13 @@
 # whole `config`, so each row below restates every key it owns.
 
 - insert:
+    # Official DeepSeek request-extension registry: the per-top-level-field seam
+    # the engine's GLM 布尔开关桥 (enable_thinking, 本机 glm 网关测试件) registers
+    # into — dsh-llm-deepseek consumes it optional-chained, so this row is what makes
+    # the seam exist. 本机测试依赖；deepseek 原生路径不依赖本行以外的任何机制。
+    - id: llm-api-extensions
+      name: '@deepseek-ai/dsh-deepseek-llm-api-extensions'
+
     # Host engine: workspaces, card prompts, runtime tools, tail scheduling.
     - id: tavern-engine
       name: 'dsh-tavern-fengyue-engine'

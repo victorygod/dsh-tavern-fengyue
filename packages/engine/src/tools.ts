@@ -25,7 +25,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ShellExecRequest, ShellExecSpec, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import { defineTool, parameterSchemaSpecToJsonSchema, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools'
@@ -502,11 +502,11 @@ function runtimeWriteTool(root: string, chain: PathChain) {
       const abs = runtimePath(root, path)
       const bytes = Buffer.byteLength(content, 'utf8')
       if (bytes > WRITE_CAP) throw new Error(`tavern: runtime write to "${path}" is ${bytes} bytes, over the ${WRITE_CAP}-byte cap`)
-      return chain(abs, () => {
+      return chain(abs, async () => {
         const existed = existsSync(abs)
         mkdirSync(dirname(abs), { recursive: true })
-        writeMutation(abs, path, content)
-        return Promise.resolve(existed ? `The file "${path}" has been overwritten successfully.` : `New file created successfully at: ${path}`)
+        await writeMutation(abs, path, content, root)
+        return existed ? `The file "${path}" has been overwritten successfully.` : `New file created successfully at: ${path}`
       })
     },
   })
@@ -520,7 +520,7 @@ Edit one world-state document under runtime/ by replacing literal text.
 * \`old_str\` should match EXACTLY one or more consecutive characters/lines of the file — mind the whitespace!
 * By default \`old_str\` must appear exactly once; a multi-match edit is refused with the occurrences' line numbers — include more surrounding context, or set \`replace_all\` to true.
 * \`new_str\` contains the replacement (empty string = delete the match); a multi-line \`new_str\` splices lines in.
-* A \`path\` ending in .json is parse-checked after the mutation — an edit that would corrupt the document is refused (nothing is written).
+* A \`path\` ending in .json is parse-checked after the mutation, and its \`statuses\` keys (on character documents) are checked against the temporary-status enum — a corrupting or out-of-enum edit is refused (nothing is written).
 `.trim(),
     parameters: {
       path: { type: 'string', required: true, description: 'File path relative to runtime/.' },
@@ -547,7 +547,7 @@ Edit one world-state document under runtime/ by replacing literal text.
         }
         const offset = offsets[0] as number
         const after = replaceAll ? before.replaceAll(oldStr, newStr) : before.slice(0, offset) + newStr + before.slice(offset + oldStr.length)
-        writeMutation(abs, path, after)
+        await writeMutation(abs, path, after, root)
         return `The file "${path}" has been edited successfully.`
       })
     },
@@ -593,18 +593,53 @@ function lineNumbersAt(content: string, offsets: readonly number[]): number[] {
 }
 
 /**
- * Write the mutation result after two guards: the runtime/ fence (already
- * applied through `runtimePath`) and, for .json documents, a whole-document
- * parse of the RESULTING text — the maintenance prompt's "写后引擎 parse
- * 校验" lives here, refusing mid-edit instead of corrupting on disk.
+ * Cached temporary-status enum (STATUS_KEYS) per workspace root, loaded lazily
+ * from the card's `preset/lib/status.mjs`. A missing/unreadable enum degrades
+ * to an empty set = no statuses filter (only the parse guard remains), so a
+ * card without the enum file keeps its runtime verbatim-writable.
  */
-function writeMutation(abs: string, rel: string, content: string): void {
+const statusKeysCache = new Map<string, Set<string>>()
+async function statusKeysFor(root: string): Promise<Set<string>> {
+  const hit = statusKeysCache.get(root)
+  if (hit) return hit
+  let keys = new Set<string>()
+  try {
+    const mod = await import(pathToFileURL(join(root, PRESET_DIR, 'lib', 'status.mjs')).href)
+    const got = (mod as Record<string, unknown>).STATUS_KEYS
+    if (got instanceof Set) keys = got
+  } catch {
+    // 枚举文件缺失/不可读 = 退化为零枚举(不拦),只保留 parse 校验。
+  }
+  statusKeysCache.set(root, keys)
+  return keys
+}
+
+/**
+ * Write the mutation result after guards: the runtime/ fence (already applied
+ * through `runtimePath`) and, for .json documents, a whole-document parse of
+ * the RESULTING text — the maintenance prompt's "写后引擎 parse 校验" lives
+ * here, refusing mid-edit instead of corrupting on disk. Character documents
+ * additionally have their `statuses` keys checked against the card's
+ * temporary-status enum (preset/lib/status.mjs), so the maintenance agent's
+ * direct runtimeWrite/runtimeEdit cannot leak narrative prose into the
+ * Conditions pane. This runs on top of the card-side saveChar gate (tool
+ * writes) — two layers, one enum; the runtime* face is the fallback for edits
+ * that bypass the card tools.
+ */
+async function writeMutation(abs: string, rel: string, content: string, root: string): Promise<void> {
   if (rel.toLowerCase().endsWith('.json')) {
+    let doc: unknown
     try {
-      JSON.parse(content)
+      doc = JSON.parse(content)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       throw new Error(`tavern: "${rel}" would not be valid JSON after this edit and was NOT written — nothing was modified (${reason}). Edit a smaller span or rewrite the whole document via runtimeWrite.`)
+    }
+    const statuses = (doc as { statuses?: unknown } | null)?.statuses
+    if (statuses && typeof statuses === 'object' && !Array.isArray(statuses)) {
+      const keys = await statusKeysFor(root)
+      const bad = Object.keys(statuses as Record<string, unknown>).filter(k => !keys.has(k))
+      if (bad.length > 0) throw new Error(`tavern: "${rel}" statuses has keys outside the temporary-status enum: ${bad.join(', ')} — refused, nothing written.`)
     }
   }
   writeFileSync(abs, content)

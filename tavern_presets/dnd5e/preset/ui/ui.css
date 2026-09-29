@@ -66,23 +66,21 @@
 .h-hp .hpbar .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px;
   background: linear-gradient(180deg, var(--hp), #a02f28);
   transition: width .6s var(--spring); box-shadow: inset 0 1px 1px rgba(255,255,255,.25); }
-.h-hp .hpbar .tmp { position: absolute; top: 0; bottom: 0;
-  background: linear-gradient(180deg, rgba(217,154,43,.9), rgba(190,130,26,.85));
-  border-right: 1px dashed rgba(255,235,190,.75); border-radius: 0 4px 4px 0; }
 .h-hp .hpbar .cap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 6px;
   font: 700 8.5px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 .h-hp .hpbar .cap .lb { opacity: .85; letter-spacing: .08em; }
 .h-hp .hpbar .cap .nn { font-variant-numeric: tabular-nums; position: relative; z-index: 2; }
 .h-hp .hpbar.low .fill { background: #7c1f1c; animation: hb 1.6s infinite; }
 @keyframes hb { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
-/* EXP 行（成长族——阈值段内进度;金阶梯配色,HP 行同构缩小） */
-.h-exp { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
-.h-exp .bar { flex: 1; height: 6px; border-radius: 99px; background: rgba(0,0,0,.55); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
-.h-exp .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6f5a2e, #d9b84f); transition: width .6s var(--spring); }
-.h-exp .lb { font: 700 8.5px var(--sans); color: var(--ink3); min-width: 78px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* EXP 行（成长族——阈值段内进度;金阶梯配色,HP 行同构缩小;主卡 h- 同伴卡 m- 同款） */
+.h-exp, .m-exp { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+.h-exp .bar, .m-exp .bar { flex: 1; height: 6px; border-radius: 99px; background: rgba(0,0,0,.55); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.h-exp .fill, .m-exp .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6f5a2e, #d9b84f); transition: width .6s var(--spring); }
+.h-exp .lb, .m-exp .lb { font: 700 8.5px var(--sans); color: var(--ink3); min-width: 78px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* 状态行（kind 三色小号 chips） */
 .h-status, .m-status { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
 .stc { font: 600 8.5px/1 var(--sans); padding: 2px 6px; border-radius: 99px; white-space: nowrap;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid rgba(201,162,75,.25); background: rgba(0,0,0,.28); }
 .stc .k { font-weight: 800; margin-right: 2px; }
 .stc.b { color: #8fd07a; background: rgba(80,150,70,.2); }
@@ -147,6 +145,7 @@
 @keyframes tw { 0%,100% { opacity: .15; } 50% { opacity: .8; } }
 .w-top { display: flex; align-items: center; gap: 10px; position: relative; }
 .dial { width: 46px; height: 46px; flex-shrink: 0; }
+.w-dial { display: flex; flex-shrink: 0; }
 .w-date { flex: 1; min-width: 0; text-align: right; }
 .d1 { font: 700 12px var(--sans); color: var(--ink); letter-spacing: .02em; }
 .wchips { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 4px; font: 600 9.5px var(--sans); color: var(--ink3); white-space: nowrap; }
@@ -162,7 +161,6 @@
 .quests { width: 100%; display: flex; flex-direction: column; gap: 3px; }
 .quests .q-tag { font: 700 9px var(--sans); letter-spacing: .28em; text-align: right; color: var(--p-ink3); opacity: .6; }
 .quests .q-item { cursor: pointer; background: var(--p1); border-left: 2px solid rgba(176,125,43,.35); border-radius: 6px; padding: 5px 9px; box-shadow: 0 2px 8px rgba(60,40,10,.12); text-align: left; }
-.quests .q-item.main { border-left: 3px solid var(--p-gold); }
 .quests .q-item.done { opacity: .45; }
 .quests .q-title { font-size: 11px; color: var(--p-ink); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quests .q-item.done .q-title { text-decoration: line-through; font-weight: 500; }
@@ -172,7 +170,7 @@
 /* ═══ 宿主 overlay 槽位贴角（卡片槽容器;宿主 css 只给 absolute 无 inset → static 兜底漂移）──
    stage 顶栏与侧栏都在 stage 之外,stage 的 top:0/left:0/right:0 即聊天区可见双角——贴住即不被遮 ═══ */
 .tavern-stage > .tavern-panel-hud-left { position: absolute; top: 0; left: 0; width: 208px; }
-.tavern-stage > .tavern-panel-hud-right { position: absolute; top: 0; right: 0; width: 180px; }
+.tavern-stage > .tavern-panel-hud-right { position: absolute; top: 0; right: 0; width: 208px; }
 
 /* ═══ 底部按钮 ═══ */
 .btns { position: fixed; bottom: 88px; right: 14px; z-index: 40; display: flex; flex-direction: column; gap: 6px; }
@@ -183,6 +181,10 @@
 .btn { width: 32px; height: 32px; background: var(--bg1); border: 1.5px solid rgba(201,162,75,.5); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--gold); box-shadow: 0 3px 10px rgba(0,0,0,.3); }
 .btn:hover { border-color: var(--gold2); }
 .btn svg { width: 15px; height: 15px; }
+/* 总开关=眼睛:面板可见→睁眼;隐藏(.off)→闭眼+斜杠 */
+.btn .i-eye-off { display: none; }
+.btn.off .i-eye { display: none; }
+.btn.off .i-eye-off { display: block; }
 
 /* ═══ hosted 列布局（v9 声明形态；anchor 直挂与 panel-hidden 旧可见性已随声明形态退役,2026-09-27 清扫）═══ */
 .tavern-panel-hud-left, .tavern-panel-hud-right {
@@ -190,11 +192,14 @@
   will-change: transform, opacity;
   transition: transform .3s cubic-bezier(.4,0,.2,1), opacity .3s cubic-bezier(.4,0,.2,1);
 }
-.tavern-panel-hud-right { right: 0; width: 180px; }
+.tavern-panel-hud-right { right: 0; width: 208px; }
 .dnd-hud--hosted { display: flex; flex-direction: column; gap: 8px; padding: 0 0 96px; position: static; align-items: stretch; }
 .dnd-hud--hosted .right { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; }
 .dnd-hud--hosted .hero, .dnd-hud--hosted .mates, .dnd-hud--hosted .right { pointer-events: auto; position: static; }
 .dnd-hud--hosted .mates { padding: 0; }
+/* 总开关收口:容器上的 --off none 挡不住子树——上面内容卡显式 auto 重新成为命中目标(opacity:0 也不挡命中),
+   隐藏时必须同行收回,否则隐形 HUD 仍吃点击。 */
+.tavern-panel--off .dnd-hud--hosted .hero, .tavern-panel--off .dnd-hud--hosted .mates, .tavern-panel--off .dnd-hud--hosted .right { pointer-events: none; }
 
 /* ═══ 宽幅数据册（羊皮纸；去 tab；滚动提示=渐隐+箭头）═══ */
 .book { position: fixed; z-index: 60; width: 544px; max-height: min(640px, 88vh); display: none;
@@ -235,7 +240,6 @@
 .bk-hp .bke .cap .nn { font-variant-numeric: tabular-nums; font-size: 9.5px; }
 .bk-hp .bk-coin { text-align: right; font: 800 13.5px var(--sans); color: var(--p-gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bk-hp .hph .fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 5px; background: linear-gradient(90deg, var(--p-hp), var(--p-hp-hi)); transition: width .5s; }
-.bk-hp .hph .tmp { position: absolute; top: 0; bottom: 0; background: rgba(217,154,43,.8); border-right: 1px dashed rgba(255,235,190,.9); border-radius: 0 5px 5px 0; }
 .bk-hp .hph .cap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 9px;
   font: 700 9.5px var(--sans); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
 .bk-hp .hph .cap .lb { opacity: .8; } .bk-hp .hph .cap .nn { font-variant-numeric: tabular-nums; font-size: 10.5px; }
@@ -276,7 +280,7 @@
 .bk-chip .v { color: var(--p-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 /* 状态（羊皮纸面三色覆盖） */
 .bk-st { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-.bk-st .stc, .bk-st .stc.b, .bk-st .stc.d, .bk-st .stc.i { font: 600 10.5px/1 var(--sans); padding: 3.5px 9px; border: none; letter-spacing: .02em; }
+.bk-st .stc, .bk-st .stc.b, .bk-st .stc.d, .bk-st .stc.i { font: 600 10.5px/1 var(--sans); padding: 3.5px 9px; border: none; letter-spacing: .02em; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .bk-st .stc.b { color: var(--buff); background: rgba(91,127,60,.12); }
 .bk-st .stc.d { color: var(--debuff); background: rgba(176,73,63,.12); }
 .bk-st .stc.i { color: var(--info); background: rgba(138,117,82,.12); }

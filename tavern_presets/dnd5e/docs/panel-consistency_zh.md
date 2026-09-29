@@ -15,7 +15,7 @@ DM 只做判断(何时/对谁/付什么代价/结果是否已成事实),一切�
 | 层 | 位置 | 内容 | 写手(现行) |
 |---|---|---|---|
 | 人物 | `characters/player.json`(固定名)+`<名>.json` | 机件(六维/hp 族/熟练/施法/装备引用/钱包/pending/statuses)+叙事面(persona/biography 行数组);键裁剪律 | 尾代(runtimeWrite 整档)+gain_exp/gain_money(级联)+front_commit(玩家点选) |
-| 世界簿记 | `state.md` | 六节(篇章/主线/支线/伏笔/玩家所在五级/时间敏感项登记表)+附近 NPC 三态名单(v4,2026-09-25)+「## 战斗」节(回合/先攻/敌行/友行)+上回合变化 | 尾代 |
+| 世界簿记 | `state.md` | 任务/伏笔/玩家所在五级/时间敏感项登记表(篇章·主线·支线退役 2026-09-28,开局不立项)+附近 NPC 三态名单(v4,2026-09-25)+「## 战斗」节(回合/先攻/敌行/友行);上回合变化节同日退役(get_changes.mjs 删,变化=快照+落盘行) | 尾代 |
 | 规则 | `dnd5e-srd-lorebook/`(1164 篇) | frontmatter 机读层+正文原文;工具 join(装备/法术/怪物/职业) | 只读 |
 | 叙事实体 | `locations/·quests/·items/` md | 非人物实体卡 | 尾代建删 |
 
@@ -50,7 +50,7 @@ DM 只做判断(何时/对谁/付什么代价/结果是否已成事实),一切�
 | 4 | 怪物特殊能力/AOE(非施法) | hp−(多目标) | check+damage 逐目标弹幕 | **ability**(转写 DC/save/dice/targets 一次循环) | 强 |
 | 5 | 坠落/陷阱/环境 | hp− | damage ✓ | 当拍写 | 强 |
 | 6 | 治疗(法术/药水/HD) | hp+(钳上限;0HP 苏醒+双清) | damage 兼职掷骰+尾代;cast 治疗术只过闸不出骰 | **cast 内联(法术治疗)/heal(药水·生命骰)**——2026-09-26 来源路由律 | 强 |
-| 7 | 临时 HP | temp_hp(取高) | 尾代 | cast 内联(法术来源)/hp 直改(无骰来源) | 强 |
+| 7 | 临时 HP | ~~temp_hp~~（字段已退役 2026-09-28） | — | **协议改组**:护盾/冰甲类=statuses 条目+hp/hp_max 同抬,到期回收 min(hp,hp_max−N)(audit-fixes §6,授予面随 C4 批拍板) | 强 |
 | 8 | 0HP 时受击 | death_fail+1(暴击+2) | 叙事+尾代 | attack/damage 归并(目标已 0HP 自动落败) | 强 |
 | 9 | 濒死掷骰 | death_success/fail | death 参数中继(v8.1 删字段) | **反转 v8.1**:计数回面板,death 读写 | 强 |
 | 10 | hp_max 变动 | hp_max | 升级/CON 溯源=gain_exp ✓;力竭4=状态域 | 工具/apply_status | 强 |
@@ -188,7 +188,7 @@ tick(Δ:"2小时"|"1天"|"3天", food:full|half|none, water:full|half|none, forc
 结算清单(给定 Δ 与声明,全部机械):
 1. **时钟重写**:state.md 当前时间行(第N日·H时)。
 2. **statuses 折算**:分/时/日单位按 Δt 递减,到 0 删行;变化日志行。
-3. **计数器族**(时间敏感项登记表为工作集):绝食日计数(无食超 3+CON 天→每日末力竭+1)、缺水(half→每日 CON DC15 失败+1/none→自动+1)、疾病/毒时间轴、downtime 进度、奥法回复 1/日重置、冒险日预算重置、长休窗口判定(last_long_rest≥24h→报告行提示可休)。
+3. **计数器族**(时间敏感项登记表为工作集):绝食日计数(无食超 3+CON 天→每日末力竭+1)、缺水(half→每日 CON DC15 失败+1/none→自动+1)、疾病/毒时间轴、downtime 进度、奥法回复 1/日重置、遭遇预算重置、长休窗口判定(last_long_rest≥24h→报告行提示可休)。
 4. **声明驱动的掷骰项**:强行军每小时 CON DC10+超时数(失败力竭+1);缺水豁免。掷骰与力竭写入一体。
 5. **钱联动**(可选):lifestyle 日费(与 gain_money 同 cp 律)。
 6. **不辖**:轮单位 statuses(回合边界=尾代,一消息=一轮);场景单位(地点切换事件);temp_hp/力竭恢复(rest 辖)。5e 无自然回血——时间驱动的恢复全部走 rest,tick 只辖纯时间项。
@@ -216,7 +216,7 @@ tick(Δ:"2小时"|"1天"|"3天", food:full|half|none, water:full|half|none, forc
 - **存储地图(2026-09-26)**:语料=类(`dnd5e-srd-lorebook/monsters/*.md`,只读,一个 goblin.md 可孵化哥布林甲/乙/丙多个实例;commoner/veteran/mage 等类人卡即 NPC 底版)· 活档=实例(`characters/<名>.json`——怪/同伴/NPC/玩家同目录同 schema,玩家=peer 同构)· 名单=身份(state.md 三态行+战时敌行 path 指回类卡,零数值)。**怪与 NPC 的区别不在存储位置,在出生抄谁**:怪抄 statbook(LLM runtimeRead 后照原文填参,语料原样),NPC 抄 DM 叙事(persona/biography 即正本)。档上刻度=**单键 `lv`**(见下条)。
 - **单键统一律(2026-09-26 用户定案,附规则核验与解释成本)**:档上唯一刻度键 `lv`——玩家/同伴=等级(整数 1–20),怪/NPC=CR(0/0.125/0.25/0.5 小数合法,上限 30)。**规则核验(SRD/BR):零矛盾**——PB 两制在 1–20 波段逐值重合(5e 拿等级标定 CR 的设计事实),单公式 `pbOf(lv)=2+⌊(clamp(lv,1,30)−1)/4⌋` 同时复现 PHB 公式(玩家段)与 DMG p.274 表(怪段;assemble 烘进 FM 的 pb 字段可 334 只逐怪交叉验证);XP 查表 key=lv——statbook NPC 照卡直读,class-NPC「CR=lv」自动成立(核心书对 PC 构造 NPC 定价沉默,卡内约定,数值 DM 可调);CR0=10 为卡内简化(SRD 有「无害者 0」注脚)。**一处施工修正**:现 core `pb()` 的 min(level,20) 会在两端皆错(0.25→+1 虚低;CR21+ 封顶 +6 错杀 +7..+9),pbOf 须 clamp(1,30)。**LLM 解释成本:降不升**——spawn schema 一行(「lv:等级或 CR,怪照 statblock 卡头抄,数值原样」),prompt 零新增(表与公式全在 core,死规则唯一载体=脚本);叙事措辞自由(怪称 CR、成长者称等级,显示层按成长面有无换标签);**单键消灭填错位事故面**(两键案存在「怪误填 level 致 pb 虚低」失败模式,单键无处填错);化妆级噪音一条:注入面板裸现 `lv: 0.25`,语境自明。
 - **与 NPC 对战的结算矩阵**:人打怪=玩家档攻侧(PB←level)+怪档防侧(ac 直值)→写怪档 hp;怪打人=攻侧转写+玩家档 AC(deriveAC)→写玩家档;怪吃豁免=怪档六维+save_prof+**PB←pbOf(lv)**;怪施法=档内施法族(见薄点);0HP 按 role 分叉(pc/同伴→濒死计数起算,怪/npc→RAW 默认即死 DM 判);**击败 NPC 的 XP(2026-09-26)**:XP 唯一档上载体=lv——statbook NPC 照卡直读,class-built/转写 NPC 核心书无硬规则、卡内约定 lv=等级(DMG 工坊精神,数值 DM 可调),构造差异被出生时一行 lv 吸收;战毕=**先结算后清理**:`gain_exp(who=参战名单, foes=被击败名单)` 在胜利回合由主面调用(亡档未删,档读 lv→**core 内嵌 XP 查表**(key=lv,含小数档)派生——xp 不落档,派生不存,单一路径→Σ→均分 floor 弃余→逐人级联,回执全透明;遭遇乘数只评难度不进发放=RAW,工具化后该经典错误结构性消灭;谁算参战/哪些算被击败=DM 判断,非致命/说服取胜走 foes 或 exp 直值;忘结算而档已删→报错+exp 直值兜底);随后尾代清场四件=敌行清+亡档删+**presence 行同步删**+战利品路由。无成长族者入 who 名单→照键裁剪律报「无成长面」;milestone 是 RAW 替代制但本卡 D4 定纯 XP 轨不开。**两个薄点如实记**:①~~statbook FM 不带施法清单~~(全参输入制下已消——LLM 直读 statblock 正文 Spellcasting 段输入施法族;FM 缺仅影响已废的自动填充通道),怪的类法术能力(吐息等)系统解法仍是二期 ability;②怪攻击侧永远转写(statblock 动作列散文,既有边界)。
-- **与 opening 体系的关系(2026-09-26 对照定案)**:同一台「出生机」五步(声明→查表→组装→裁剪→写盘+可考回执),三个内核必须分立——构造知识源(职业表 classes/*.md vs 怪物块 monsters/*.md)、校验性态(opening=白名单镜像防玩家作弊 vs spawn=完备律防声明残缺)、成长面开关(玩家 ON/NPC OFF)。汇合三层:①opening-meta 即「class-built NPC」的知识底座——复杂剧情 NPC(对手法师 LV5 式)走 spawn 第三通道 class+level 复用其全套表(二期+ 候选);②**机械层共享清单(2026-09-26 定案)**:stripEmptyArrays(裁剪律落地)/classRow(序数词版单源进 core,兼修 gain_exp 病)/readFM(opening 本地副本退役)/写盘+可考回执规约——收拢 core(YAGNI 门槛已过:第二消费者出现);**构造器三件分立**:职业表构造器(opening,玩家/class-NPC:真 level+成长 ON+白名单镜像)·怪物块构造器(spawn,怪:lv=CR 直值+成长 OFF+完备律)·转写直通(即兴)——共用材料机,不共用填料器;③**gain_exp 的 classRow 纯数字正则 vs SRD 序数词等级列(| 1st |)永不匹配,升级回执特征行恒 '—'(2026-09-26 实锤)——同律分叉第三案(AC 律→save_prof→classRow),classRow 单源进 core 即修,不必等一期**;④**opening 耦合审计(2026-09-26)**:职业轴七族耦合 solid(施法族/子职时点/技能白名单/法术池/豁免起装训练面/特征回充/HP),零跨轴——X族×Y职限制 5e 2014 本不存在,正确地零实现;**种族轴与背景轴未建**——ability_bonuses 在 FM 但四层零消费(全员出生少 +2/+1)、种族 FM 仅三键致 darkvision/languages/resist 死读(矮人丢暗视毒抗、全员丢本族语)、backgrounds/ 目录从未装配(背景授予零落地)、half-elf 的 +1+1 自选源库即散文。修复排序:属性加成(最便宜)→ assemble 补提取 darkvision/languages → 背景轴(贵,随二期 class 通道一起)。
+- **与 opening 体系的关系(2026-09-26 对照定案)**:同一台「出生机」五步(声明→查表→组装→裁剪→写盘+可考回执),三个内核必须分立——构造知识源(职业表 classes/*.md vs 怪物块 monsters/*.md)、校验性态(opening=白名单镜像防玩家作弊 vs spawn=完备律防声明残缺)、成长面开关(玩家 ON/NPC OFF)。汇合三层:①opening-meta 即「class-built NPC」的知识底座——复杂剧情 NPC(对手法师 LV5 式)走 spawn_npc class 制复用其全套表(class-build.mjs 单源,2026-09-29 已落地);②**机械层共享清单(2026-09-26 定案)**:stripEmptyArrays(裁剪律落地)/classRow(序数词版单源进 core,兼修 gain_exp 病)/readFM(opening 本地副本退役)/写盘+可考回执规约——收拢 core(YAGNI 门槛已过:第二消费者出现);**构造器三件分立**:职业表构造器(opening,玩家/class-NPC:真 level+成长 ON+白名单镜像)·怪物块构造器(spawn_monster,怪:lv=CR 直值+成长 OFF+完备律)·转写直通(即兴,已废——怪强制 from 无原创通道)——共用材料机,不共用填料器;③**gain_exp 的 classRow 纯数字正则 vs SRD 序数词等级列(| 1st |)永不匹配,升级回执特征行恒 '—'(2026-09-26 实锤)——同律分叉第三案(AC 律→save_prof→classRow),classRow 单源进 core 即修,不必等一期**;④**opening 耦合审计(2026-09-26)**:职业轴七族耦合 solid(施法族/子职时点/技能白名单/法术池/豁免起装训练面/特征回充/HP),零跨轴——X族×Y职限制 5e 2014 本不存在,正确地零实现;**种族轴与背景轴未建**——ability_bonuses 在 FM 但四层零消费(全员出生少 +2/+1)、种族 FM 仅三键致 darkvision/languages/resist 死读(矮人丢暗视毒抗、全员丢本族语)、backgrounds/ 目录从未装配(背景授予零落地)、half-elf 的 +1+1 自选源库即散文。修复排序:属性加成(最便宜)→ assemble 补提取 darkvision/languages → 背景轴(贵,随二期 class 通道一起)。
 
 ### 4.6 回执写据规约(W3 的落地)
 

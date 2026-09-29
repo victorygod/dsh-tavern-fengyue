@@ -14,7 +14,7 @@ export function book(ctx) {
   const existing = document.querySelector('.book.open')
   if (existing !== null && existing.dataset['target'] === target) { existing.remove(); anchorEl = null; return }
   existing?.remove()
-  // v4(2026-09-25):按卡所属面板取切片——左池(companions/neutrals)与右池(foes)分住两个面板响应,取点击源头的那份。
+  // 按卡所属面板取切片——左池(companions/neutrals)与右池(foes)分住两个面板响应(2026-09-30 三态回锅)。
   ctx.runScript('ui_data.mjs', JSON.stringify({ op: 'panel', name: ctx.panel })).then(text => {
     const slice = JSON.parse(text)
     const pools = target === 'player'

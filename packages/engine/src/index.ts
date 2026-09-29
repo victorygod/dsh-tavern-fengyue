@@ -23,9 +23,8 @@ import z from '@deepseek-ai/schemastery'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { setApprovalPolicy } from '@deepseek-ai/dsh-user-approval'
-import type { Agent, AssistantStreamFrame, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { LlmAttemptId } from '@deepseek-ai/dsh-llm'
-import { createSystemMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
+import { createSystemMessage, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type { Session, SessionEvent, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
@@ -159,12 +158,6 @@ interface WriterRegistry {
   readonly deleted: readonly string[]
 }
 
-/** AttemptId prefix the stream transposer stamps onto tail-child frames — the UI's
- *  only key for routing the parent stream's transient chunks into the tail row. */
-const TAIL_STREAM_PREFIX = 'tavern-tail:'
-/** Marks this module's own re-emissions so {@link TavernRuntime.transposeTailStream} never re-enters itself. */
-const TRANSPOSED: unique symbol = Symbol('tavern-tail-transposed')
-
 /** Read one session id persisted in a marker file, if any. */
 function readPersistedMarker(root: string, file: string): string | null {
   try {
@@ -270,6 +263,16 @@ function syncShippedPresets(): void {
   }
 }
 
+/** The enable_thinking field provider the engine contributes to the official
+ *  DeepSeek request-extension registry (see the GLM 布尔开关桥 wiring in the
+ *  constructor): per-request decision, undefined = no contribution. */
+export interface GlmThinkingBridgeProvider {
+  prepare(request: {
+    body?: { model?: unknown; thinking?: { type?: unknown } }
+    signal: AbortSignal
+  }): Promise<{ value?: unknown } | undefined> | { value?: unknown } | undefined
+}
+
 /**
  * One completed turn's settlement run: the strict chain main → main.after →
  * tail → tail.after, tracked so the pre-step gate can bar the tail child's
@@ -282,6 +285,10 @@ interface TurnRun {
   readonly mainAfterDone: Promise<void>
   /** The tail child's assistant narration, buffered in event order for the tail file. */
   readonly tailTexts: string[]
+  /** Set when a settled-off tail still produced non-empty reasoning blocks —
+   *  the model side ignored the request (thinking-only/forced-thinking family);
+   *  the run's settle logs it once with the last-seen model id. */
+  tailThoughtModel?: string
   /** The spawned tail's phase promise (play-through → tail file → tail.after); undefined when tail disabled. */
   tailPhase?: Promise<void>
   /** The fork child's session id, once hatched. */
@@ -298,6 +305,10 @@ export class TavernRuntime extends Service {
   static Config: z<Config> = Config
 
   private readonly cfg: Config
+  /** The GLM enable_thinking field provider registered into the official
+   *  request-extension registry; undefined = the registry is unmounted (tests
+   *  / bare compositions) and the whole bridge sleeps. Read-mostly by tests. */
+  readonly glmThinkingBridge?: GlmThinkingBridgeProvider
   /** Session id → workspace root, set at session creation. */
   private readonly workspaces = new Map<SessionId, string>()
   /** Card-writing agent session id → workspace root (see {@link ensureWriter}); never a main/tail session. */
@@ -352,11 +363,14 @@ export class TavernRuntime extends Service {
       resolveSession: dirName => this.sessionDirOf(dirName),
       logger: this.ctx.logger,
     })
-    // 尾代理透流改道：子会话的 assistant 流帧只进子会话的 follow，浏览器永远
-    // 跟的是父会话流——不转道，数据维护行只能等落定后取数。见 transposeTailStream。
-    this.ctx.on('agent/assistant-stream', ({ agent, frame }: { agent: Agent; frame: AssistantStreamFrame }) => {
-      this.transposeTailStream(agent, frame)
-    })
+    // 尾子会话的 assistant 流帧由内核按 session.id 只注给子会话自己的 follow
+    // （dsh-api-session-controller/lib/index.js:1481 过滤）；浏览器以 subagent 地址
+    // 直跟子会话（packages/ui/src/client/tail-live.ts）。
+    // 2026-09-29 透流改道退役：尾代是独立 dsh-agent-loop 实例，frame.revision 用
+    // 自己的 loop 级计数（dsh-agent-loop/lib/index.js:765,1037），转挂父流即混序——
+    // 客户端按「严格 +1 连续」核 revision（dsh-api-session-controller/lib/client.js:449-452），
+    // 必抛 RemoteStreamCarrierError 撕窗重建，重建基线失 activeAttempt，主代理该步
+    // 瞬态被客户端静默丢弃（每回合第一步思考不直播的真机定罪，见 docs/notes/devlog.zh.md）。
     this.ctx.on('agent/created', ({ agent }: { agent: Agent }) => { this.onAgentCreated(agent) })
     this.ctx.on('session/event', (session: Session, event: SessionEvent) => { this.onSessionEvent(session, event) })
     this.ctx.on('agent/pre-step', (payload: {
@@ -366,6 +380,43 @@ export class TavernRuntime extends Service {
       step: number
       signal: AbortSignal
     }, next: () => Promise<PreStepDecision>): Promise<PreStepDecision> => this.gate(payload, next))
+    // 尾代理硬关思考（2026-09-29 用户定案，无旋钮）：维护＝回执→结构化原子落盘，
+    // 判断力在工具回执与 checklist，thinking 只产出等待时长与成本。内核先例：
+    // dsh-llm-deepseek/lib/index.js:1689 对 session-title（机械任务）同样强制
+    // reasoningEffort 'off'。契约：agent/request waterfall──cordis 派发保持注册
+    // 序、shift() 队首＝最外层＝post-await 覆写最后生效（cordis/lib/index.js:258,
+    // 317-325）；{prepend:true} 无视注册时序取队首，压过内核模型选座的 effort
+    // 回填（dsh-agent/lib/index.js:181-192 会按全局配置重填，不压必被改回）。
+    // off 的 wire 表达由适配器翻译（deepseek/Messages 系＝thinking:{type:'disabled'}，
+    // 与官方最新 API 的开关字段同形；默认开是官方口径，省略参数≠关闭）；
+    // 不服从的模型（thinking-only/强制思考家族）由尾子 assistant/message 的
+    // reasoning 检出兜底可见（tailThoughtModel → 收束 WARN）。
+    this.ctx.on('agent/request', async ({ agent }, next) => {
+      const resolved = await next()
+      if (!this.tailChildRuns.has(agent.session.id)) return resolved
+      return { ...resolved, reasoningEffort: ReasoningEffortId('off') }
+    }, { prepend: true })
+    // GLM 布尔开关桥——**仅限本机 glm 网关测试用**，deepseek 原生路径（锁 1 →
+    // 适配器 thinking:{type}）才是正本。依据＝桌面 elf 项目的实传：同一平台的
+    // /api/openai/v1 面上，enable_thinking 布尔系顶层 body 字段（elf config
+    // params_schema default false；message_manager 摘要调用直传 enable_thinking:
+    // false 即生产实证）。本 host 走 /api/anthropic/v1 面（适配器只讲 Anthropic
+    // 协议，openai 路径恒 404），该面上顶层 enable_thinking 能否被网关读取未证——
+    // 桥只作测试镜像，锁 3 WARN 是 off 方向的实测仪。经官方扩展注册表
+    // （dsh-deepseek-llm-api-extensions，bundle patch 挂载）注入：glm 路由镜像
+    // 布尔（enabled=true 与 elf 的开方向传法同源），非 glm 路由零贡献；注册表
+    // 缺席（测试/未挂组合）整桥沉睡——dsh-llm-deepseek 消费方同款可选式。
+    const extensionsRegistry = this.ctx.get('deepseekLlmApiExtensions') as
+      | undefined
+      | { register(field: string, provider: GlmThinkingBridgeProvider): () => void }
+    if (extensionsRegistry !== undefined) {
+      this.glmThinkingBridge = { prepare: async (request) => {
+        const model = request.body?.model
+        if (typeof model !== 'string' || !/(^|[^a-z0-9])glm([/.\-_: ]|$)/i.test(model)) return undefined
+        return { value: request.body?.thinking?.type !== 'disabled' }
+      } }
+      extensionsRegistry.register('enable_thinking', this.glmThinkingBridge)
+    }
   }
 
   /**
@@ -1561,7 +1612,17 @@ export class TavernRuntime extends Service {
     // the gate below: its assistant narration buffers for runtime/.chat.tail.jsonl.
     if (event.type === 'assistant/message') {
       const run = this.tailChildRuns.get(session.id)
-      if (run !== undefined) run.tailTexts.push(textOfBlocks(event.data.message.content))
+      if (run !== undefined) {
+        run.tailTexts.push(textOfBlocks(event.data.message.content))
+        // 锁 3：强制 off 的回合里孩子仍持有非空 reasoning 块＝模型侧不服从
+        // （thinking-only/强制思考家族，服务端无视开关）。记模型名备收束警告。
+        const blocks = event.data.message.content as unknown as readonly { type?: unknown; text?: unknown }[]
+        if (run.tailThoughtModel === undefined
+          && blocks.some(block => block.type === 'reasoning' && typeof block.text === 'string' && block.text !== '')) {
+          const source = (event.data.message as { source?: { model?: unknown } }).source
+          run.tailThoughtModel = typeof source?.model === 'string' ? source.model : 'unknown'
+        }
+      }
     }
     const root = this.workspaces.get(session.id)
     if (root === undefined) return
@@ -1666,38 +1727,6 @@ export class TavernRuntime extends Service {
   }
 
   /**
-   * The tail fork's live assistant stream, re-attributed to the PARENT agent so
-   * the browser's existing parent follow receives it: child frames go to the
-   * child's stream, which no browser follows (one-shot forks are invisible), so
-   * without this hop the 数据维护 row can only learn a run's tool calls after the
-   * whole run settles. Chunk frames pass through the same wire pipeline as the
-   * parent's own (wireAssistantStreamFrame passes raw start/end frames through),
-   * and no durable event is written — transients are replay-never, so the
-   * parent's log and fork seeds stay untouched.
-   *
-   * Frame contract: attemptId is namespaced `tavern-tail:<childId>:<attempt>`
-   * (collision-free against the parent's own attempts; the UI parses the
-   * childId back out); the terminal frame publishes `abandoned` — this stream
-   * never carries the child's durable settlement, and a `committed` outcome
-   * would trip the client's pending-settlement match into a full rebaseline.
-   */
-  private transposeTailStream(agent: Agent, frame: AssistantStreamFrame): void {
-    const payload = { agent, frame } as { agent: Agent; frame: AssistantStreamFrame; [TRANSPOSED]?: boolean }
-    if (payload[TRANSPOSED] === true) return
-    const header = agent.session.header
-    const parentId = header.origin === 'subagent' ? header.parentSession : undefined
-    if (parentId === undefined || !this.workspaces.has(parentId)) return
-    const parent = this.ctx.agents.get(parentId)
-    if (parent === undefined) return
-    const attemptId = brandString<LlmAttemptId>(`${TAIL_STREAM_PREFIX}${String(agent.session.id)}:${String(frame.attemptId)}`)
-    const rewritten: AssistantStreamFrame = frame.type === 'end'
-      ? { ...frame, attemptId, outcome: { kind: 'abandoned' } }
-      : { ...frame, attemptId }
-    // The extra symbol prop is the echo guard; cordis listeners read only agent/frame.
-    this.ctx.emit('agent/assistant-stream', { agent: parent, frame: rewritten, [TRANSPOSED]: true } as { agent: Agent; frame: AssistantStreamFrame })
-  }
-
-  /**
    * A completed turn's strict settlement chain: main → main.after → tail →
    * tail.after, run as one promise held open for the next submission through
    * {@link gates}, and settled with the one tavern-tail-done signal after
@@ -1797,6 +1826,12 @@ export class TavernRuntime extends Service {
       // Queued on the write queue head so the phase's quiesce (first step of
       // runHookPhase) sees it on disk.
       this.tailChildRuns.delete(started.id)
+      // 锁 3 收束告警：强制 off 已提案而孩子仍然 think 了——请求照发、状态照收，
+      // 但这次维护的「不思考」承诺没有兑现（模型侧无视开关），缺省起见一次运行
+      // 报一条（tailThoughtModel 取首个违规消息所带的 source.model）。
+      if (run.tailThoughtModel !== undefined) {
+        this.ctx.logger.warn(new Error(`tavern: tail agent reasoned despite forced reasoningEffort 'off' (thinking-only or forced-thinking model): model=${run.tailThoughtModel}`))
+      }
       await this.enqueueWrite(root, () => {
         writeTailSnapshot(root, { sessionId: String(session.id), turnSeq, texts: run.tailTexts })
         return true

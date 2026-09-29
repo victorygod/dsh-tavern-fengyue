@@ -22,7 +22,7 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
-import LlmRuntime, { LlmAdapter, LlmError, createUserMessage } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { LlmAdapter, LlmError, createUserMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -36,9 +36,12 @@ import * as BashTool from '@deepseek-ai/dsh-tool-bash'
 import * as SubagentTool from '@deepseek-ai/dsh-tool-subagent'
 import * as ShellEnv from '@deepseek-ai/dsh-shell-env'
 import TavernRuntime from '../src/index.ts'
+import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 /** One recorded model call: the request facts the adapter observed. */
 interface RecordedCall {
+  session?: string
+  reasoningEffort?: string
   tools: { name: string; parameters: unknown }[]
   userTexts: string[]
   lastUserText: string
@@ -46,8 +49,9 @@ interface RecordedCall {
   system: string
 }
 
-/** One scripted model behavior, consumed by call order. */
-type ScriptStep = { kind: 'text'; text: string } | { kind: 'tool-call'; name: string; arguments: string } | { kind: 'fail' } | { kind: 'hang' }
+/** One scripted model behavior, consumed by call order. `reasoning` 模拟
+ *  thinking-only/强制思考家族：无视请求里的 off 照样产出思考块。 */
+type ScriptStep = { kind: 'text'; text: string; reasoning?: string } | { kind: 'tool-call'; name: string; arguments: string } | { kind: 'fail' } | { kind: 'hang' }
 
 const CARD_SYSTEM = '世界规则：组合测试卡。'
 const CARD_PREFIX = '前缀X'
@@ -66,6 +70,22 @@ class ScriptedTavernAdapter extends LlmAdapter {
   private step = 0
   constructor(private readonly script: readonly ScriptStep[]) { super() }
 
+  /** 挂牌 reasoning 能力目录（off 档在场）──否则内核 prepareCall 对任何请求
+   *  effort 都抛 UNSUPPORTED_REASONING_EFFORT（resolveCallWithInfo 的能力校验）。 */
+  override async resolveModel(provider: string, model: string): Promise<unknown> {
+    return {
+      provider,
+      id: model,
+      name: model,
+      reasoning: {
+        efforts: [
+          { id: ReasoningEffortId('off'), name: 'Off' },
+          { id: ReasoningEffortId('max'), name: 'Max' },
+        ],
+      },
+    }
+  }
+
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const step = this.script[this.step]
     this.step += 1
@@ -75,6 +95,8 @@ class ScriptedTavernAdapter extends LlmAdapter {
     const systemMessage = options.messages.find(message => message.role === 'system')
     const system = systemMessage === undefined ? '' : textOf(systemMessage)
     this.calls.push({
+      session: options.sessionId === undefined ? undefined : String(options.sessionId),
+      reasoningEffort: options.reasoningEffort === undefined ? undefined : String(options.reasoningEffort),
       tools: (options.tools ?? []).map(tool => ({ name: tool.name, parameters: tool.parameters as unknown })),
       userTexts: users.map(user => textOf(user)),
       lastUserText: users.length > 0 ? textOf(users.at(-1) as typeof users[number]) : '',
@@ -95,9 +117,16 @@ class ScriptedTavernAdapter extends LlmAdapter {
       throw new LlmError('cancelled by stop', 'CANCELLED')
     }
     if (step.kind === 'text') {
-      yield { type: 'block-start', index: 0, blockType: 'text' }
-      yield { type: 'text-delta', index: 0, text: step.text }
-      yield { type: 'block-end', index: 0, block: { type: 'text', text: step.text } }
+      let index = 0
+      if (step.reasoning !== undefined) {
+        yield { type: 'block-start', index, blockType: 'reasoning' }
+        yield { type: 'reasoning-delta', index, text: step.reasoning }
+        yield { type: 'block-end', index, block: { type: 'reasoning', text: step.reasoning } }
+        index += 1
+      }
+      yield { type: 'block-start', index, blockType: 'text' }
+      yield { type: 'text-delta', index, text: step.text }
+      yield { type: 'block-end', index, block: { type: 'text', text: step.text } }
       yield { type: 'finish', reason: { kind: 'stop' } }
       return
     }
@@ -233,6 +262,7 @@ async function compose(options: { workspaceBase: string; libraryBase: string }):
     ['@deepseek-ai/dsh-tool-subagent', SubagentTool],
     ['@deepseek-ai/dsh-subagent', SubagentRuntime],
     ['@deepseek-ai/dsh-subagent-fork-in-process', forkProvider],
+    ['@deepseek-ai/dsh-deepseek-llm-api-extensions', DeepSeekLlmApiExtensionRegistry],
     ['test-session-controller-stub', sessionControllerStub],
     ['tavern-engine-test', TavernRuntime],
   ])
@@ -255,6 +285,7 @@ async function compose(options: { workspaceBase: string; libraryBase: string }):
     '    provider: fork',
     "- name: '@deepseek-ai/dsh-subagent'",
     "- name: '@deepseek-ai/dsh-subagent-fork-in-process'",
+    "- name: '@deepseek-ai/dsh-deepseek-llm-api-extensions'",
     "- name: 'test-session-controller-stub'",
     "- name: 'tavern-engine-test'",
     '  config:',
@@ -981,14 +1012,15 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     expect(events().length).toBe(before)
   })
 
-  it('透流改道:尾子代理的助手流帧以父 agent 名义流出（tavern-tail: 前缀 attemptId，end=abandoned）', { timeout: 60_000 }, async () => {
+  it('尾子会话的助手流帧只在子 agent 名下流出（透流改道退役：父总线零混序帧，revision 各归其主）', { timeout: 60_000 }, async () => {
     root = mkdtempSync(join(tmpdir(), 'tavern-tail-stream-'))
     const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
     seedCard(join(root, 'presets'))
 
-    // Record every stream frame the root dispatch sees: the transposer
-    // re-emits child frames under the PARENT agent, so parent-attributed
-    // frames carrying the tavern-tail: prefix are the transpose's receipt.
+    // Record every stream frame the root dispatch sees. 2026-09-29 透流改道退役:
+    // 每个-frame revision 严格 +1 连续是 wire 契约(dsh-api-session-controller
+    // client.js:449-452),尾代自己的 loop 计数从 1 重新起算,转挂父流必混序——
+    // 现在子帧原生只在子 agent 名下,浏览器以 subagent 地址直跟(tail-live.ts)。
     interface FrameRecord { agentId: string; frame: { type: string; attemptId?: string; outcome?: unknown; chunk?: { type?: string; text?: string } } }
     const frames: FrameRecord[] = []
     ctx.on('agent/assistant-stream', (payload: { agent: { session: { id: SessionId } }; frame: FrameRecord['frame'] }) => {
@@ -1014,22 +1046,107 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     await agent!.whenIdle()
     await vi.waitFor(() => { expect(engine.state(sessionId).tailRunning).toBe(false) }, { timeout: 20_000, interval: 50 })
 
-    const transposed = frames.filter(row => row.agentId === sessionId && typeof row.frame.attemptId === 'string'
-      && row.frame.attemptId.startsWith('tavern-tail:'))
-    expect(transposed.length).toBeGreaterThan(0)
-    // The live reply text of the tail fork streamed through, folded from the
-    // parent-attributed transient frames.
-    const streamedText = transposed
+    // 父总线零透流:任何 agent 名下都不出现 tavern-tail: 前缀 attemptId——
+    // 父流的 revision 序列全程纯净,主代理思考/正文瞬态不再被断流。
+    const prefixed = frames.filter(row => typeof row.frame.attemptId === 'string' && row.frame.attemptId.startsWith('tavern-tail:'))
+    expect(prefixed).toEqual([])
+
+    // 子帧以其本名流出:childId 从台账反查,子 agent 名下应有 chunk 流
+    // (这正是客户端 subagent 地址 follow 的供血来源——wire 按 agent.session.id 注流)。
+    const transcript = await engine.tailTranscript(sessionId)
+    const childId = transcript.tails.at(-1)?.childId
+    expect(childId).toBeDefined()
+    const childFrames = frames.filter(row => row.agentId === childId)
+    expect(childFrames.length).toBeGreaterThan(0)
+    const streamedText = childFrames
       .filter(row => row.frame.type === 'chunk' && row.frame.chunk?.type === 'text-delta')
       .map(row => row.frame.chunk?.text ?? '')
       .join('')
     expect(streamedText).toContain('已记账')
-    // The parent stream has no durable settlement for a child attempt —
-    // the terminal frame must publish `abandoned` (never `committed`, which
-    // would trip the client's pending-settlement match into a rebaseline).
-    const end = transposed.find(row => row.frame.type === 'end')
-    expect(end?.frame.outcome).toEqual({ kind: 'abandoned' })
+
     expect(readFileSync(join(rootPath, 'runtime', 'deed.md'), 'utf8')).toBe('回合一记账')
+  })
+
+  it('尾代理强制关思考：中立档覆写为最终话语权，模型不服从时收束告警', { timeout: 60_000 }, async () => {
+    root = mkdtempSync(join(tmpdir(), 'tavern-tail-nothink-'))
+    const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
+    seedCard(join(root, 'presets'))
+
+    // 仿真最坏情形覆盖者：post-next 给「所有」代理回填 max——内核模型选座
+    // provisioner（dsh-agent installModelSelection，生产中注册晚于引擎＝链内层，
+    // 本测试组合缺席）的忠实替身，注册序同生产。断言差分：主代理吃 max（探针
+    // 真实落地的证据），尾代理仍 off（引擎外层覆写最后生效的链序契约）。
+    ctx.on('agent/request', async (_payload, next) => {
+      const resolved = await next()
+      return { ...resolved, reasoningEffort: ReasoningEffortId('max') }
+    })
+
+    // 尾回合按 thinking-only 家族形态无视 off 照产 reasoning 块（真 wire 的
+    // reasoning-delta 走内核归一成 reasoning 内容块）。
+    const adapter = new ScriptedTavernAdapter([
+      { kind: 'text', text: '叙事一。' },
+      { kind: 'text', text: '已维护。', reasoning: '无视 off 的思考' },
+    ])
+    ctx.llm.registerAdapter(['tavern-mock'], adapter)
+
+    const engine = ctx.tavernService
+    // 锁 3 观察口：直接在 logger 的 warn 槽外包捕获（cordis LoggerService 的
+    // structured-exporter 注册对 loader 子纤维里的展开点不可见；warn 槽是引擎
+    // this.ctx.logger.warn 的实调唯一入口，同一槽换装＝全树可见）。
+    const warnings: string[] = []
+    const loggerFace = ctx.logger as unknown as { warn(...args: unknown[]): unknown }
+    const serviceWarn = loggerFace.warn
+    loggerFace.warn = (...args: unknown[]) => {
+      const first = args[0]
+      const text = first instanceof Error ? first.message : typeof first === 'string' ? first : ''
+      if (text.includes("reasoned despite forced reasoningEffort 'off'")) warnings.push(text)
+      return serviceWarn.apply(loggerFace, args)
+    }
+    const sessionId = await engine.createSession()
+    engine.importFromLibrary(sessionId, 'probe-card')
+    interface AgentHandle { whenIdle(): Promise<void> }
+    const agents = ctx.agents as unknown as { get(id: SessionId): AgentHandle | undefined }
+    const agent = agents.get(sessionId)
+
+    await engine.prompt({ sessionId, text: '第一回合', requestId: 'rpc-tn-1', clientTimeZone: 'Asia/Shanghai' }, new AbortController().signal)
+    await agent!.whenIdle()
+    await vi.waitFor(() => { expect(engine.state(sessionId).tailRunning).toBe(false) }, { timeout: 20_000, interval: 50 })
+
+    const childId = (await engine.tailTranscript(sessionId)).tails.at(-1)?.childId
+    expect(childId).toBeDefined()
+    const mainCalls = adapter.calls.filter(row => row.session === sessionId)
+    expect(mainCalls.length).toBeGreaterThan(0)
+    expect(mainCalls.every(row => row.reasoningEffort === 'max')).toBe(true)
+    const childCalls = adapter.calls.filter(row => row.session === childId)
+    expect(childCalls.length).toBeGreaterThan(0)
+    expect(childCalls.every(row => row.reasoningEffort === 'off')).toBe(true)
+
+    // 模型不服从（尾回合 reasoning 块在场）→ 收束 WARN 带模型名。
+    await vi.waitFor(() => { expect(warnings.length).toBeGreaterThanOrEqual(1) }, { timeout: 2_000, interval: 50 })
+    expect(warnings.at(-1)).toContain('mock-a')
+  })
+
+  it('GLM 布尔开关桥（本机 glm 网关测试件）：glm 路由镜像 elf 实传形状，非 glm 路由零贡献', async () => {
+    root = mkdtempSync(join(tmpdir(), 'tavern-glm-bridge-'))
+    const ctx = await compose({ workspaceBase: join(root, 'workspaces'), libraryBase: join(root, 'presets') })
+    seedCard(join(root, 'presets'))
+
+    // 注册表行在组合里在场 → 引擎构造即完成 enable_thinking 字段注册；
+    // 桥本体经引擎面取回（glmThinkingBridge 挂引擎实例）。
+    const bridge = (ctx.tavernService as unknown as { glmThinkingBridge?: {
+      prepare(request: { body?: { model?: unknown; thinking?: { type?: unknown } }; signal: AbortSignal }):
+        Promise<{ value?: unknown } | undefined> | { value?: unknown } | undefined
+    } }).glmThinkingBridge
+    expect(bridge).toBeDefined()
+    const signal = new AbortController().signal
+
+    // 强制 off（thinking disabled）→ glm 布尔 false（服务侧缺省即开，false 是硬关）
+    expect(await bridge!.prepare({ body: { model: 'glm-4.7', thinking: { type: 'disabled' } }, signal })).toEqual({ value: false })
+    // enabled → true：同一事实源（effort/thinking 决策）镜像到第二套形状
+    expect(await bridge!.prepare({ body: { model: 'glm-4.7', thinking: { type: 'enabled' } }, signal })).toEqual({ value: true })
+    // 非 glm 路由零贡献（deepseek 官方 API 对未知字段不能容忍，绝不通投）
+    expect(await bridge!.prepare({ body: { model: 'deepseek-flash', thinking: { type: 'disabled' } }, signal })).toBeUndefined()
+    expect(await bridge!.prepare({ body: { model: 'qwen3-max', thinking: { type: 'enabled' } }, signal })).toBeUndefined()
   })
 
   it('尾代理关闭：completed 回合照发落定信号——解锁协议成对、闸门全程不置', { timeout: 60_000 }, async () => {

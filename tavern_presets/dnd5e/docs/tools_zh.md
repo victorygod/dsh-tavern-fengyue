@@ -63,7 +63,7 @@ d20+修正 vs DC（专注=auto:专注维持+damage 内算 DC;对抗=vs+target �
 
 **如实声明的边界（不自动化,记档）**：
 1. **升环增值**：源库无 machine-readable 字段——DM 照法术正文传显式 `dice`（转写非计算）；
-2. **怪物攻检/伤害**：statblock 正文承载——DM 照抄传 `modifier`/`dice`（转写非计算；未来可选 assembler 正文抽取,有解析风险,不做）；
+2. **怪物攻检/伤害**：~~statblock 正文承载~~→2026-09-29b 档案材料化——怪 spawn 时攻击/能力/特征已全材料化在档,attack 结算纯档案驱动（MONSTER_ATTACKS/ABILITIES 退居 spawn 数据源;旧档 path 回退 join 兼容）；
 3. **特征骰条件**（偷袭是否满足优势/ adjacency）：DM 判断后经 `extra_dice` 传入；
 4. **种族/特征重骰**（半身人幸运等）：DM 判定后二次调用取后值；
 5. **离手武器/双持后手**（无属性调整值）：`weapon` 解析+`modifier:0` 覆盖表达。
@@ -76,10 +76,18 @@ roll(`purpose:"攻击"`, `who:"洛克"`, `weapon:"短弓"`, `target:"哥布林�
 结算段:rest(见 §九例)。
 
 ## 三 · attack——攻击链（叙事段 · context 必填）
-命中判定→伤害判定（nat20 自动翻骰）→抗性应用。**输出增量,无目标 HP 绝对值**;死活=DM 单步叙述+尾代终写;怪攻击=DM 照 statblock 转写 modifier/dice。
+命中判定→伤害判定（nat20 自动翻骰）→抗性应用。**输出增量,无目标 HP 绝对值**;死活=DM 单步叙述+尾代终写;怪攻击=档案材料自动取（attack 传攻击名/ability 传豁免能力名,agent 零转写）。
 
 ## 四 · cast——施法链（叙事段 · context 必填）
 闸区三检（位表/升环/专注冲突;ritual 豁免）→豁免法术逐目标 save 循环（half_on_save 自动;DC 内算）→伤害判定（增量）。法术攻击型走 attack。
+
+> **2026-09-28 审计批行为变更（判决表与病理=docs/audit-fixes_zh.md）**：
+> ① **收录闸**：spell ∉ caster.spells_known（slug 归一）→ err——施法族「声明则必全」契约的读者；
+> ② **自动伤害管道收窄**：仅表内显式 `bolts` 声明（magic-missile 类）走自动命中；位移/mishap/骑手/地形类（teleport·wish·divine-favor 原误伤通道）一律落「◇ 无掷效果」显式回执——SPELL_DATA 成为语义分类层（`suppress`/`save` 覆写/`healMulti`）；
+> ③ **豁免分支三补**：目标侧 save/attack_save 状态修正入豁免值（bless 的 d4 从此对豁免生效,回执带「状态修正 名: 骰值」行）；伤害套抗免（immunity/resist/vulnerability,与 attack 同一 resistNote）；hitFlat（disintegrate +40）失败全伤/成功**对总额**减半；
+> ④ **群疗** healMulti 逐人独立掷+独立落盘；单疗多填=响亮报错（A2 静默丢目标修复）；
+> ⑤ **多攻骰**（scorching-ray）逐目标独立攻检+名额校验；单目标攻击型多填=报错。
+> 同批：attack 伤害侧 mods 扩骰式骑手（divine-favor/branding-smite 的附伤,暴击同翻,回执「附伤」行）；check 豁免侧吃 save/attack_save（statusesMod 旧正则通道退役——effect 文本不再承载机械语义,rollMods=core 单源掷算口）。
 
 ## 五 · damage——纯伤害（叙事段 · context 必填）
 无攻击检定的伤害结算（坠落/环境/手动转写）。
@@ -89,6 +97,12 @@ roll(`purpose:"攻击"`, `who:"洛克"`, `weapon:"短弓"`, `target:"哥布林�
 
 ## 七 · death——濒死（叙事段 · context 必填 · 每角色每轮一次）
 raw d20→新计数回执（读面板计数不陈旧）,封顶3;稳定/死亡建议。
+
+## 八 · spawn——角色建档（主尾双面 · context 必填 · 单工具拆二 2026-09-29）
+
+- **spawn_monster(context, name, stance, monster_kind, count?, gear?, persona?, companion?, attacks?)**：**statblock 制·枚举选怪（2026-09-29b 档案自含批）**——`monster_kind` 全量枚举（334 statblock 文件 slug,内核 enum 硬拦+工具读卡兜底）,LLM 零文档阅读面;HP=语料骰式掷（FM `hp_roll`,如 2d6-2,默认≥1,缺字段回退卡值平均,批量每只独立）;**档案自含材料化**——attacks（MONSTER_ATTACKS 条目+RIDERS 附伤+STATUS_RIDERS 豁免-上状态,agent `attacks` 覆盖优先）、abilities（ABILITIES 豁免型如龙息）、features（正文 Trait 行 `名|释义`）、description（FM description）全入档;**钱袋=DMG 个人财宝表按 CR 掷**（lib/treasure.mjs,五币归一三币入 gp/sp/cp;物品仍是 agent 的 gear 面）——掉落=背包+钱,本工具即 lorebook monsters 章对 LLM 的完全替代;`lv=CR` 直值、成长 OFF;`monster_kind` 为身份元数据（旧 path 键退役）;count 天干批量、同名拒、附近 NPC 单列行;回执=人物卡同格式整卡 JSON。
+- **spawn_npc(context, name, stance, class, level, abilities?, skills?, subclass?, …)**（`stance` enum 同伴/中立/敌对=在场关系快照,2026-09-30 回锅——前端三区与注入标注据此;战斗节仍=参战名单）：**class 制**——数值按「等级+职业」规则自动派生（HP 公式/豁免/甲武熟练/起装/特征累积/施法位表，库 `lib/class-build.mjs` 单源），**成长族出生**（exp=当前级下限/hd_available=level——同伴可吃 gain_exp 升级走 pending）；`abilities` 可选（1 级基础值，不传=标准数组按主属性自动 roll），历史 ASI 成长按档自动随机补足（主属性加权，回执列明细）；spells_known/prepared 照语料校验（存在/职业表/环位）；AC 由 armor 派生不落显式 ac；出生即满血。
+- 两者回执带面板：`[创建 · 名 · 态]` 后追加 `### 名（态）` + 整卡 JSON（`get_npc_state` 同格式），DM 可考全貌。
 
 ## 九 · gain_exp / gain_money——尾面级联工具
 
@@ -243,3 +257,11 @@ op=prepare: prepared ⊆ spells_known(牧师=可准备池语义);数量 ≤ 等�
 ```json
 { "ok": true, "who": "洛克", "updated": {"dex": 13, "hp_max": 22}, "pending": [] }
 ```
+
+### 值域与档案自含（2026-09-30 数据面批）
+
+- **枚举即名录**：spawn_monster `monster_kind`(334) / spawn_npc `class·level·race·gender·subclass·skills·spells_known·spells_prepared`(319) / update_status `status`(STATUS_KEYS)——schema 级硬闸经内核，漂移钉对死规则/语料逐一相等。
+- **值域=「who 会什么」的不枚举**：attack `attack/ability/weapon`、cast `spell`——传名,查无即拒(拦截回执)。
+- **档案自含**：人物卡 spell_details(名/环位/效果 SRD 原文——学法术与出生双写)、feature_details(职业特征释义全文)、怪卡 attacks(附骑手)、abilities/features(`名|释义`)——**cast/attack 运行时零 lorebook 读取**(数据模块 SPELL_CORE/EQ_CORE/MONSTER_CORE 主路+md 断档回退)。
+- **stance 回锅(2026-09-30)**:spawn 两工具 `stance` enum 必填(同伴|中立/敌对——出生当拍在场快照),presence 行/三区分区/注入标注回 v4 形;战斗节仍=参战名单(2026-09-29b 保留,敌我不入战斗节)。
+- cast 回执新增 `效果:` 行(本术效果原文,超长截断指向档案);纯叙事法术(飞行/幻术类)「效果归叙事」自此引文有据。
