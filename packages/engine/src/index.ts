@@ -403,7 +403,7 @@ export class TavernRuntime extends Service {
     // false 即生产实证）。本 host 走 /api/anthropic/v1 面（适配器只讲 Anthropic
     // 协议，openai 路径恒 404），该面上顶层 enable_thinking 能否被网关读取未证——
     // 桥只作测试镜像，锁 3 WARN 是 off 方向的实测仪。经官方扩展注册表
-    // （dsh-deepseek-llm-api-extensions，bundle patch 挂载）注入：glm 路由镜像
+    // （dsh-deepseek-llm-api-extensions，dsh-base 基库行挂载）注入：glm 路由镜像
     // 布尔（enabled=true 与 elf 的开方向传法同源），非 glm 路由零贡献；注册表
     // 缺席（测试/未挂组合）整桥沉睡——dsh-llm-deepseek 消费方同款可选式。
     const extensionsRegistry = this.ctx.get('deepseekLlmApiExtensions') as

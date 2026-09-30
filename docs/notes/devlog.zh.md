@@ -2,6 +2,15 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-09-30 双批：发布面词表清理（internal 中性化）+ Windows `pnpm tavern` 双注册破案
+
+- **现象（用户报）**：Windows 侧 `pnpm tavern` 起宿主即报 `llm-api-extensions(...): Error: service "deepseekLlmApiExtensions" has been registered at <DeepSeekLlmApiExtensionRegistry>`。同批要求：发布面清 `internal`/内网域名字眼（远端 origin 是公网 GitHub，词表扫描远端树 7 处命中：CHANGELOG 1 + 0.1.7 迁移笔记 4 + devlog 2）。
+- **证据链**：`dsh-base@0.1.7-rc.2` 自带 `cordis.patch.yml:38` 官方行（id `deepseek-llm-api-extensions`，name `@deepseek-ai/dsh-deepseek-llm-api-extensions`）；我们 bundle patch 又 insert 同包一行（id `llm-api-extensions`）。同包两实例，后到者 provide 撞上官方行已占住的 `deepseekLlmApiExtensions` 服务。我们的行是 d46757f（tail-thinking 批）手动挂载的遗产——那会儿 rc 系还没有官方行；0.1.7 bump 后 dsh-base 收编了官方行，我们的行变冗余。
+- **根因**：重复挂载。bump 机械化了版本升级，但「我们 patch 里被上游收编的行」没有退役闸。
+- **修复**：删 `packages/bundle/cordis.patch.yml` 的 `llm-api-extensions` insert 行；engine 注释挂载点改述（`（dsh-deepseek-llm-api-extensions，dsh-base 基库行挂载）`）。engine 对注册表本就是守卫式可选消费（`extensionsRegistry !== undefined` 才 register），官方行在场 ⇢ GLM 布尔桥照常；注册表缺席整桥沉睡的语义不变。发面 7 处改中性措辞（内网端点/自定义端点/internal.example.com，双仓同步落地）。
+- **验证**：全套 vitest 绿；修复后 `bin/dev.mjs start` 真机 boot 无注册报错。
+- **防复发**：`scripts/bump-dsh.mjs` 升级流程可加「我方 patch 行 vs 上游自带行」退役核对（未做，记档待办）；发面文案往后落笔先过词表（internal/redacted/example-corp 系域名/内网 URL）。
+
 ## 2026-09-27 双批定案:①芙宁娜「卡住」=失败可见性断链 ②Windows 全卡报废=沙盒拒绝
 
 - **现象(用户报,双机分叉)**:mac 上芙宁娜「消耗 token 但无法对话」(实则 401 秒拒,token 未计费);Windows 上全卡齐挂(galgame「数据源未就绪」、dnd「opening 落盘失败」,报错原文自陈 `sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined`)。
