@@ -5,7 +5,7 @@
 ## 2026-09-27 双批定案:①芙宁娜「卡住」=失败可见性断链 ②Windows 全卡报废=沙盒拒绝
 
 - **现象(用户报,双机分叉)**:mac 上芙宁娜「消耗 token 但无法对话」(实则 401 秒拒,token 未计费);Windows 上全卡齐挂(galgame「数据源未就绪」、dnd「opening 落盘失败」,报错原文自陈 `sandbox mode "workspace-write" is requested but no sandbox backend is usable on this host; refusing to run the command unconfined`)。
-- **根因一(诊断链)**:会话 transcript 每拍 `turn/end reason=error 401` 官端认证拒绝——`settings.yaml` 缺位使宿主回落官端(`llm-deepseek.baseURL` 须指 internal `/api/anthropic/v1`,0.1.7 适配器讲 Anthropic 协议,见 [[2026-09-27-dsh-017-migration]])。**顺带破案:`settings.yaml` 是一次性导入件,宿主 boot 读取吸收后改名 `settings.yaml.imported`(mtime 原样保留)**——9-22「E2E 删除」实为导入协议残影;恢复=cp 回正名+restart(换 baseURL 必 restart,LLM 配置 boot 快照)。
+- **根因一(诊断链)**:会话 transcript 每拍 `turn/end reason=error 401` 官端认证拒绝——`settings.yaml` 缺位使宿主回落官端(`llm-deepseek.baseURL` 须指内网端点 `/api/anthropic/v1`,0.1.7 适配器讲 Anthropic 协议,见 [[2026-09-27-dsh-017-migration]])。**顺带破案:`settings.yaml` 是一次性导入件,宿主 boot 读取吸收后改名 `settings.yaml.imported`(mtime 原样保留)**——9-22「E2E 删除」实为导入协议残影;恢复=cp 回正名+restart(换 baseURL 必 restart,LLM 配置 boot 快照)。
 - **根因二(看不见)**:失败回合宿主侧唯一出口=转写红行(`.errMsg`),而 galgame 卡 `chat.css` 明文「转写区恒隐」——画了,但生在玩家看不见的地方;卡泵 `gal_data` 的失败又在 api→face 三层被吞成空串。dnd 卡「有报错」是可见性差异而非特权差异;两机两个案子共用同一个病根:**被丢弃的是失败的原因本身**。
 - **修复(两批,拆两份正式笔记)**:turnError face 三层+芙宁娜失败演出(横幅/即刻回落/回声锁,含 E2E 判据分叉)→ [turn-error-face-channel](feature/2026-09-27-turn-error-face-channel.zh.md);引擎 spawn 显式信任策略(trustedScriptPolicy)+分诊探针 → [windows-sandbox-refusal](bug-fix/2026-09-27-windows-sandbox-refusal.zh.md)。
 - **验证**:UI 192/192、引擎 194/194(各含新钉);真机 error/happy 双 phase(401→404 换装各验)全绿;分诊探针本机跑通(dnd 工作区业务回执恰证「栈通≠退出码干净」)。
@@ -81,7 +81,7 @@
   1. 我们的读法：`binding.eventSource.getSnapshot().entries` 找 `type:'transient'`（`assistant/live-chunk`）。`events.d.ts` 契约 `SessionEventWindow.entries` 确实是 `event | transient` 二型，**transient 就该在窗口里**。
   2. **stock 同 seat**：D `dsh-client-ui-conversation` 读 live delta 也是 `owner.eventSource`（同一个 `assistant/live-chunk` transient 条目）——**读法没有错，方法论不在我们这边**。
   3. 决定性观测（真实消耗 token）：宿主自建转写 `hostNarr` 也是 `0 → 82 一次性跳变`（非逐字）。即 **eventSource 从未收到任何 live-chunk**——不是卡没接，是**模型链向 eventSource 根本不产生瞬时帧**。
-  4. adapter（`dsh-llm-deepseek`）已 `stream:true` + SSE parser，但理想源（`internal[.]example[.]com` baseURL / glm-4.7）实测整包返回（0→82 一次），故无分行块。
+  4. adapter（`dsh-llm-deepseek`）已 `stream:true` + SSE parser，但真源（内网 Anthropic 端点 baseURL / glm-4.7）实测整包返回（0→82 一次），故无分行块。
 - **结论**：tavern 前端逐 chunk 的前提 = 模型源真正 SSE 分块到达 eventSource。当前配置下该源整包、任何前端（含宿主自建转写、我们卡）都只能 durable 结算后整体出现。要逐 chunk 需切换能流式的端点/模型（true streaming），卡/桥（feedAssistantLive→handleLive 按行切）代码已就位。
 - **防复发**：排查「前端不流式」先锁定 eventSource 是否真的收到 transient（宿主自建转写 hostNarr 是否逐字增长）；读法照 `events.d.ts`/stock 对齐，不臆造 seat。已落相关：开场白上移中点、emoji 字体回退、防剧透恢复、新回合重置。
 

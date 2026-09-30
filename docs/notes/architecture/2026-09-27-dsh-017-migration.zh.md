@@ -41,17 +41,17 @@
 0.1.7 的 DeepSeek 适配器讲 **Anthropic Messages 协议**（`POST <base>/messages` SSE，`frame.event` 必须等于 JSON `type`；`config.baseURL ?? env DEEPSEEK_BASE_URL ?? 官端` 的优先级里 **config 恒压 env**）。本机 profile 的用户覆盖（`~/.dsh-tavern-fengyue/profiles/tavern-fengyue/cordis.patch.yml`）把 baseURL 钉成 `!!js` 表达式实现**双路切换**：
 
 ```yaml
-baseURL: !!js process.env.DEEPSEEK_BASE_URL ?? 'https://internal[.]example[.]com/api/anthropic/v1'
+baseURL: !!js process.env.DEEPSEEK_BASE_URL ?? 'https://internal.example.com/api/anthropic/v1'
 ```
 
-带 env 跑 env（本地 mock 等）、无 env 走 internal；key 层天然同语义（进程 env > `.credentials.yaml` 管理库）。双路 Playwright 实测全绿。**fallback 必须是 `/api/anthropic/v1`**——适配器只讲 Anthropic `/messages`，openai 路径恒 404。其他实测要点：
+带 env 跑 env（本地 mock 等）、无 env 走内网端点；key 层天然同语义（进程 env > `.credentials.yaml` 管理库）。双路 Playwright 实测全绿。**fallback 必须是 `/api/anthropic/v1`**——适配器只讲 Anthropic `/messages`，openai 路径恒 404。其他实测要点：
 
 - 鉴权 `Authorization: Bearer <key>` 或 `x-api-key` 均可；
-- 模型名是 internal 的目录名（本 token 可用 `Qwen3-32B`；`DeepSeek-V41-Flash` 在 internal 不存在——客户端模型选择必须选目录内名字）；
+- 模型名是内网端点的目录名（本 token 可用 `Qwen3-32B`；`DeepSeek-V41-Flash` 在内网端点不存在——客户端模型选择必须选目录内名字）；
 - **非流式调用必须 `enable_thinking:false`**，否则 MPE-001（本项目全走流式，无此约束）；
 - mock（`scripts/mock-llm.mjs`）已补 `/messages` 路由 + Anthropic SSE + `event:` 行；字符串载荷（`[DONE]`、malformed_json）保持裸排不加引号；**带 thinking 的真请求**（`reasoningEffort: low` → `thinking.enabled`）必须走 `message_start → thinking 块(thinking_delta) → text 块 → message_delta/stop` 的块流——OpenAI 的 `reasoning_content` 帧首帧无 `type`，宿主即报 event type mismatch（裸 curl 正确、真请求即炸的坑）。
 
-连带修了 `bin/dev.mjs bootstrap`：profile `cordis.patch.yml` 只在缺席时落占位（原实现每次无条件覆写成 `[]`，会把 internal 这类用户覆盖静默抹掉、打回默认端）。该文件可能被多个会话共编，改动前先重读。
+连带修了 `bin/dev.mjs bootstrap`：profile `cordis.patch.yml` 只在缺席时落占位（原实现每次无条件覆写成 `[]`，会把自定义端点这类用户覆盖静默抹掉、打回默认端）。该文件可能被多个会话共编，改动前先重读。
 
 ## 四、实测验收（Playwright，真 token 非全好评）
 
