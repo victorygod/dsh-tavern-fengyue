@@ -15,7 +15,7 @@ const { rollExpr, resolveTarget, deathHitFail, injure, saveChar, err } = await i
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context')
 a.dice || err('缺必填 dice')
-a.target || err('缺必填 target——世界伤害必有挨打者(纯掷已废,生命骰走 heal)')
+a.target || err('缺必填 target——世界伤害必有挨打者(纯掷已废;生命骰归 rest,药水掷骰恢复归 hp_change=dice)')
 const tg = resolveTarget(a.target) || err(`!查无目标:${a.target}——先用角色创建工具建档`)
 const r = rollExpr(a.dice); r || err(`!骰式不合法:${a.dice}`)
 

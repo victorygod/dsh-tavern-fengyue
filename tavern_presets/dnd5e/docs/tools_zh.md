@@ -76,7 +76,7 @@ roll(`purpose:"攻击"`, `who:"洛克"`, `weapon:"短弓"`, `target:"哥布林�
 结算段:rest(见 §九例)。
 
 ## 三 · attack——攻击链（叙事段 · context 必填）
-命中判定→伤害判定（nat20 自动翻骰）→抗性应用。**输出增量,无目标 HP 绝对值**;死活=DM 单步叙述+尾代终写;怪攻击=档案材料自动取（attack 传攻击名/ability 传豁免能力名,agent 零转写）。
+命中判定→伤害判定（nat20 自动翻骰）→抗性应用。**输出增量,无目标 HP 绝对值**;死活=DM 单步叙述+尾代终写;怪攻击=档案材料自动取（attack 传攻击名/ability 传豁免能力名,agent 零转写）。**panel 武器路径带持有闸（2026-09-30 背包律批）**——weapon 必须在攻击者的 weapons/gear 行上:判据=表目（中/英）经 equipmentFM 归一比对同一 fm.path+自由文本行包含式（gear 是『10 支飞镖』『两把匕首』类,解析不出单件,取中文名 WEAPON_SLUG 反查/英文名 fm.name）——查无即拒「!武器没带」（Exit 1,未至结算）,默认持位 weapons[0] 天然在列;怪/原创 NPC 走 born attacks 不经此闸。背包律正本=systemPrompt 工具纪律（战斗中可使用的物品必须在 weapons/gear 行上/消耗品必须在背包行上才能被使用/关键道具·任务道具·贵重物品必须在背包行上才能被交付）;拾取/入包=update_character（weapons/gear）。
 
 ## 四 · cast——施法链（叙事段 · context 必填）
 闸区三检（位表/升环/专注冲突;ritual 豁免）→豁免法术逐目标 save 循环（half_on_save 自动;DC 内算）→伤害判定（增量）。法术攻击型走 attack。
@@ -131,7 +131,7 @@ raw d20→新计数回执（读面板计数不陈旧）,封顶3;稳定/死亡建
 
 ## 十二 · 不设工具（对照清单）
 
-判定时机/DC 选档/优劣势来源/摆位/态度/灵感授予/意图翻译/叙述 = **LLM 判断**；时间推进/状态衰减/combat 维护/gear 转录/新实体建档 = **尾代直改**；任务选择/HD 花几枚 = **对话内声明**（叙事动作,非分配面板）。
+判定时机/DC 选档/优劣势来源/摆位/态度/灵感授予/意图翻译/叙述 = **LLM 判断**；时间推进/状态衰减/combat 维护/新实体建档 = **尾代直改**；gear 装备与背包转录 = **update_character**（2026-09-30 背包律批——主面当拍+尾面兜底双走工具;runtimeEdit 仅特殊字段兜底）；任务选择/HD 花几枚 = **对话内声明**（叙事动作,非分配面板）。
 
 ## 十三 · 收缩史（备查）
 
@@ -208,7 +208,7 @@ initiative→独立（分裂后）；consume→cast 闸区；encounter→撤（L
 ```
 （实现注:回执数值全部由工具算好,DM 只转述;尾代照抄。）
 
-### rest 逻辑（已消亡——存档:休整落账归尾代直接编辑(maintenancePrompt 3.a 长休细则+短休走 heal),思路见 §九·B）
+### rest 逻辑（已消亡——存档:休整落账归尾代直接编辑(maintenancePrompt 3.a 长休细则+短休=rest.hd 内嵌掷骰),思路见 §九·B）
 ```
 kind 分派;targets=who 或扫描 characters/(role pc+companion);
 读 state.md frontmatter(time_day/hour)+`last_long_rest`(队伍节,缺=从未);

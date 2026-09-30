@@ -1,13 +1,13 @@
 /** @tavern-schema
 {
-  "description": "攻击结算器——一切攻击检定必经本工具（法术走 cast）：攻检→伤害→抗免→扣血，一次走完。何时调：攻击发生即调，每次一掷（多击＝同回合连调）。攻击数据三来源自动取：怪/原创 NPC 照出生档案材料（spawn 时攻击/能力/特征已全材料化在档——attack 传攻击名如 bite、ability 传豁免能力名如 fire-breath）；PC/同伴照面板武器。濒死目标 5 尺内命中自动暴击。细则见各参数；即兴无档目标先 spawn 建档（怪走 spawn_monster、有职业者走 spawn_npc）。",
+  "description": "攻击结算器——一切攻击检定必经本工具（法术走 cast）：攻检→伤害→抗免→扣血，一次走完。何时调：攻击发生即调，每次一掷（多击＝同回合连调）。攻击数据三来源自动取：怪/原创 NPC 照出生档案材料（spawn 时攻击/能力/特征已全材料化在档——attack 传攻击名如 bite、ability 传豁免能力名如 fire-breath）；PC/同伴照面板武器（背包律硬闸：武器不在其 weapons/gear 行上＝拒）。濒死目标 5 尺内命中自动暴击。细则见各参数；即兴无档目标先 spawn 建档（怪走 spawn_monster、有职业者走 spawn_npc）。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
     "who": { "type": "string", "description": "攻击者姓名，默认玩家。工具按名读档取攻击数据。" },
     "target": { "type": "string", "required": true, "description": "目标名。AC 与抗免自动读目标档——含其 statuses 机械修正（弃盾类状态走档案，不传数字）。" },
     "attack": { "type": "string", "description": "怪物/原创 NPC 的攻击名，英文原文（如 bite、scimitar）——spawn 回执整卡在档（attacks 键），加值/骰式/类型/触及自动带出。" },
     "ability": { "type": "string", "description": "怪物豁免能力名（如 fire-breath、lightning-breath、wing-attack）——走豁免不走攻检，目标每个生物各调一次，DC/骰式从档案 abilities 自动带出。" },
-    "weapon": { "type": "string", "description": "PC/同伴的面板武器名（默认持位第一把）——骰式、灵巧、熟练全自动。" },
+    "weapon": { "type": "string", "description": "PC/同伴的面板武器名（默认持位第一把）——骰式、灵巧、熟练全自动。不在其 weapons/gear 行上＝拒（背包律）——拾取/入包走 update_character。" },
     "off_hand": { "type": "boolean", "description": "双持的后手武器——攻检照常，伤害不加属性调整值。" },
     "extra_dice": { "type": "string", "description": "特征骰（偷袭/神圣打击类），暴击同翻；条件是否满足由你判断。" },
     "mode": { "type": "string", "description": "攻击检定：adv＝优势，dis＝劣势，默认 normal。是否有优劣势由你按局面判断（隐形、伏击等）。" },
@@ -19,7 +19,7 @@
 }
 */
 import { pathToFileURL } from 'node:url'
-const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, equipmentFM, resolveTarget, resolveSave, deathHitFail, rollMods, injure, consumeBonus, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, equipmentFM, WEAPON_SLUG, slugify, resolveTarget, resolveSave, deathHitFail, rollMods, injure, consumeBonus, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { STATUS_CN } = await import(pathToFileURL(process.cwd() + '/../preset/lib/status.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context(剧情梗概——反作弊铁则)')
@@ -77,20 +77,48 @@ if (born) {
   const wname = (a.weapon ?? (char.weapons ?? [])[0] ?? '').replace(/\s*[x×]\s*\d+\s*$/, '').trim()
   const fm = equipmentFM(wname)
   fm || err(`!攻击无源:${wname || '(未传)'}——怪物/原创 NPC 传 attack,PC/同伴传 weapon`)
+  holdGate(char, fm, wname)
   dmgDice = fm.damage; dmgType = String(fm.damage_type ?? '').toLowerCase()
   const prop = JSON.stringify(fm.properties ?? '').toLowerCase()
-  const finesse = prop.includes('finesse'), ranged = prop.includes('range') && !thrownOnly(prop), thrown = prop.includes('thrown')
+  const finesse = prop.includes('finesse'), ranged = String(fm.weapon ?? '').toLowerCase().includes('ranged') || (prop.includes('range') && !thrownOnly(prop))
   panelRanged = ranged
-  const st = finesse || thrown ? (mod(char.str ?? 10) >= mod(char.dex ?? 10) ? 'str' : 'dex') : ranged ? 'dex' : 'str'
-  const prof = (char.weapon_prof ?? []).some(p => JSON.stringify(fm).toLowerCase().includes(String(p).toLowerCase()))
+  // 属性律(RAW):灵巧←STR/DEX 择高(远近皆然——飞镖类灵巧远程同享);无灵巧远程←DEX;其余(含投掷无灵巧的矛/标枪)←STR。
+  const st = finesse ? (mod(char.str ?? 10) >= mod(char.dex ?? 10) ? 'str' : 'dex') : ranged ? 'dex' : 'str'
+  // 熟练桥(2026-09-30 修:weapon_prof 全中文=PROF_WEAPON 单源,对英文 fm 的 includes 永假——
+  // 全职业武器攻检无 PB 主病灶)。类目对 fm.weapon(simple/martial);武器名走 WEAPON_SLUG 中转
+  // 对 slugify(fm.name)/fm.path;英文串直配兜底(存量英文训练面兼容)。
+  const PROF_CAT = { '简易武器': 'simple', '军用武器': 'martial' }
+  const fmSlug = slugify(fm.name ?? ''), fmPath = String(fm.path ?? '')
+  const prof = (char.weapon_prof ?? []).some(p => {
+    const s = String(p).trim()
+    if (PROF_CAT[s]) return String(fm.weapon ?? '').toLowerCase().includes(PROF_CAT[s])
+    const slug = WEAPON_SLUG[s] ?? WEAPON_SLUG[s.replace(/（.*?）|\(.*?\)/g, '').trim()]
+    if (slug) return fmSlug === slug || fmPath.includes(slug)
+    return JSON.stringify(fm).toLowerCase().includes(s.toLowerCase())
+  })
   atkBonus = mod(char[st] ?? 10) + (prof ? PB : 0)   // 吞零修复:显式 0 也尊重
   dmgMod = a.off_hand === true ? 0 : mod(char[st] ?? 10)        // 后手:伤害不加属性
 }
 function thrownOnly(prop) { return prop.includes('thrown') && !prop.includes('range') }
+// ── 持有闸(背包律,2026-09-30):panel 武器路径的战斗用物必须在 weapons/gear 行上——没带即拒 ──
+// 判据=weapons 表目(中/英)经 equipmentFM 归一比对同一 slug(path 即键);gear 是自由文本
+// (『两把匕首』『10 支飞镖』解析不出单件),取包含式——行文本含该武器的中文名(WEAPON_SLUG 反查)
+// 或英文名(fm.name)。默认持位 weapons[0] 天然在列;怪物/原创 NPC 走 born attacks 不经此闸。
+function holdGate(char, fm, wname) {
+  const slug = String(fm.path).replace(/^equipment\//, '').replace(/\.md$/, '')
+  const cns = Object.entries(WEAPON_SLUG).filter(([, s]) => s === slug).map(([cn]) => cn)
+  const en = String(fm.name ?? '').toLowerCase()
+  const held = [...(char.weapons ?? []), ...(char.gear ?? [])].some(row => {
+    const t = String(row).replace(/\s*[x×]\s*\d+\s*$/, '').trim()
+    if (equipmentFM(t)?.path === fm.path) return true
+    return cns.some(cn => t.includes(cn)) || (en && t.toLowerCase().includes(en))
+  })
+  held || err(`!武器没带:${wname}(${who})——weapons/gear 行查无(背包律:战斗用物须随身)——拾取/入包=update_character(weapons/gear)再攻`)
+}
 
 // ── 攻击侧机械 buff(rollMods 单源,2026-09-28 审计批 B1):attack/attack_save 双通道,骰式每掷独立 ──
 const bm = rollMods(char, ['attack', 'attack_save'])
-const buffFlat = bm.flat, buffParts = bm.parts
+let buffFlat = bm.flat; const buffParts = bm.parts   // let:consume 分支 += 摘出的加骰(2026-09-30 修 const 重赋=消费型状态一用即崩)
 // 消费型状态(consume,2026-09-28 F2):攻检用掉即摘+加骰(资源消耗=机械事实写盘)
 if (a.consume) {
   const cb = consumeBonus(char, a.consume)

@@ -71,7 +71,7 @@ describe('spawn_monster 怪物创建(真实脚本)', () => {
   })
 })
 
-describe('damage/heal/hp_change 生命直改三件套(真实脚本)', () => {
+describe('damage/hp_change 生命结算件(dice 骰入 hp_change,2026-09-30 audit批;真实脚本)', () => {
   it('damage 落盘+0HP 分叉(PC 濒死起算)', () => {
     const { cwd: rt, base } = rig()
     const r = runTool(rt, 'damage', { context: '陷阱激射', dice: '2d6+99', target: '梅西雅', type: 'piercing' })
@@ -105,12 +105,15 @@ describe('damage/heal/hp_change 生命直改三件套(真实脚本)', () => {
     expect(j(rt, 'player.json')).toMatchObject({ death_success: 0, death_fail: 1 })
     rmSync(base, { recursive: true, force: true })
   })
-  it('heal 钳上限;0HP 苏醒+濒死计数双清', () => {
+  it('hp_change dice=掷骰恢复(heal 并入):钳上限;0HP 苏醒+濒死计数双清;负骰拒绝', () => {
     const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_success: 1, death_fail: 2 })
-    const r = runTool(rt, 'heal', { context: '药水回魂', dice: '1d4+50', target: '梅西雅' })
+    const r = runTool(rt, 'hp_change', { context: '药水回魂', dice: '1d4+50', target: '梅西雅' })
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/hp 0→22\(钳上限\) · 濒死计数双清/)
+    expect(r.stdout).toMatch(/hp 0→22\(1d4\+50=\d+，钳上限\) · 濒死计数双清/)
     expect(j(rt, 'player.json')).toMatchObject({ hp: 22, death_success: 0, death_fail: 0 })
+    const neg = runTool(rt, 'hp_change', { context: '反噬回火', dice: '1d4+50', modifier: -60, target: '梅西雅' })
+    expect(neg.status).toBe(1)
+    expect(neg.stdout).toContain('恢复不得为负')
     rmSync(base, { recursive: true, force: true })
   })
   it('hp_change 直改(负向 0HP 分叉)与 full 回满;二选一校验', () => {
@@ -123,7 +126,7 @@ describe('damage/heal/hp_change 生命直改三件套(真实脚本)', () => {
     expect(full.stdout).toMatch(/hp 0→22\(回满\)/)
     const none = runTool(rt, 'hp_change', { context: 'x', target: '梅西雅' })
     expect(none.status).toBe(1)
-    expect(none.stdout).toContain('缺 amount')
+    expect(none.stdout).toContain('四选一')
     rmSync(base, { recursive: true, force: true })
   })
 })

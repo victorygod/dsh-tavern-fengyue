@@ -11,8 +11,7 @@
 | **cast** | 收录闸(spells_known)、位闸(戏法/仪式免位/升环)、专注顶替级联(dropConcentration)、选骰(语料表基础+升环Δ聚合/戏法角色档)、治疗属性内算、豁免逐目标、抗免+平值+半伤、多弹份额(targets 重复)、buff 写 statuses、临时生命(temp)、suppress 语义分类 | caster/targets/spell 选、升不升环 as_level、多弹分配 |
 | **check** | 技能/属性/豁免修正解析、专注维持 DC 内算、豁免吃 save/attack_save(rollMods)、专注失败断链级联、消费型状态 | skill/stat/save 选、DC 档、对抗比大小、优劣势 |
 | **damage** | 环境伤害掷骰+抗免+落盘 | dice/type/target |
-| **heal** | 掷骰回血+钳上限+苏醒双清 | dice/target（生命骰逐枚投=分次调） |
-| **hp_change** | 无骰直改/回满/临时生命(temp)三写 | amount/full/temp 选、直改值（独立事件） |
+| **hp_change** | 生命结算四态(2026-09-30 heal 并入):dice 掷骰恢复(药水类,钳上限+苏醒双清)/amount 直改±(负向 injure 先吸 temp)+full/temp 三写;已结算骰果不得借此涂改(铁则) | dice/amount/full/temp 四选一、直改值（独立事件） |
 | **death** | 濒死豁免 raw d20、成败计数落盘、nat1 双败/nat20 回血、三成稳定/三败死亡判词 | 何时调（玩家濒死每轮） |
 | **update_character** | 人物卡更新器(2026-09-30):statuses 数组全量替换(每条=名+applied_at,effect/on_use/mods 机械按名自动匹配——STATUS_TEXT/spell-data 单源;未列=摘除)、平铺叙事字段(armor/shield/装备/现况/历史追加/role/力竭)、法术三检+spell_details 重铺、拒收字段点名(生成面/结算面)、整卡回执 | statuses/各字段、target(玩家名直通) |
 | **rest** | 短休 HD 掷+池回充+契术师整池；长休三铁轨+hp/hd/位表/力竭/专注清全链 | 何时休整、谁、滴/无饮食 food/water、HD 花费枚数 |

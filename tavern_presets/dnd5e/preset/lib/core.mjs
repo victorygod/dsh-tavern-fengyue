@@ -121,12 +121,17 @@ export function toCp(str) {
 }
 export const normWallet = (cp) => ({ gp: Math.floor(cp / 100), sp: Math.floor((cp % 100) / 10), cp: cp % 10 })
 
-// 常用武器/护甲 中文名→equipment slug（语料为英文名;开 committed 面板存中文名时的桥）
-export const WEAPON_SLUG = { '短剑':'shortsword','长剑':'longsword','短弓':'shortbow','长弓':'longbow','匕首':'dagger','手斧':'handaxe','战斧':'battleaxe','巨斧':'greataxe','巨剑':'greatsword','长枪':'spear','木棒':'club','钉锤':'mace','战锤':'warhammer','弯刀':'scimitar','细剑':'rapier','矛':'spear','三叉戟':'trident','链枷':'flail','战镐':'war-pick','连枷':'flail','轻弩':'light-crossbow','重弩':'heavy-crossbow','手弩':'hand-crossbow','飞镖':'dart','投石索':'sling','标枪':'javelin','大棒':'greatclub' }
+// 常用武器/护甲 中文名→equipment slug（语料为英文名;开 committed 面板存中文名时的桥）。
+// 弩系三值对齐 EQ 键(crossbow-hand/-light/-heavy,2026-09-30 修——旧值 hand/light/heavy-crossbow 全查无);
+// 镰刀/长杖/木棍 补齐(PROF_WEAPON druid/sorcerer/wizard 在役文档,桥接前全查无)。
+export const WEAPON_SLUG = { '短剑':'shortsword','长剑':'longsword','短弓':'shortbow','长弓':'longbow','匕首':'dagger','手斧':'handaxe','战斧':'battleaxe','巨斧':'greataxe','巨剑':'greatsword','长枪':'spear','木棒':'club','木棍':'club','钉锤':'mace','战锤':'warhammer','弯刀':'scimitar','细剑':'rapier','矛':'spear','三叉戟':'trident','链枷':'flail','战镐':'war-pick','连枷':'flail','镰刀':'sickle','长杖':'quarterstaff','轻弩':'crossbow-light','重弩':'crossbow-heavy','手弩':'crossbow-hand','飞镖':'dart','投石索':'sling','标枪':'javelin','大棒':'greatclub' }
 export const ARMOR_SLUG = { '镶钉皮甲':'studded-leather-armor','皮甲':'leather-armor','皮甲（镶钉）':'studded-leather-armor','链甲':'chain-mail','链甲衫':'chain-shirt','板甲':'plate-armor','板条甲':'splint-armor','鳞甲':'scale-mail','胸甲':'breastplate','半板甲':'half-plate-armor','环甲':'ring-mail','兽皮甲':'hide-armor','填棉甲':'padded-armor' }
 export const slugify = (en) => en.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+// slugify 产物的别名兜底(EN 别名 'hand crossbow' 类输入;EQ 键是 'Crossbow, hand' 逗号形)
+export const SLUG_ALIAS = { 'hand-crossbow': 'crossbow-hand', 'light-crossbow': 'crossbow-light', 'heavy-crossbow': 'crossbow-heavy' }
 export function equipmentFM(name) {
-  const slug = WEAPON_SLUG[name] ?? ARMOR_SLUG[name] ?? slugify(name)
+  const raw = WEAPON_SLUG[name] ?? ARMOR_SLUG[name] ?? slugify(name)
+  const slug = SLUG_ALIAS[raw] ?? raw
   // 纯数据(EQ_CORE 快照,2026-09-30——attack/deriveAC 零 lorebook 零回退);查无即 null
   return EQ_CORE[slug] ? { ...EQ_CORE[slug].fm, path: `equipment/${slug}.md` } : null
 }
