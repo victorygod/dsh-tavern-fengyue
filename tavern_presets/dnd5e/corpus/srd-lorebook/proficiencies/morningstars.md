@@ -1,5 +1,0 @@
----
-name: Morningstars
-description: Weapons
----
-

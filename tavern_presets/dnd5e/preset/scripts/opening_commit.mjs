@@ -20,6 +20,7 @@ const { RACE_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib
 const { materializeSpellDetails } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-build.mjs').href)
 const { CANTRIPS_BY_LEVEL, knownSpellsAt, CLASS_CN, RACE_CN, ALL_SKILL_KEYS } = await import(pathToFileURL(process.cwd() + '/../preset/lib/opening-meta.mjs').href)
 const { buildClass, classHpMax } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-build.mjs').href)
+const { personaGate } = await import(pathToFileURL(process.cwd() + '/../preset/lib/persona.mjs').href)
 
 const fail = (m, h) => { console.log(JSON.stringify({ ok: false, error: m, hint: h ?? '' })); process.exit(1) }
 const inp = JSON.parse(typeof globalThis.argv?.[0] === 'string' ? globalThis.argv[0] : '{}')
@@ -93,8 +94,9 @@ if (isCaster) {
       : (poolK.length || fail(`语料无 ${cls} 的 1..${maxSlot} 环卡——不能出生施法族`))
     learned = inK.length ? [...inK] : rollFrom(poolK, wantK)
   }
-  if (cls === 'cleric' || cls === 'druid') {
-    // 准备制:整表备选,准备数=职业等级+施法属性调整值(SRD;1 级=1+调整与旧口径一致)——roll 满额默认表,长休整表可换
+  if (['cleric', 'druid', 'paladin', 'ranger'].includes(cls) && maxSlot > 0) {
+    // 准备制:整表备选,准备数=职业等级+施法属性调整值(SRD;1 级=1+调整与旧口径一致)——roll 满额默认表,长休整表可换。
+    // 准备制四职(SRD 准备施法族;半施法圣骑士/游侠 L2 起才有施法——L1 maxSlot=0 不进此支,重生无施法面是正确行为)
     const wantP = level + Math.max(mod(ab[casterAttr] ?? 10), 0)
     const pEff = Math.min(wantP, poolK.length)
     inP.length ? (inP.length === pEff || fail(`已准备须 ${pEff} 个(等级+施法调整,受语料池上限)、得 ${inP.length}`), inP.every(s => poolK.includes(s)) || fail('已准备超出本职业语料或环位超可施'))
@@ -121,12 +123,15 @@ const hpMax = classHpMax(cls, c.hit_die, ab.con, level, subclass)
 const eq = c.equipment ?? fail(`起装表缺 ${cls}`)
 
 // ── 施法族(仅施法职业;位表整档按等级直落;spell_details=档案自含全文) ──
+// 戏法并册(2026-09-30 翻案):spells_known 一张名单,0 环+环术同册——与 NPC 口径(spawn_npc「0 环归
+// spells_known」)、官方纸卡(同表 0 环行竖标 cantrips)、原型正本(hud-proto-grow mock)三方对齐;
+// 戏法行/法术行拆分是展示层投影(ui_data splitSpells 按卡 level:0 拆)。
 const slots = Object.fromEntries((c.slots ?? []).map((v, i) => [`slots_l${i + 1}`, v]))
-const spellDetails = materializeSpellDetails([...learned, ...prepared])
+const spellDetails = materializeSpellDetails([...cantrips, ...learned, ...prepared])
 const casterFields = isCaster
   ? {
       caster_attr: casterAttr,
-      spells_known: learned, spells_prepared: prepared,
+      spells_known: [...cantrips, ...learned].sort(), spells_prepared: prepared,
       ...(spellDetails.length ? { spell_details: spellDetails } : {}),
       concentrating: null, ...slots,
     }
@@ -139,14 +144,19 @@ const features = c.features
 const armors = c.armor_prof
 const weaponsArr = c.weapon_prof
 
-// ── 组装面板(全字段骨架→裁剪) ──
+// ── 人设三层(2026-09-30,persona-threelayer_zh.md 定案 1):persona 七键照表单落——形量硬闸与
+//    同伴四件必填复用 lib/persona.mjs(PC=长线人物;空串=缺席,可选键不硬拦);history[0]=玩家写
+//    的履历首行(旧 backstory 死通道以别名收编);description=出生现况(身份+底色),此后随
+//    history 追加同拍刷新(维护面=maintenancePrompt,组装句退役)。 ──
 const clsCn = CLASS_CN[cls] ?? cls
 const raceCn = RACE_CN[race] ?? race
-const persona = ch.persona ?? {}
-const description = `${raceCn} ${clsCn}——${persona.personality ?? '来历各异的冒险新手'}`
-const biography0 = ch.backstory?.trim() ||
-  `${ch.background ?? '无名'}出身,一脚踏进了${clsCn}这行。${persona.personality ? personalityPhrase(persona.personality) : ''}${persona.bonds ? `心里搁着「${persona.bonds}」。` : ''}${persona.ideals ? `认 ${persona.ideals} 这两个字。` : ''}`.trim()
-function personalityPhrase(p) { return `一来一往都是${p}的做派。` }
+const personaIn = typeof ch.persona === 'object' && ch.persona
+  ? Object.fromEntries(Object.entries(ch.persona).filter(([, v]) => typeof v === 'string' && v.trim()))
+  : undefined
+const pg = personaGate({ persona: personaIn, history: ch.history ?? ch.backstory, description: undefined }, { role: 'companion', requireHistory: false })
+// 人设闸账本化(2026-09-30):errors 聚合空跳;非空 fail(join——出生面此处无写盘,清账点安全)
+pg.errors.length && fail(pg.errors.join(' / '))
+const description = `${raceCn} ${clsCn}——${pg.persona?.lens ?? '来历各异的冒险新手'}`
 
 // ── 历史 ASI pending(2026-09-29b):高等级出生该有的属性提升不机械随机补——逐档挂待办,
 //    玩家在面板册子 Ability Scores 节逐档点选(恰 2 点/上限 20/CON 追溯——front_commit 既有闸全适用);
@@ -159,7 +169,7 @@ const panel = {
   description,
   role: 'pc',
   class: cls, subclass, level, exp: XP_THRESHOLDS[level - 1] ?? 0,
-  race: race, background: ch.background ?? '',
+  race: race,
   hp: hpMax, hp_max: hpMax, temp_hp: 0,
   hd_available: level, exhaustion: 0,
   gp: eq.gp, sp: eq.sp, cp: eq.cp,
@@ -175,8 +185,8 @@ const panel = {
   features: features,
   ...(c.feature_details?.length ? { feature_details: c.feature_details } : {}),
   pending: asiPend, statuses: {},
-  persona: persona,
-  biography: [biography0],
+  persona: pg.persona,
+  ...(pg.history ? { history: [pg.history] } : {}),
   weapons: [eq.weapon], gear: eq.gear,
 }
 
@@ -193,7 +203,7 @@ const scenario = (OPENINGS?.scenarios ?? []).find(s => s.id === scenarioId) ?? {
 const st = scenario.state ?? {}
 
 let stateMd = existsSync('state.md') ? readFileSync('state.md', 'utf8') : ''
-stateMd = stateMd.replace(/^(## 时间敏感项\n[\s\S]*?)(^- 当前时间：).*$/m, `$1$2第1日·18时`)
+stateMd = stateMd.replace(/^(## 时间敏感项\n[\s\S]*?)(^- 当前时间：).*$/m, `$1$2第1日·18时00分`)
 stateMd = stateMd.replace(/(## 玩家所在\n)[\s\S]*?(?=\n## |$)/, `$1`
   + `- 大区：${st.大区 ?? '碧野丘陵'}\n`
   + `- 区域：${st.区域 ?? '酒桶镇'}\n`

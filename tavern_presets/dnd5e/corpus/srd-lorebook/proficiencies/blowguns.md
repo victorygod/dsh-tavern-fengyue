@@ -1,5 +1,0 @@
----
-name: Blowguns
-description: Weapons
----
-

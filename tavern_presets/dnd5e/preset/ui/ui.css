@@ -146,6 +146,9 @@
 .w-top { display: flex; align-items: center; gap: 10px; position: relative; }
 .dial { width: 46px; height: 46px; flex-shrink: 0; }
 .w-dial { display: flex; flex-shrink: 0; }
+.w-clock { flex-shrink: 0; text-align: center; }
+.w-clock .t1 { font: 800 13px/1.1 var(--sans); color: var(--ink); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.w-clock .ampm { font: 700 7.5px/1.4 var(--sans); color: var(--ink3); letter-spacing: .14em; text-transform: lowercase; }
 .w-date { flex: 1; min-width: 0; text-align: right; }
 .d1 { font: 700 12px var(--sans); color: var(--ink); letter-spacing: .02em; }
 .wchips { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 4px; font: 600 9.5px var(--sans); color: var(--ink3); white-space: nowrap; }

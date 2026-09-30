@@ -1,5 +1,0 @@
----
-name: Greataxes
-description: Weapons
----
-

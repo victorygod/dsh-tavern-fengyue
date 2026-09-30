@@ -1,5 +1,0 @@
----
-name: Celestial
-description: Exotic
----
-

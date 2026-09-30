@@ -1,5 +1,0 @@
----
-name: Greatclubs
-description: Weapons
----
-

@@ -1,5 +1,0 @@
----
-name: Flails
-description: Weapons
----
-

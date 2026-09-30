@@ -5,7 +5,7 @@
 import { statSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const { mod, pbOf, parseCombat, deriveAC, XP_THRESHOLDS, presence } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
-const { spellCn } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
+const { spellCn, SPELL_INTRO_CN, SKILL_TIP_CN } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
 const { EQ_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/equip-core-data.mjs').href)
 const a = globalThis.argv?.[0] ? JSON.parse(globalThis.argv[0]) : (globalThis.argv ?? {})
@@ -77,7 +77,7 @@ let state = { time: '', place: '', tasks: [] }
 try {
   const md = readFileSync('state.md', 'utf8')
   const grab = (h) => { const i = md.indexOf('## ' + h); if (i < 0) return []; const j = md.indexOf('\n## ', i + 1); return (j < 0 ? md.slice(i) : md.slice(i, j)).split('\n').slice(1).filter(l => l.trim().startsWith('-')).map(l => l.replace(/^\s*-\s*/, '')) }
-  const tm = /当前时间：第(\d+)日·(\d+)时/.exec(md)
+  const tm = /当前时间：第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md)   // 分=2026-09-30 起;旧档无分容缺→0
   const locLines = grab('玩家所在')
   // v8 层级约定：大区/区域/地点/地形/天气 五行 key：value；兼容旧单行（无 key 前缀=地点）
   const locKV = {}
@@ -88,7 +88,7 @@ try {
     else if (raw.trim() && legacyPlace === null) legacyPlace = raw.trim()
   }
   state = {
-    time_day: +(tm?.[1] ?? 1), time_hour: +(tm?.[2] ?? 18),
+    time_day: +(tm?.[1] ?? 1), time_hour: +(tm?.[2] ?? 18), time_minute: +(tm?.[3] ?? 0),
     region: locKV['大区'] ?? null, area: locKV['区域'] ?? null,
     place: locKV['地点'] ?? legacyPlace ?? '',
     terrain: locKV['地形'] ?? null, weather: locKV['天气'] ?? null,
@@ -185,7 +185,14 @@ function splitSpells(c) {
     const lvl = spellFm(n)?.level
     ;(lvl === 0 ? cantrips : leveled).push(n)
   }
-  return { cantrips, known: leveled }
+  // hover 浮签(2026-09-30):在册法术名→中文简介(glossary-cn;查无=条目缺省,绝不空 tip)
+  const prepared = Array.isArray(c.spells_prepared) ? c.spells_prepared : []
+  const tips = {}
+  for (const n of [...cantrips, ...leveled, ...prepared]) {
+    const t = SPELL_INTRO_CN[_slug(n)]
+    if (t) tips[n] = t
+  }
+  return { cantrips, known: leveled, tips }
 }
 
 // ── 人际三池投影(2026-09-30 stance 回锅):presence()=state.md「附近 NPC」三态名单,注入与前端同源镜像 ──
@@ -196,7 +203,16 @@ const avKey = c => {
   const gk = c.gender === 'female' ? 'female' : c.gender === 'male' ? 'male' : 'unknown'
   return `${norm(c.race ?? '').replace(/_/g, '-')}-${gk}`
 }
-const withSpells = c => c ? { ...c, spellSplit: splitSpells(c) } : null
+// 技能 hover 浮签:熟练技能 key→中文句子(glossary-cn;仅熟练行上屏,未熟练不供)
+const skillTipsOf = c => {
+  const out = {}
+  for (const s2 of (c?.derived?.skills ?? []).filter(s => s.prof)) {
+    const t = SKILL_TIP_CN[_slug(s2.key)]
+    if (t) out[s2.key] = t
+  }
+  return out
+}
+const withSpells = c => c ? { ...c, spellSplit: splitSpells(c), skillTips: skillTipsOf(c) } : null
 const projMate = r => r.j === null
   ? { name: r.name, _file: r.file, _missing: true }
   : withSpells({ ...r.j, _file: r.file, derived: derive(r.j) })

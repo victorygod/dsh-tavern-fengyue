@@ -1,5 +1,0 @@
----
-name: Undercommon
-description: Exotic
----
-

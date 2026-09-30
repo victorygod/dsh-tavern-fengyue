@@ -44,7 +44,7 @@ function runTool(runtime: string, tool: string, args: Record<string, unknown>, s
 }
 const j = (rt: string, f: string) => JSON.parse(readFileSync(join(rt, 'characters', f), 'utf8'))
 // 卡内夹具助手(2026-09-30 批3:数据核注入,卡片测试工具住卡片)
-const { injectMonsterCore, injectSpellCore } = await import(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'scripts', 'test-fixtures.mjs')).href)
+const { injectMonsterCore, injectSpellCore } = await import(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'test', 'test-fixtures.mjs')).href)
 
 describe('spawn_monster 怪物创建(真实脚本)', () => {
   it('完备律:读卡自动填+presence 行+派生摘要;count 天干批量', () => {
@@ -66,7 +66,7 @@ describe('spawn_monster 怪物创建(真实脚本)', () => {
     expect(dup.stdout).toContain('!同名已存在:梅西雅')
     const miss = runTool(rt, 'spawn_monster', { context: 'x', name: '幻影', stance: '敌对', monster_kind: 'nonexistent'  })
     expect(miss.status).toBe(1)
-    expect(miss.stdout).toContain('!查无 statblock:monsters/nonexistent.md')
+    expect(miss.stdout).toContain('!查无怪物档案:monsters/nonexistent.md')
     rmSync(base, { recursive: true, force: true })
   })
 })
@@ -260,7 +260,6 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   })
   it('attack 濒死自动暴击(表路径):reach5 咬击 2d4+2 翻 4d4+2,败+2,三败判词', () => {
     const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
-    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'wolf.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'wolf.md'))
     runTool(rt, 'spawn_monster', { context: 'x', name: '狼', stance: '敌对', monster_kind: 'wolf'  })
     const r = runTool(rt, 'attack', { context: '狼牙锁喉', who: '狼', target: '梅西雅', attack: 'bite' }, 2)
     expect(r.status).toBe(0)
@@ -282,12 +281,11 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   })
   it('attack 出生定伤必落:怪 0HP 即死', () => {
     const { cwd: rt, base } = rig()
-    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'commoner.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'commoner.md'))
     runTool(rt, 'spawn_monster', { context: 'x', name: '蜥蜴人', stance: '敌对', monster_kind: 'goblin', attacks: ['bite|melee|+4|1d10+9|piercing|5'] })
-    runTool(rt, 'spawn_monster', { context: 'x', name: '路人甲', stance: '敌对', monster_kind: 'commoner'  })
+    runTool(rt, 'spawn_npc', { context: 'x', name: '路人甲', stance: '敌对', class: 'commoner', level: 1, persona: { lens: '混口饭吃', reaction: '遇乱→躲' } })   // 普通人=spawn_npc 职业(2026-09-30 迁出 spawn_monster 枚举)
     const r = runTool(rt, 'attack', { context: '一口定音', who: '蜥蜴人', target: '路人甲', attack: 'bite' }, 2)
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/落盘: 路人甲 hp \d→0 \[characters\/路人甲\.json\]/)   // commoner hp=1d8-4 掷,上限 4
+    expect(r.stdout).toMatch(/落盘: 路人甲 hp \d→0 \[characters\/路人甲\.json\]/)   // commoner hp=d8+con0=8
     expect(r.stdout).toContain('0HP——即死')
     rmSync(base, { recursive: true, force: true })
   })
@@ -341,8 +339,6 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   })
   it('选骰语料表:火球升环自动(8d6+Δ)/治疗属性内算/飞弹弹数展开;dice=逃生舱', () => {
     const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, caster_attr: 'int', slots_l1: 4, slots_l5: 1, spells_known: ['fireball', 'cure-wounds', 'magic-missile'] })
-    for (const n of ['fireball.md', 'cure-wounds.md', 'magic-missile.md']) cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'spells', n), join(rt, 'dnd5e-srd-lorebook', 'spells', n))
-    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'ogre.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'ogre.md'))
     runTool(rt, 'spawn_monster', { context: 'x', name: '食人魔', stance: '敌对', monster_kind: 'ogre'  })
     const ogreHp0 = j(rt, '食人魔.json').hp   // spawn hp=语料骰式掷(hp_roll),相对断言
     const fb = runTool(rt, 'cast', { context: '五环火球', spell: 'fireball', targets: '食人魔', as_level: 5 })

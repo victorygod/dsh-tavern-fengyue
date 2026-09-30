@@ -1,5 +1,8 @@
-// race-core-data.mjs — 9 种族面(2026-09-30 由 scripts/extract-race-core.mjs 抽取;
-// assemble 重跑后重抽)。opening/spawn_npc 零 lorebook 读取——断档回退=readFM 原路径。勿手改,重抽覆盖。
+// race-core-data.mjs — 种族域数据(RACE_CORE 9 族 fm;与 opening/spawn 的 raceFM 同前缀家族)。
+// 出处=SRD 5.1(5e-bits/5e-database @3b124d8;OGL/CC-BY 4.0)。corpus/抽取链已退役——改动直改本件
+// (域家族:其余数据见 spell-core-data/spell-data/monster-core-data/monster-extra-data/glossary-cn)。
+
+// ── RACE_CORE · 9 种族 fm 全档(原 race-core-data.mjs) ──
 export const RACE_CORE = {
  "dragonborn": {
   "fm": {

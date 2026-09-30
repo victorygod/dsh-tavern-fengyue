@@ -9,7 +9,7 @@ const MATE = { name: '老铁', _file: 'characters/老铁.json', gender: 'male', 
 const NEU = { name: '掌柜', _file: 'characters/掌柜.json', gender: 'unknown', statuses: {}, derived: { hpPct: null } }   // 中立池(v4 回锅)
 const GHOST = { name: '幽灵客', _file: 'characters/幽灵客.json', _missing: true }
 const FOE = { name: '石牙', _file: 'characters/石牙.json', gender: 'male', level: 1, hp: 5, hp_max: 9, init: 11, statuses: { 中毒: { effect: '' } }, derived: { hpPct: 56 } }
-const STATE = { time_day: 1, time_hour: 18, region: '边境边地', area: '灰鸦丘陵', place: '边境小镇·北门', terrain: '温带丘陵', weather: '小雨', tasks: ['线人失联——北门外丘陵'] }
+const STATE = { time_day: 1, time_hour: 18, time_minute: 30, region: '边境边地', area: '灰鸦丘陵', place: '边境小镇·北门', terrain: '温带丘陵', weather: '小雨', tasks: ['线人失联——北门外丘陵'] }
 
 describe('heroPanel · 左区(同伴)', () => {
   it('zone 序=同伴→中立;同伴/中立卡可点开册', () => {
@@ -41,5 +41,20 @@ describe('rightPanel · 右区第三态(敌对沉底于任务下方)', () => {
     expect(html).not.toContain('sec-foes')
     expect(html).toContain('wcard')
     expect(html).toContain('任务')
+  })
+  it('时钟=12 小时数字读数+段标独立行+双针表盘(2026-09-30:旧版 h/24 旋转骑 12 刻度面,既非 12 时也非 24 时)', () => {
+    const html = rightPanel({ state: STATE, foes: [] })
+    expect(html).toContain('class="t1">6:30</div>')       // 18:30 → 12 小时制数字
+    expect(html).toContain('class="ampm">p.m.</div>')      // a.m./p.m. 标在数字下
+    expect(html).toContain('第 1 日 · 18 时 30 分')        // 浮签=24 时制明细(日+时+分)
+    expect(html).toContain('第 1 日 · 黄昏')
+  })
+  it('时钟容缺与边界:time_minute 缺席→00 分 a.m./p.m. 按真值 24 小时界算(0-11=a.m. 含 0 时=12 a.m.)', () => {
+    const html = rightPanel({ state: { ...STATE, time_minute: undefined }, foes: [] })
+    expect(html).toContain('class="t1">6:00</div>')
+    expect(html).toContain('class="ampm">p.m.</div>')
+    const dawn = rightPanel({ state: { ...STATE, time_hour: 7 }, foes: [] })
+    expect(dawn).toContain('class="t1">7:30</div>')
+    expect(dawn).toContain('class="ampm">a.m.</div>')
   })
 })

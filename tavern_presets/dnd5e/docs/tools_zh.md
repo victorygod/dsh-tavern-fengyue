@@ -100,9 +100,13 @@ raw d20→新计数回执（读面板计数不陈旧）,封顶3;稳定/死亡建
 
 ## 八 · spawn——角色建档（主尾双面 · context 必填 · 单工具拆二 2026-09-29）
 
-- **spawn_monster(context, name, stance, monster_kind, count?, gear?, persona?, companion?, attacks?)**：**statblock 制·枚举选怪（2026-09-29b 档案自含批）**——`monster_kind` 全量枚举（334 statblock 文件 slug,内核 enum 硬拦+工具读卡兜底）,LLM 零文档阅读面;HP=语料骰式掷（FM `hp_roll`,如 2d6-2,默认≥1,缺字段回退卡值平均,批量每只独立）;**档案自含材料化**——attacks（MONSTER_ATTACKS 条目+RIDERS 附伤+STATUS_RIDERS 豁免-上状态,agent `attacks` 覆盖优先）、abilities（ABILITIES 豁免型如龙息）、features（正文 Trait 行 `名|释义`）、description（FM description）全入档;**钱袋=DMG 个人财宝表按 CR 掷**（lib/treasure.mjs,五币归一三币入 gp/sp/cp;物品仍是 agent 的 gear 面）——掉落=背包+钱,本工具即 lorebook monsters 章对 LLM 的完全替代;`lv=CR` 直值、成长 OFF;`monster_kind` 为身份元数据（旧 path 键退役）;count 天干批量、同名拒、附近 NPC 单列行;回执=人物卡同格式整卡 JSON。
-- **spawn_npc(context, name, stance, class, level, abilities?, skills?, subclass?, …)**（`stance` enum 同伴/中立/敌对=在场关系快照,2026-09-30 回锅——前端三区与注入标注据此;战斗节仍=参战名单）：**class 制**——数值按「等级+职业」规则自动派生（HP 公式/豁免/甲武熟练/起装/特征累积/施法位表，库 `lib/class-build.mjs` 单源），**成长族出生**（exp=当前级下限/hd_available=level——同伴可吃 gain_exp 升级走 pending）；`abilities` 可选（1 级基础值，不传=标准数组按主属性自动 roll），历史 ASI 成长按档自动随机补足（主属性加权，回执列明细）；spells_known/prepared 照语料校验（存在/职业表/环位）；AC 由 armor 派生不落显式 ac；出生即满血。
+- **spawn_monster(context, name, stance, monster_kind, count?, gear?, persona?, companion?, attacks?)**：**statblock 制·枚举选怪（2026-09-29b 档案自含批）**——`monster_kind` 全量枚举（333 statblock 文件 slug,内核 enum 硬拦+工具读卡兜底;commoner 已迁出 2026-09-30=spawn_npc 职业）,LLM 零文档阅读面;HP=语料骰式掷（FM `hp_roll`,如 2d6-2,默认≥1,缺字段回退卡值平均,批量每只独立）;**档案自含材料化**——attacks（MONSTER_ATTACKS 条目+RIDERS 附伤+STATUS_RIDERS 豁免-上状态,agent `attacks` 覆盖优先）、abilities（ABILITIES 豁免型如龙息）、features（正文 Trait 行 `名|释义`）、description（FM description）全入档;**钱袋=DMG 个人财宝表按 CR 掷**（lib/treasure.mjs,五币归一三币入 gp/sp/cp;物品仍是 agent 的 gear 面）——掉落=背包+钱,本工具即 lorebook monsters 章对 LLM 的完全替代;`lv=CR` 直值、成长 OFF;`monster_kind` 为身份元数据（旧 path 键退役）;count 天干批量、同名拒、附近 NPC 单列行;回执=人物卡同格式整卡 JSON。
+- **spawn_npc(context, name, stance, class, level, abilities?, skills?, subclass?, …)**（`stance` enum 同伴/中立/敌对=在场关系快照,2026-09-30 回锅——前端三区与注入标注据此;战斗节仍=参战名单）：**class 制**——数值按「等级+职业」规则自动派生（HP 公式/豁免/甲武熟练/起装/特征累积/施法位表，库 `lib/class-build.mjs` 单源），**成长族出生**（exp=当前级下限/hd_available=level——同伴可吃 gain_exp 升级走 pending）；`abilities` 可选（1 级基础值，不传=标准数组按主属性自动 roll;**commoner 例外=SRD 全 10**），历史 ASI 成长按档自动随机补足（主属性加权，回执列明细）；spells_known 三检照语料校验（存在/职业表/环位;**spells_prepared 参数退役 2026-09-30——已备表出生为空,叙事期走 update_character**）；AC 由 armor 派生不落显式 ac；出生即满血。**commoner 普通人(2026-09-30 加入)**=SRD NPC statblock(d8 全 10,无豁免/技能/特征/熟练)——NPC/同伴建档一律走本工具,怪物才走 spawn_monster。**字段校验聚合(2026-09-30 批)**:入参错处全字段一趟查完一次报全——失败回执每行以 ! 点名一处(不再首错即断把后续字段问题藏进下一轮);**同名守护**=同名已存在(含 player.json)拒建不覆盖(schema 承诺落地);**半施法正位(2026-09-30 批)**:施法家族=core 三族位表判定单源(isCasterClass),圣骑士/游侠照半施位表 L2 起施法(caster_attr 魅/感知,L1 无施法=SRD 正确,传 1 环法术报「环位超可施」),三检照常。
 - 两者回执带面板：`[创建 · 名 · 态]` 后追加 `### 名（态）` + 整卡 JSON（`get_npc_state` 同格式），DM 可考全貌。
+
+## 八·B · update_character——人物卡更新器（主尾双面 · 2026-09-30;update_status 改名扩面继任）
+
+- **update_character(context, target, statuses?, description?, thought?, history_append?, role?, exhaustion?, armor?, shield?, weapons?, gear?, languages?, spells_known?, spells_prepared?, pending?)**：叙事可变字段单源落档——**平铺参数只改传入项**（不传=不改;传 null=删键;数组=全量替换）。**statuses=在施状态全量列表**（每条=`状态名+applied_at`;枚举=STATUS_KEYS 内核硬闸+工具代码双闸;**条目 effect/on_use/mods 机械按名自动匹配**——条件/职业态文案单源=`lib/status.mjs STATUS_TEXT`、法术条=spell-data 的 buff/pool/onFail 按名检索,LLM 不手写效果文本与机械修正;**替换式——未列即摘除**,无 remove 参数;`temp` 仅「临时生命」条目带）。**thought=当前想法**（NPC/怪卡专属内心一句,玩家卡拒落=内心自主权;面板小传常驻行,唯一写入通道=本参数）。`role`(companion|npc)/`languages`(16 键 LANGUAGE_CN)枚举即名录。生成面字段(persona/abilities/race/gender/六熟练/特征/抗免)与结算字段(hp/钱款/经验/法术位/concentrating/slots)传了即报错点名归属——特殊修档=尾代 runtimeEdit 兜底;未知参数防幻觉点名(回执 lint)。**回执=逐键行+改后整卡 JSON**（维护代理接力,面板即现值）。`spells_known/spells_prepared` 传全表走三检（存在/职业表/环位≤当前可施;prepared 禁 0 环）,spell_details 自动重铺;施法池=known∪prepared,**已备表由此可施**——准备制四职(cleric/druid/paladin/ranger——半施二职 L2 起才有施法面,出生无已备表照走本键补齐)。
 
 ## 九 · gain_exp / gain_money——尾面级联工具
 
@@ -244,7 +248,7 @@ who 默认全队;逐人: exp+=share;查阈值表(20 行常量)→可多级连升
   ⬜ pending: LV4·ASI 点选(前端) —— DM 下回合宣告
 ```
 
-### front_commit 逻辑（2026-09-27 存档注:op=prepare 已删——「长休换准备表」UI 从未进版面定案,spells_prepared 字段仍存,唯一写入者=出生 roll;下文 asi/spells 守卫以脚本现行为准:恰 2 点/恰 2 法术一档一保存）
+### front_commit 逻辑（2026-09-27 存档注:op=prepare 已删——「长休换准备表」UI 从未进版面定案,spells_prepared 写入者=出生 roll + update_character 叙事期已备表;下文 asi/spells 守卫以脚本现行为准:恰 2 点/恰 2 法术一档一保存）
 ```
 op=asi:   校验 pending 含 ASI 项;payload.stats 合计 ≤2(或 plus 单值);目标属性 <20(超出→报错);
           应用 str..cha += x;若 con 变化→hp_max += level(追溯每级);清该 pending 项;回写 JSON(parse 往返)。
@@ -260,8 +264,8 @@ op=prepare: prepared ⊆ spells_known(牧师=可准备池语义);数量 ≤ 等�
 
 ### 值域与档案自含（2026-09-30 数据面批）
 
-- **枚举即名录**：spawn_monster `monster_kind`(334) / spawn_npc `class·level·race·gender·subclass·skills·spells_known·spells_prepared`(319) / update_status `status`(STATUS_KEYS)——schema 级硬闸经内核，漂移钉对死规则/语料逐一相等。
-- **值域=「who 会什么」的不枚举**：attack `attack/ability/weapon`、cast `spell`——传名,查无即拒(拦截回执)。
+- **枚举即名录**：spawn_monster `monster_kind`(333) / spawn_npc `class`(12 职+commoner)·`level·race·gender·subclass·skills·spells_known`(319) / update_character `statuses[].status`(STATUS_KEYS)·`role`(companion|npc)·`languages`(16,LANGUAGE_CN 单源) / rest `kind`(short|long) / damage `type`(13,DAMAGE_TYPE_CN 单源)——schema 级硬闸经内核，漂移钉对死规则/语料逐一相等（dnd5e-enum-drift）；**spells_known=agent 视野唯一全法术枚举,别处不重复**（update_character 法术参数无 enum,三检在工具代码）。
+- **值域=「who 会什么」的不枚举**：attack `attack/ability/weapon`、cast `spell`、update_character `spells_known/spells_prepared`（传名,查无即拒,拦截回执）。
 - **档案自含**：人物卡 spell_details(名/环位/效果 SRD 原文——学法术与出生双写)、feature_details(职业特征释义全文)、怪卡 attacks(附骑手)、abilities/features(`名|释义`)——**cast/attack 运行时零 lorebook 读取**(数据模块 SPELL_CORE/EQ_CORE/MONSTER_CORE 主路+md 断档回退)。
 - **stance 回锅(2026-09-30)**:spawn 两工具 `stance` enum 必填(同伴|中立/敌对——出生当拍在场快照),presence 行/三区分区/注入标注回 v4 形;战斗节仍=参战名单(2026-09-29b 保留,敌我不入战斗节)。
 - cast 回执新增 `效果:` 行(本术效果原文,超长截断指向档案);纯叙事法术(飞行/幻术类)「效果归叙事」自此引文有据。

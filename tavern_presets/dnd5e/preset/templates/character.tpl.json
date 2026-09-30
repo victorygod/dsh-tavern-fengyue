@@ -1,9 +1,9 @@
 {
-  "_tpl": "人物模板 v9.1（2026-09-19——v9 三删照旧(①inspiration 机制删除:灵感=玩家扮演奖励,NPC 由 DM 直接推演;②resources 并入 features 行内池状态(名|回充时机|已用),回充=时间推移检查清单;③origin 删除)。+④**键能力裁剪律**(用户定案,取代两档制):『没有什么能力,就没有相关字段』,对所有角色——玩家同律(战士玩家天生无施法族):施法族(caster_attr/spells_known/prepared/slots_l1..9/concentrating)·成长族(exp/pending/hd_available)·features(无职业者)·训练面(熟练六件)整族跟随能力出生/缺席;核心键永不裁(身份=含 gender(male|female|unknown)/六维/hp 族/防护/资产/gear/weapons/persona/biography)。role:pc|npc 二类=路由值,不再决定字段。runtime/characters/ 下 player.json 固定名+具名人物同 schema;杂兵不入档,住 state.md 战斗节敌行）",
+  "_tpl": "人物模板 v10（2026-09-30——**persona 七键重写**（女娲维度:appearance/lens/reaction/voice/never/tension+alignment,人格七键=怎么演）;**history 行数组**（履历流水=[0]出身+塑造往事+运行时追加行,「[秘]」前缀=秘密）,**description=现况一句**（身份+当前处境,随 history 追加同拍刷新）;background/biography/原五件(personality/ideals/bonds/flaws)退役——分层与写法判据=docs/persona-threelayer_zh.md。+继承 v9.1（2026-09-19——v9 三删照旧(①inspiration 机制删除:灵感=玩家扮演奖励,NPC 由 DM 直接推演;②resources 并入 features 行内池状态(名|回充时机|已用),回充=时间推移检查清单;③origin 删除)。+④**键能力裁剪律**(用户定案,取代两档制):『没有什么能力,就没有相关字段』,对所有角色——玩家同律(战士玩家天生无施法族):施法族(caster_attr/spells_known/prepared/slots_l1..9/concentrating)·成长族(exp/pending/hd_available)·features(无职业者)·训练面(熟练六件)整族跟随能力出生/缺席;核心键永不裁(身份=含 gender(male|female|unknown)/六维/hp 族/防护/资产/gear/weapons/persona/history/description)。role:pc|npc 二类=路由值,不再决定字段。runtime/characters/ 下 player.json 固定名+具名人物同 schema;杂兵不入档,住 state.md 战斗节敌行））",
   "_holes": "{{key}} 标量占位；生成器=替换→JSON.parse（出生即合法性断言）→未激活能力族整族删行(不留 0/空壳)→stringify 规范化→schema 条件检查一次(裁剪律=panel-data 二·B)",
   "_consumers": "将来的 preset/scripts/opening_commit.mjs（唯一），微渲染内嵌其身（YAGNI：lib 未建）",
   "name": "{{name}}",
-  "description": "{{description}}",
+  "description": "{{description}}",   // 现况层(v10):身份+当前处境/动向,≤40字;双曝光=整卡注入+roster 一行;出生写当下,无追加保持出生值
   "role": "{{role}}",
   "class": "{{class}}",
   "subclass": null,
@@ -11,7 +11,6 @@
   "exp": {{exp}},
   "race": "{{race}}",
   "gender": "{{gender}}",
-  "background": "{{background}}",
   "hp": {{hp}},
   "hp_max": {{hp_max}},
   "temp_hp": 0,   // 临时生命(RAW 独立缓冲池):受伤先扣本键再由 injure 落到 hp;治疗不回填;取高不叠;耗尽/到期归零
@@ -57,10 +56,10 @@
   "slots_l9": 0,
   "features": {{features}},
   "pending": [],
-  "statuses": {},  // 临时状态(唯一家,对象表):key=状态名,value={applied_at, effect?, mods?:[{stat,magnitude}], temp?}——覆盖式更新(同名 key 覆盖);mods=机械修正(白名单 ac/attack/save/attack_save/damage);temp=临时生命数额(组合池三写,取高不叠,到期 recoverTemp 回收);effect 文本带效果+持续+解除;applied_at=施加时游戏时间(agent 手写);cast 自动写/update_status 工具写
-  "persona": { "personality": "{{personality}}", "ideals": "{{ideals}}", "bonds": "{{bonds}}", "flaws": "{{flaws}}", "alignment": "{{alignment}}" },
-  "biography": {{biography}},
+  "statuses": {},  // 临时状态(唯一家,对象表):key=状态名,value={applied_at, effect?, mods?:[{stat,magnitude}], temp?, on_use?}——覆盖式更新(同名 key 覆盖);mods=机械修正(白名单 ac/attack/save/attack_save/damage);temp=临时生命数额(组合池三写,取高不叠,到期回收);effect 文本带效果+持续+解除;applied_at=施加时游戏时间(agent 手写);写入者=cast 自动写 / update_character 的 statuses 数组(条目 effect/mods 机械按名自动匹配,替换式未列即摘除)
+  "persona": { "appearance": "{{appearance}}", "lens": "{{lens}}", "reaction": "{{reaction}}", "voice": "{{voice}}", "never": "{{never}}", "tension": "{{tension}}", "alignment": "{{alignment}}" },   // 人格七键(v10,女娲维度):appearance外观(西幻:头发/脸/特点部位+当前穿搭)/lens底色/reaction遇事契约/voice腔调/never红线/tension张力/alignment阵营——单行短串,字数闸见 lib/persona.mjs;写法与判据=docs/persona-threelayer_zh.md §2/§5
+  "history": {{history}},   // 履历层(v10,行数组追加式,只增):[0]=出身+塑造往事(≤120字,事件对「之所以是此」的因果;秘密子句行首「[秘]」),运行时追加行带日戳(「第N日·」)——追加与 description 刷新同拍(同一笔写档,维护面=maintenancePrompt)
   "weapons": {{weapons}},
   "gear": {{gear}},
-  "_notes": "全人物统一 schema(v9)。纪律:叙事字段=单行短串/字符串数组(追加式),严禁多行长段。features=已获特征行数组,池类特征内标使用状态(名|回充时机|已用)——时间推移检查清单按短休/长休/每日档回充。派生量(PB/调整值/DC/AC/passive)一概不存,官方纸卡对照见 character.official-sheet.json(将删)。战斗期现值走 state.md 战斗节敌行,战末归档回写本件。role:pc|npc 二类=路由值;键裁剪律——字段存在性跟随能力,无族不出生(施法族/成长族 exp·pending·hd/features/训练面熟练六件),玩家同律;工具读缺席键=结构化报错(tools 一·可选键律)"
+  "_notes": "全人物统一 schema(v10)。纪律:叙事字段=单行短串/字符串数组(追加式),严禁多行长段。三层人设(docs/persona-threelayer_zh.md):persona 七键答「怎么演」/history 行数组答「发生了什么」/description 现况答「现在怎么样」——创造面=spawn 工具键描述,维护面=maintenancePrompt。features=已获特征行数组,池类特征内标使用状态(名|回充时机|已用)——时间推移检查清单按短休/长休/每日档回充。派生量(PB/调整值/DC/AC/passive)一概不存,官方纸卡对照见 character.official-sheet.json(将删)。role:pc|npc 二类=路由值;键裁剪律——字段存在性跟随能力,无族不出生(施法族/成长族 exp·pending·hd/features/训练面熟练六件),玩家同律;工具读缺席键=结构化报错(tools 一·可选键律)"
 }

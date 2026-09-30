@@ -98,9 +98,12 @@ function run(cwd: string, script: 'opening_data.mjs' | 'opening_commit.mjs', arg
 }
 
 const baseChar = (over: Record<string, unknown> = {}) => ({
-  name: '洛克', race: 'human', class: 'wizard', gender: 'male', background: '学者',
+  name: '洛克', race: 'human', class: 'wizard', gender: 'male',
   abilities: { str: 8, dex: 14, con: 13, int: 15, wis: 12, cha: 10 },
   skills: ['arcana', 'investigation'],
+  // 人设三层(2026-09-30 persona-threelayer):同伴四件必填+七键照传;history=履历首行(旧 backstory 通道)
+  persona: { appearance: '灰发方脸,青灰眼,旧旅袍', lens: '把知识当命', reaction: '见奇珍→挪不开脚', voice: '咬字清晰如念文书', never: '不烧书', tension: '求真知却接危险委托', alignment: '守序中立' },
+  history: '学者出身,家学断在第二次战争',
   ...over,
 })
 
@@ -129,22 +132,24 @@ describe('opening_data · meta 整包下发(单源语料解析)', () => {
 })
 
 describe('opening_commit · 施法者出生即满(RAW L1)', () => {
-  it('无 payload 法术 → 服务端 roll:法师 3 戏法+6 进书(全在本职业池内);训练面/特征时机/中文描述齐活', () => {
+  it('无 payload 法术 → 服务端 roll:法师 3 戏法+6 进书并册 9 件(全本职业池);训练面/特征时机/中文描述齐活', () => {
     const { cwd } = rig(SPELL_FIXTURE)
     const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'hamlet' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
-    expect(panel.spells_known).toHaveLength(6)
+    expect(panel.spells_known).toHaveLength(9)                                      // 戏法并册(2026-09-30):0 环+环术同册
     const pool = SPELL_FIXTURE.spells
     for (const s of panel.spells_known) expect(Object.keys(pool).some(k => pool[k].includes(s))).toBe(true)
     const fmOf = (s: string) => pool[Object.keys(pool).find(k => pool[k].includes(s)) as string]
-    for (const c of panel.spells_known) expect(fmOf(c)).not.toContain('level: 0')   // 进书=首环,戏法不混
+    expect(panel.spells_known.filter(s => fmOf(s).includes('level: 0'))).toHaveLength(3)   // 0 环=戏法并册;戏法/法术行拆分=展示层投影
     expect(panel.features.join('|')).toContain('Arcane Recovery|每日')                // 时机按表,非池 |—
     expect(panel.features.join('|')).toContain('Spellcasting: Wizard|—')
     expect(panel.armor_prof).toBeUndefined()                                         // 法师无甲熟练——空数组整族被键裁剪剥除
     expect(panel.weapon_prof).toContain('匕首')
     expect(panel.description).toContain('人类 法师')
-    expect(panel.biography[0]).toContain('学者出身')
+    expect(panel.history[0]).toContain('学者出身')
+    expect(panel.persona.lens).toBe('把知识当命')   // 人设三层:七键照落(biography/background 退役,history 接棒)
+    expect(panel.biography).toBeUndefined()
     expect(panel.subclass).toBeNull()
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
@@ -191,7 +196,7 @@ describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)'
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.caster_attr).toBe('cha')
     expect(panel.slots_l1).toBe(1)
-    expect(panel.spells_known as string[]).toHaveLength(2)   //RAW L1=2 已知(池含 Hex/Unseen Servant)
+    expect(panel.spells_known as string[]).toHaveLength(4)   //RAW L1:2 戏法+2 已知——并册(0 环归 spells_known,与 NPC 口径一致)
     expect(panel.features.join('|')).toContain('Otherworldly Patron|—')
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
@@ -285,7 +290,7 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
     expect(panel.pending).toBeUndefined()
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
-  it('wizard L5 出生:戏法 4/进书 14(=4+2·5,1..3 环联合池)/位表 [4,3,2]/exp 6500/subclass Evocation/pending LV4 一档', () => {
+  it('wizard L5 出生:戏法 4+进书 14=并册 18(进书线=4+2·5,1..3 环联合池)/位表 [4,3,2]/exp 6500/subclass Evocation/pending LV4 一档', () => {
     const { cwd } = rig(SPELL_FIXTURE)
     const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ level: 5 }), scenario: 'hamlet' })
     expect(out.ok).toBe(true)
@@ -293,11 +298,11 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
     expect(panel.level).toBe(5)
     expect(panel.exp).toBe(6500)
     expect(panel.hd_available).toBe(5)
-    expect(panel.spells_known as string[]).toHaveLength(14)   // SRD wizard 进书线=4+2·L
+    expect(panel.spells_known as string[]).toHaveLength(18)   // SRD 进书线=4+2·L=14 + 戏法 4(L4+ 档)并册
     const pool = SPELL_FIXTURE.spells
     for (const s of panel.spells_known) expect(Object.keys(pool).some(k => pool[k].includes(s))).toBe(true)
     const fmOf = (s: string) => pool[Object.keys(pool).find(k => pool[k].includes(s)) as string]
-    for (const c of panel.spells_known) expect(fmOf(c)).not.toContain('level: 0')   // 全为 1+. 环
+    expect(panel.spells_known.filter(s => fmOf(s).includes('level: 0'))).toHaveLength(4)   // 戏法并册 4 个(L4+ 档)
     for (const c of panel.spells_known) expect(fmOf(c)).not.toContain('level: 4')   // 环位 ≤ L5 可施 3 环
     expect(panel.slots_l1).toBe(4)
     expect(panel.slots_l2).toBe(3)
@@ -308,7 +313,7 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
     expect((out.rolled as { asi_pend: number }).asi_pend).toBe(1)
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
-  it('cleric L3 出生:准备数=等级+施法调整(3+2=5,1..2 环联合池)/准备制无 known/位表 [4,2]/子职仍落', () => {
+  it('cleric L3 出生:准备数=等级+施法调整(3+2=5,1..2 环联合池)/known=3 戏法并册/位表 [4,2]/子职仍落', () => {
     const { cwd } = rig(SPELL_FIXTURE)
     const out = run(cwd, 'opening_commit.mjs', {
       character: baseChar({
@@ -321,7 +326,7 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
     expect(panel.level).toBe(3)
     expect(panel.spells_prepared as string[]).toHaveLength(5)
     for (const s of panel.spells_prepared) expect(['Detect Magic', 'Cure Wounds', 'Bless', 'Spiritual Weapon', 'Lesser Restoration', 'Spirit Guardians'].includes(s)).toBe(true)
-    expect(panel.spells_known).toBeUndefined()   // 准备制无 known
+    expect(panel.spells_known).toEqual(['Guidance', 'Light', 'Sacred Flame'])   // 准备制无 known 面,但戏法并册在册(夹具池恰 3 个全 roll)
     expect(panel.slots_l1).toBe(4)
     expect(panel.slots_l2).toBe(2)
     expect(panel.slots_l3).toBeUndefined()

@@ -14,10 +14,10 @@ const WIZ = {
   skill_prof: ['arcana'], save_prof: ['int'], weapon_prof: ['匕首', '长杖'], tool_prof: ['书写工具'],
   languages: ['通用语', '龙语'], caster_attr: 'int', slots_l1: 4, slots_l2: 3,
   spells_known: ['火焰箭', '魔法飞弹', '护盾术'], spells_prepared: ['魔法飞弹'],
-  spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'] },
+  spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'], tips: { 火焰箭: '掷火击敌', 魔法飞弹: '三枚力场飞镖', 护盾术: '力场屏障 +5 AC' } }, skillTips: { arcana: '奥术知识的回溯检定' },
   pending: ['LV4·ASI 点选', 'LV4·新法术×2'], hd_available: 4, features: ['奥法回复|短休回环位|—'],
   gear: ['法术书'], resist: [], immune: [], statuses: {},
-  persona: { alignment: '中立善良' }, background: '佣兵',
+  persona: { alignment: '中立善良' },
   derived: {
     hpPct: 77, pb: 2, dc: 13, atk: 4, passive: 11, ac: null, expBar: null, slotsNow: 7, slotsTotal: 7,
     slotsLv: [{ lv: 1, now: 4, total: 4 }, { lv: 2, now: 3, total: 3 }],
@@ -62,6 +62,9 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(html).not.toContain('>Ability Scores<'); expect(html).not.toContain('>Saving Throws<')
     expect(html).not.toContain('>Spellcasting<'); expect(html).not.toContain('>Conditions<')
   })
+  it('hover 浮签:技能行挂 skillTips 的 data-tip(2026-09-30 施法/技能中文简介批)', () => {
+    expect(html).toContain('bk-sk prof" data-tip="奥术知识的回溯检定"')
+  })
   it('全 data-tip 不留原生 title 属性', () => {
     expect(html).not.toMatch(/\stitle="/)
     expect(html).toContain('data-tip="六维属性——')
@@ -86,11 +89,11 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(html).toContain('data-tip="Weapons——攻检加熟练加值')
   })
   it('施法三行=戏法(level0)/法术(环术)/已备——空行「无」;非施法者整节「无」', () => {
-    expect(html).toContain('>戏法</span><span class="nms">火焰箭</span>')
-    expect(html).toContain('>法术</span><span class="nms">魔法飞弹 · 护盾术</span>')
-    expect(html).toContain('>已备</span><span class="nms">魔法飞弹</span>')
+    expect(html).toContain('>戏法</span><span class="nms"><span data-tip="掷火击敌">火焰箭</span></span>')
+    expect(html).toContain('>法术</span><span class="nms"><span data-tip="三枚力场飞镖">魔法飞弹</span> · <span data-tip="力场屏障 +5 AC">护盾术</span></span>')
+    expect(html).toContain('>已备</span><span class="nms"><span data-tip="三枚力场飞镖">魔法飞弹</span></span>')
     const noSplit = bookHtml({ ...WIZ, spellSplit: undefined }, {})
-    expect(noSplit).toContain('>法术</span><span class="nms">火焰箭 · 魔法飞弹 · 护盾术</span>')   // 泵缺席回退=法术行全列
+    expect(noSplit).toContain('>法术</span><span class="nms"><span>火焰箭</span> · <span>魔法飞弹</span> · <span>护盾术</span></span>')   // 泵缺席回退=法术行全列,无 tips 不挂 data-tip
     const f = bookHtml(FIGHTER, {})
     expect(f).toContain('<span class="bk-empty">无</span>')
     expect(f).not.toContain('bk-slot')
@@ -104,5 +107,32 @@ describe('bookHtml · 版面与术语锚', () => {
     expect(withImg).toContain('av-clip')
     expect(withImg).toContain('class="av-img"')
     expect(bookHtml({ ...WIZ }, {})).not.toContain('av-clip')
+  })
+})
+
+describe('bookHtml · 人设三层小传(2026-09-30 persona-threelayer)', () => {
+  const SEVEN = { appearance: '灰发方脸', lens: '重价不重义', reaction: '遇袭→翻账本', voice: '冷腔', never: '不碰老头目', tension: '守约却盼约毁', alignment: '守序中立' }
+  it('persona 六行有则逐行显(外观/底色/遇事/腔调/红线/张力);五件旧标退役;履历=[0]+追加行', () => {
+    const h = bookHtml({ ...WIZ, persona: SEVEN, history: ['学者出身,家道中落', '第3日·欠了酒钱', '[秘]仍在找当日嚣张的账房'] }, {})
+    for (const [l, v] of [['外观', '灰发方脸'], ['底色', '重价不重义'], ['遇事', '遇袭→翻账本'], ['腔调', '冷腔'], ['红线', '不碰老头目'], ['张力', '守约却盼约毁']])
+      expect(h).toContain(`<span class="pl">${l}</span><span class="pv">${v}</span>`)
+    expect(h).toContain('<div class="mt">履历</div>')
+    expect(h).toContain('学者出身,家道中落'); expect(h).toContain('第3日·欠了酒钱')
+    expect(h).toContain('仍在找当日嚣张的账房')   // [秘] 玩家=去前缀显示
+    expect(h).not.toContain('[秘]')
+    expect(h).not.toContain('>性格</span>'); expect(h).not.toContain('>理想</span>')
+  })
+  it('NPC:[秘] 行永不显示;卡头=阵营(background 顶键已退役)', () => {
+    const h = bookHtml({ ...WIZ, role: 'npc', persona: SEVEN, history: ['北境来客', '[秘]通匪'] }, {})
+    expect(h).toContain('北境来客')
+    expect(h).not.toContain('通匪')
+    expect(h).toContain('<div class="bk-sub2">守序中立</div>')
+  })
+  it('无 persona/无 history:小传仍可由 description 撑起;七键缺哪不渲染哪(不占位)', () => {
+    const h = bookHtml({ ...WIZ, persona: { lens: '重价不重义' }, description: '现况一句' }, {})
+    expect(h).toContain('<span class="pl">底色</span><span class="pv">重价不重义</span>')
+    expect(h).not.toContain('<span class="pl">外观</span>')
+    expect(h).not.toContain('<div class="mt">履历</div>')
+    expect(h).toContain('现况一句')
   })
 })

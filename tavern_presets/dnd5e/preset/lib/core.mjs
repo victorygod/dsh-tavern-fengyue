@@ -272,7 +272,7 @@ export const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 4800
 
 // ASI(属性值提升)档位表(PHB 职业表;2026-09-29 从 gain_exp 内联迁单源)——fighter/rogue 多两档。
 // 消费者=gain_exp 升级 pending 标记 + class-build.applyAsiGrowth(class-NPC 出生历史成长)。
-export const ASI_LEVELS = { fighter: [4, 6, 8, 12, 14, 16, 19], rogue: [4, 8, 10, 12, 16, 19], default: [4, 8, 12, 16, 19] }
+export const ASI_LEVELS = { fighter: [4, 6, 8, 12, 14, 16, 19], rogue: [4, 8, 10, 12, 16, 19], commoner: [], default: [4, 8, 12, 16, 19] }
 
 // ── 施法位表三族(2026-09-28 G 线迁 core 单源):gain_exp 升级级联 + rest 长休回满共用一个位表。──
 // slotsFor(cls,level)=该职业该级位表数组(下标 0 起=1 环;值为该环位格数,0=该环无位);非施法职业 null。
@@ -290,6 +290,12 @@ export function slotsFor(cls, level) {
   if (HALF_CASTER[c]) return SLOTS_HALF[level] ?? null
   if (c === 'warlock') return SLOTS_PACT[level] ?? null
   return null
+}
+// 施法者家族判定单源(三族:全施/半施/契术)——buildClass.isCaster 与创角面 CASTERS 名单皆由本表派生,
+// 名单另一处手抄即漂移(旧案:CASTERS 只抄全施六族,ranger/paladin 被判非施法,带法术的 spawn 整体拒)。全施 L1 就有位表;半施 L1 无(行缺省,null)。
+export function isCasterClass(cls) {
+  const c = String(cls ?? '').toLowerCase()
+  return Boolean(FULL_CASTER[c] || HALF_CASTER[c] || c === 'warlock')
 }
 
 // ── 出生机/写盘助手(2026-09-26 机械层收拢:第二消费者出现,YAGNI 门槛已过)──

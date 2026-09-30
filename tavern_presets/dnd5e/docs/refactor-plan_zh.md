@@ -76,7 +76,7 @@ asi-pending_zh.md **L3/L4/L6–L11**:
 
 ## E · 工程面
 
-- **E1** 六件工具 schema 通顺化(**不含** cast/attack/check——对方已改;剩 death/damage/heal/hp_change/initiative/spawn_npc/gain_exp/gain_money/update_status)。
+- **E1** 六件工具 schema 通顺化(**不含** cast/attack/check——对方已改;剩 death/damage/heal/hp_change/initiative/spawn_npc/gain_exp/gain_money;update_status 已由 update_character 承接 2026-09-30)。
 - **E2** HUD「最终(基)」双值渲染(ui_data 已发数据,视图未接)。
 - **E3** P0 E2E regenerate/stop 真机实证。
 

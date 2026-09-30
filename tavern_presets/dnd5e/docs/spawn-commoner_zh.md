@@ -1,6 +1,7 @@
 # Spawn 双制补正 · 普通人类（class）出生——设计定案
 
 > 状态：**设计已裁，未施工**（2026-09-29）。定案三则 + 施工清单；本文锚已逐条对码，动手照单走，改码后同步勾销。
+> **2026-09-30 取代标注**：定案 3（四要素 ideals/bonds/flaws 进 spawn_npc）作废，由 [persona-threelayer_zh.md](persona-threelayer_zh.md) 定案 1/4 取代（persona 七键+分极闸）；定案 1/2（commoner 双通道分界、钱包）维持有效。
 
 ## 背景：9dbffd1 双制拆分留下的三个缺口
 

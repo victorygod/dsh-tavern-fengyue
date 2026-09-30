@@ -5,7 +5,7 @@
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
     "dice": { "type": "string", "required": true, "description": "骰式，如 2d6+3；坠落按 10 尺 1d6（上限 20d6＝200 尺封顶）。" },
     "target": { "type": "string", "required": true, "description": "挨打者名——抗免读档、hp 落盘。" },
-    "type": { "type": "string", "description": "伤害类型（穿刺/火焰/钝击）——按它匹配抗性免疫。" },
+    "type": { "type": "string", "enum": ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"], "description": "伤害类型(枚举=SRD 13 型,键=小写英文正典;口径=glossary-cn DAMAGE_TYPE_CN 单源,漂移钉兜同步;错值内核硬拦)——按它匹配抗性免疫。" },
     "modifier": { "type": "integer", "description": "附加调整值。" }
   }
 }

@@ -1,5 +1,0 @@
----
-name: Breastplate
-description: Armor
----
-

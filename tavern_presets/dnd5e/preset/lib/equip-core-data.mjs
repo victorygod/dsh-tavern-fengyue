@@ -1,5 +1,8 @@
-// equip-core-data.mjs — 237 装备/武器全文档(2026-09-30 由 scripts/extract-equipment-core.mjs 抽取;
-// assemble 重跑后重抽)。attack/deriveAC 零 lorebook 读取——断档回退=equipmentFM 原路径。勿手改,重抽覆盖。
+// equip-core-data.mjs — 装备域数据(EQ_CORE 237 件 fm;attack/AC join 消费)。
+// 出处=SRD 5.1(5e-bits/5e-database @3b124d8;OGL/CC-BY 4.0)。corpus/抽取链已退役——改动直改本件
+// (域家族:其余数据见 spell-core-data/spell-data/monster-core-data/monster-extra-data/glossary-cn)。
+
+// ── EQ_CORE · 237 装备全档(fm)——attack/AC join 消费(原 equip-core-data.mjs) ──
 export const EQ_CORE = {
  "abacus": {
   "fm": {

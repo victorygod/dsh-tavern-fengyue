@@ -1,5 +1,0 @@
----
-name: Halberds
-description: Weapons
----
-

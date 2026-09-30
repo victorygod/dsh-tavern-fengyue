@@ -2,21 +2,20 @@
 // 职责:构数值知识源(职业表 classes/*.md 的 hit_die/saves/subclass + opening-meta 死规则表) → 确定性派生。
 // **不含** roll / fail-loud 校验 / spells 表单白名单 / 中文组装 / player.json·state.md 写——那些归 opening(玩家)/spawn_npc(NPC)。
 // hp 因依赖子职(Draconic +1/级)单独成 classHpMax——buildClass 只出与子职无关的确定性数值。
-import { mod, slotsFor, classRow, ASI_LEVELS } from './core.mjs'
-import { CASTERS, SUBCLASS_LEVEL, SUBCLASS_HP_BONUS, FEATURES_RECHARGE, EQUIP_BY_CLASS, parseSkillChoices, ALL_SKILL_KEYS, PRIMARY } from './opening-meta.mjs'
-import { CLS_FEATURES } from './class-feature-data.mjs'
-import { CLASS_CORE } from './class-core-data.mjs'
+import { mod, slotsFor, classRow, ASI_LEVELS, isCasterClass } from './core.mjs'
+import { SUBCLASS_LEVEL, SUBCLASS_HP_BONUS, FEATURES_RECHARGE, EQUIP_BY_CLASS, parseSkillChoices, ALL_SKILL_KEYS, PRIMARY } from './opening-meta.mjs'
+import { CLASS_CORE, CLS_FEATURES } from './class-core-data.mjs'
 
-// 施法主属性映射(class FM 无此键;死规则内嵌)
-export const CASTER_ATTR = { wizard: 'int', cleric: 'wis', sorcerer: 'cha', druid: 'wis', bard: 'cha', warlock: 'cha' }
+// 施法主属性映射(class FM 无此键;死规则内嵌;半施法:圣骑士=魅/游侠=感知)
+export const CASTER_ATTR = { wizard: 'int', cleric: 'wis', sorcerer: 'cha', druid: 'wis', bard: 'cha', warlock: 'cha', paladin: 'cha', ranger: 'wis' }
 // 12 职业甲/武熟练(语料 classes/*.md 无 armor/weapon 键;迁自 opening_commit 原表)
 export const PROF_ARMOR = {
-  barbarian: ['轻甲', '中甲', '盾牌'], bard: ['轻甲'], cleric: ['轻甲', '中甲', '盾牌'], druid: ['轻甲', '中甲', '盾牌'],
+  barbarian: ['轻甲', '中甲', '盾牌'], bard: ['轻甲'], cleric: ['轻甲', '中甲', '盾牌'], commoner: [], druid: ['轻甲', '中甲', '盾牌'],
   fighter: ['轻甲', '中甲', '重甲', '盾牌'], monk: [], paladin: ['轻甲', '中甲', '重甲', '盾牌'], ranger: ['轻甲', '中甲', '盾牌'],
   rogue: ['轻甲'], sorcerer: [], warlock: ['轻甲'], wizard: [],
 }
 export const PROF_WEAPON = {
-  barbarian: ['简易武器', '军用武器'], bard: ['简易武器', '手弩', '长剑', '细剑', '短剑'], cleric: ['简易武器'],
+  barbarian: ['简易武器', '军用武器'], bard: ['简易武器', '手弩', '长剑', '细剑', '短剑'], cleric: ['简易武器'], commoner: [],
   druid: ['木棍', '匕首', '飞镖', '矛', '弯刀(语料键对齐)', '镰刀', '投石索'], fighter: ['简易武器', '军用武器'],
   monk: ['简易武器', '短剑'], paladin: ['简易武器', '军用武器'], ranger: ['简易武器', '军用武器'],
   rogue: ['简易武器', '手弩', '长剑', '细剑', '短剑'], sorcerer: ['匕首', '飞镖', '轻弩', '长杖'], warlock: ['简易武器'],
@@ -37,7 +36,7 @@ export function buildClass(cls, level = 1) {
   if (!core) throw new Error(`!查无职业快照:${cls}(重跑 extract-class-core.mjs)`)
   const classFM = core.fm
   const parsed = parseSkillChoices(core.prof_line)
-  const isCaster = CASTERS.includes(cls)
+  const isCaster = isCasterClass(cls)   // 家族判定单源(core 三族位表)——全施六族+半施 paladin/ranger+契术 warlock
   // 特征累积 L1..level(去重);每级 classRow 只吐本级特征列,单 L 会漏早级特征(L3 战士缺 Second Wind)
   const features = []
   const seen = new Set()

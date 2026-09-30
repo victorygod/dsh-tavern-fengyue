@@ -3,7 +3,7 @@
   "description": "休整结算器——一次叙事休整事件走完(短休/长休),逐人结算逐人落盘。何时调:你声明休整发生(短休≥1小时/长休≥8小时)即调,一次调用一个休整事件。短休传 kind:'short'+hd(每人花费的生命骰枚数,可不同则分次调);长休传 kind:'long'.what 结算:短休=掷生命骰回血+hd 扣减+短休池回充+契术师位回满;长休=hp 回满+hd 回充一半+法术位回满+短休长休池全充+力竭-1(有饮食)+专注清+last_long_rest 落账(24h 窗口校验)。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概:本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起,后续叙事必须遵守。" },
-    "kind": { "type": "string", "required": true, "description": "休整类型:short(短休)|long(长休)。" },
+    "kind": { "type": "string", "required": true, "enum": ["short", "long"], "description": "休整类型(枚举即名录):short(短休)|long(长休)——错值内核硬拦。" },
     "who": { "type": "string", "required": true, "description": "休整名单,逗号分隔(如 '梅西雅,缇娜,老铁')。" },
     "hd": { "type": "integer", "description": "短休每人花费的生命骰枚数(默认 0)。逐步决策分次调用。" },
     "food": { "type": "boolean", "description": "长休有无进食——false 则跳过力竭恢复(饥饿)。" },
@@ -22,9 +22,11 @@ const names = String(a.who ?? '').split(/[,，]/).map(s => s.trim()).filter(Bool
 names.length || err('缺必填 who(名单)')
 
 const readState = () => { try { return readFileSync('state.md', 'utf8') } catch { return '' } }
-const parseNow = md => { const m = /当前时间：第(\d+)日·(\d+)时/.exec(md); return m ? { day: +m[1], hour: +m[2] } : null }
-const parseLast = md => { const m = /last_long_rest=第(\d+)日·(\d+)时/.exec(md); return m ? { day: +m[1], hour: +m[2] } : null }
+// 分=2026-09-30 起真值行带分;旧档无分容缺→0(分钟只随行落账,24h 窗口校验仍以小时取整)
+const parseNow = md => { const m = /当前时间：第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md); return m ? { day: +m[1], hour: +m[2], minute: +(m[3] ?? 0) } : null }
+const parseLast = md => { const m = /last_long_rest=第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md); return m ? { day: +m[1], hour: +m[2], minute: +(m[3] ?? 0) } : null }
 const hoursSince = (last, now) => (now.day - last.day) * 24 + (now.hour - last.hour)
+const restMin = now => String(Math.floor(now.minute ?? 0) % 60).padStart(2, '0')
 const hitDie = (j, cls) => j.hit_die ?? (+CLASS_CORE[cls]?.fm?.hit_die || 8)
 // 池回充:features 行 `名|回充时机|已用N` → 已用0
 function recharge(j, mode) {
@@ -102,10 +104,10 @@ if (a.kind === 'short') {
   }
   // 写 last_long_rest
   if (now) {
-    const newLine = `- 长休窗口：last_long_rest=第${now.day}日·${now.hour}时`
+    const newLine = `- 长休窗口：last_long_rest=第${now.day}日·${now.hour}时${restMin(now)}分`
     const fresh = /长休窗口：/.test(stateMd) ? stateMd.replace(/.*长休窗口：.*/, newLine) : stateMd.replace(/(## 时间敏感项[^\n]*\n)/, `$1${newLine}\n`)
     writeFileSync('state.md', fresh)
-    lines.push(`  落盘: state.md 长休窗口 last_long_rest=第${now.day}日·${now.hour}时`)
+    lines.push(`  落盘: state.md 长休窗口 last_long_rest=第${now.day}日·${now.hour}时${restMin(now)}分`)
   }
 }
 lines.push(`  ◇ 梗概: ${a.context}`)

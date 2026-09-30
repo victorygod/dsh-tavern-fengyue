@@ -63,7 +63,8 @@ function writeFixture() {
     skill_prof: ['arcana'], save_prof: ['int'], weapon_prof: ['长杖'], tool_prof: [], languages: ['通用语'],
     caster_attr: 'int', slots_l1: 4, slots_l2: 3, concentrating: null, hd_available: 4,
     spells_known: ['火焰箭', '魔法飞弹', '护盾术'], spells_prepared: ['魔法飞弹'],
-    spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'] },
+    spellSplit: { cantrips: ['火焰箭'], known: ['魔法飞弹', '护盾术'], tips: { 火焰箭: '掷出火焰箭射向目标,命中造成 1d10 火焰伤害。', 魔法飞弹: '创造三枚魔法力场飞镖,各造成 1d4+1 力场伤害。', 护盾术: '反应施放,AC 获 +5 加值,挡下魔法飞弹。' } },
+    skillTips: { arcana: '回溯法术、魔法物品与诸界知识。' },
     pending: ['LV4·ASI 点选', 'LV4·新法术×2'], exp: 6100, expMin: 2700, expNext: 6500,
     features: ['奥法回复|短休回环位|—'], statuses: {}, weapons: [], gear: [], resist: [], immune: [],
     gp: 21, sp: 4, cp: 9, persona: { alignment: '中立善良' }, background: '佣兵',
@@ -99,7 +100,7 @@ function writeFixture() {
           }
           if (argv.op === 'spells') {
             p.spells_known.push(...argv.payload.learned)
-            p.spellSplit = { cantrips: p.spellSplit.cantrips, known: [...p.spellSplit.known, ...argv.payload.learned] }   // 拆行快照同步——真实现由泵重读语料
+            p.spellSplit = { cantrips: p.spellSplit.cantrips, known: [...p.spellSplit.known, ...argv.payload.learned], tips: p.spellSplit.tips }   // 拆行快照同步(tips 保留)——真实现由泵重读语料
             p.pending = p.pending.filter(x => !x.includes('新法术'))
           }
           return JSON.stringify({ ok: true, pending: p.pending })
@@ -242,6 +243,22 @@ describe.runIf(hasChrome && hasPw)('dnd5e 成长流浏览器层(playwright 无�
     expect((await page.$eval('#vtip', el => el.textContent))!).toContain('HP 20/26')
     await page.mouse.move(700, 860)
     expect(await page.$eval('#vtip', el => el.classList.contains('open'))).toBe(false)
+  })
+
+  it('法术名/技能行浮签:中文简介上签+vtip 链路(mouseover→closest 出签)——中文浮签批', { timeout: 15000 }, async () => {
+    await openBook()
+    // 域断言:法术三个名字逐词 chip 挂 data-tip;技能行 div 级 data-tip
+    const tips = await page.$$eval('.book.open .bk-sp-row .nms [data-tip]', els => els.map(e => e.textContent))
+    expect(tips).toEqual(['火焰箭', '魔法飞弹', '护盾术', '魔法飞弹'])   // 戏法/法术/已备三行逐词 chip 全部挂签
+    expect(await page.$eval('.book.open .bk-skills .bk-sk[data-tip]', el => el.textContent)).toContain('奥秘')
+    // vtip 链路:mouseover 冒泡到挂签元素 → 0.1s 后出签,文案=简介;real-hover 已由 hpbar 用例覆盖
+    await page.evaluate(() => document.querySelector('.book.open .nms [data-tip]')?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })))
+    await page.waitForTimeout(160)
+    expect(await page.$eval('#vtip', el => el.classList.contains('open'))).toBe(true)
+    expect((await page.$eval('#vtip', el => el.textContent))!).toContain('火焰箭')
+    await page.evaluate(() => document.querySelector('.book.open .bk-skills .bk-sk[data-tip]')?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })))
+    await page.waitForTimeout(160)
+    expect((await page.$eval('#vtip', el => el.textContent))!).toContain('诸界知识')
   })
 
   it('留证截图:册+学习框(人工对照原型 docs/hud-proto-grow.html)', { timeout: 25000 }, async () => {

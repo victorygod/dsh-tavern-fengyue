@@ -17,7 +17,6 @@ function rig() {
   const cwd = join(base, 'runtime')
   for (const d of ['characters', 'dnd5e-srd-lorebook/monsters']) mkdirSync(join(cwd, d), { recursive: true })
   cpSync(join(CARD, 'lib'), join(base, 'preset', 'lib'), { recursive: true })
-  for (const f of ['kobold.md', 'goblin.md', 'wolf.md', 'zombie.md']) cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', f), join(cwd, 'dnd5e-srd-lorebook', 'monsters', f))
   writeFileSync(join(cwd, 'characters', 'player.json'), JSON.stringify({ name: '梅西雅', role: 'pc', hp: 10, hp_max: 10 }))
   writeFileSync(join(cwd, 'state.md'), '# 世界状态\n\n## 附近 NPC\n\n## 战斗\n- （无战斗）\n')
   return { cwd, base }
@@ -66,7 +65,6 @@ describe('spawn_monster 枚举选怪+档案自含(真实脚本)', () => {
   })
   it('龙类能力材料化:adult-red-dragon 档案带 fire-breath(豁免型)+bite riders;查无 kind/缺参错误', { timeout: 15_000 }, () => {
     const { cwd: rt, base } = rig()
-    cpSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters', 'adult-red-dragon.md'), join(rt, 'dnd5e-srd-lorebook', 'monsters', 'adult-red-dragon.md'))
     const r = runTool(rt, 'spawn_monster', { context: '龙袭', name: '老红龙', stance: '敌对', monster_kind: 'adult-red-dragon' })
     expect(r.status).toBe(0)
     const p = j(rt, '老红龙.json') as Record<string, any>
@@ -75,7 +73,7 @@ describe('spawn_monster 枚举选怪+档案自含(真实脚本)', () => {
     expect(String(p.description)).toContain('dragon')
     const miss = runTool(rt, 'spawn_monster', { context: 'x', name: '幻影', stance: '敌对', monster_kind: 'nonexistent' })
     expect(miss.status).toBe(1)
-    expect(miss.stdout).toContain('!查无 statblock')
+    expect(miss.stdout).toContain('!查无怪物档案')
     const nof = runTool(rt, 'spawn_monster', { context: 'x', name: '无卡', stance: '敌对' })
     expect(nof.status).toBe(1)
     expect(nof.stdout).toContain('缺必填 monster_kind')
@@ -84,11 +82,26 @@ describe('spawn_monster 枚举选怪+档案自含(真实脚本)', () => {
     expect(dup.stdout).toContain('!同名已存在:梅西雅')
     rmSync(base, { recursive: true, force: true })
   })
-  it('schema 漂移钉:spawn_monster 头 enum 集合==语料 monsters 目录 stem 集合(assemble 加怪不漏改 schema)', () => {
+  it('怪人设=数据面预生成(2026-09-30 二次裁定):工具不收 persona/history——传参即拒,数据 persona 行在则落', { timeout: 15_000 }, async () => {
+    const { cwd: rt, base } = rig()
+    const stray = runTool(rt, 'spawn_monster', { context: 'x', name: '被代填', stance: '敌对', monster_kind: 'bugbear', persona: { lens: '敬畏拳头' } })
+    expect(stray.status).toBe(1)
+    expect(stray.stdout).toContain('!spawn_monster 不收 persona/history')
+    const histInject = runTool(rt, 'spawn_monster', { context: 'x', name: '被代填历', stance: '敌对', monster_kind: 'bugbear', history: '外传设定' })
+    expect(histInject.status).toBe(1)
+    expect(histInject.stdout).toContain('!spawn_monster 不收 persona/history')
+    const named = runTool(rt, 'spawn_monster', { context: '怪头领', name: '疤哥', stance: '敌对', monster_kind: 'bugbear' })
+    expect(named.status).toBe(0)
+    // 数据批已落:怪卡带 MONSTER_PERSONA.bugbear(固定 persona 行,零 LLM 人设通道)
+    const { MONSTER_PERSONA } = await import(pathToFileURL(join(CARD, 'lib', 'monster-persona-data.mjs')).href)
+    expect(j(rt, '疤哥.json').persona).toEqual(MONSTER_PERSONA.bugbear)
+    rmSync(base, { recursive: true, force: true })
+  })
+  it('schema 漂移钉:spawn_monster 头 enum 集合==MONSTER_CORE 键集(数据加怪不漏改 schema)', async () => {
     const src = readFileSync(join(CARD, 'tools', 'spawn_monster.mjs'), 'utf8')
     const schema = JSON.parse(/\/\*\*\s*@tavern-schema([\s\S]*?)\*\//.exec(src)![1])
     const enumKinds = schema.parameters.monster_kind.enum as string[]
-    const dirKinds = readdirSync(join(CARD, '..', 'corpus', 'srd-lorebook', 'monsters')).filter(f => f.endsWith('.md') && f !== 'INDEX.md').map(f => f.slice(0, -3)).sort()
-    expect(enumKinds).toEqual(dirKinds)
+    const { MONSTER_CORE } = await import(pathToFileURL(join(CARD, 'lib', 'monster-core-data.mjs')).href)
+    expect(enumKinds).toEqual([...Object.keys(MONSTER_CORE)].sort())   // 单源=monster-core-data(corpus 已退役)
   })
 })

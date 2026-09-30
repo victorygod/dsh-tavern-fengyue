@@ -19,7 +19,6 @@ function rig(player = WIZARD) {
   const cwd = join(base, 'runtime')
   for (const d of ['characters']) mkdirSync(join(cwd, d), { recursive: true })
   cpSync(join(CARD, 'lib'), join(base, 'preset', 'lib'), { recursive: true })
-  cpSync(join(CARD, '..', 'corpus', 'srd-lorebook'), join(cwd, 'dnd5e-srd-lorebook'), { recursive: true })
   writeFileSync(join(cwd, 'characters', 'player.json'), JSON.stringify(player))
   writeFileSync(join(cwd, 'state.md'), STATE)
   return { cwd, base }

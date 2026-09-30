@@ -3,11 +3,11 @@
   "description": "施法链结算器——一切施法必经本工具（武器攻击走 attack）：位闸→效果→写盘，一次走完。何时调：施放任一法术即调，spell 必填，targets 填受影响者；伤害/治疗/升环的骰全部由语料表自动结算，治疗法术自动识别；多弹法术份额=targets 重复名单（几发几个名单位）。细则见各参数。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
-    "spell": { "type": "string", "required": true, "description": "法术名，英文原文（如 fireball）——从 who 的法术面取（spells_known 在册名），不枚举；环位/仪式/专注/豁免/伤害骰与升环增量工具按名自动读，未收录即拒绝。" },
+    "spell": { "type": "string", "required": true, "description": "法术名，英文原文（如 fireball）——从 who 的法术面取（spells_known/已备 spells_prepared 在册名，并集施法），不枚举；环位/仪式/专注/豁免/伤害骰与升环增量工具按名自动读，未收录即拒绝。" },
     "caster": { "type": "string", "description": "施法者姓名，默认玩家。工具按名读档，取其施法属性与法术位。" },
     "targets": { "type": "string", "description": "受影响者名单，逗号分隔。豁免型可填多个，每人各掷一次豁免；群疗型逐人独立掷骰；多攻骰/多弹法术（如 scorching-ray、magic-missile）用重复名字表达每发去哪——三发打两个目标写 '甲,乙,甲'；单目标攻击型与单疗型只填一个名字。" },
     "as_level": { "type": "integer", "description": "升环施放时填目标环位，必须不低于法术自身环位，工具消耗对应环位的法术位；不填＝按原环位施放。" },
-    "at": { "type": "string", "description": "施法时刻（增益/减益型用）——你按当前叙事时间手写，如 '第 3 日 9 时' 或 '第 2 轮'。" },
+    "at": { "type": "string", "description": "施法时刻（增益/减益型用）——你按当前叙事时间手写，如 '第 3 日 9 时 30 分'（对齐「当前时间」行精到分）或 '第 2 轮'。" },
     "mode": { "type": "string", "description": "攻击型法术的攻击检定：adv＝优势，dis＝劣势，默认 normal。是否有优劣势由你按局面判断（隐形、伏击等）。" }
   }
 }
@@ -24,11 +24,13 @@ const casterName = a.caster ?? '玩家'
 const char = readChar(casterName)
 ;(char.caster_attr === undefined || char.caster_attr === null) && err('!无施法能力（该角色无施法族）')
 const casterFile = findCharFile(casterName)
-// 收录闸(2026-09-28 审计批 A3):spells_known 是施法族「声明则必全」的既定面,本闸是它迟到已久的读者——
-// 幻觉施法(表上根本没有的法术)在此拦死。slug 归一比较,大小写/空格/连字符差异不敏感。
+// 收录闸(2026-09-28 审计批 A3;2026-09-30 拓宽法术面=known∪prepared 并集施法):法术面是施法族
+// 「声明则必全」的既定面,本闸是它迟到已久的读者——幻觉施法(面上没有的法术)在此拦死。
+// 准备制职业(cleric/druid 出生如 opening_commit:known=戏法列+prepared 分置)靠并集施放已备法术。
+// slug 归一比较,大小写/空格/连字符差异不敏感。
 const wanted = a.spell.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-const known = (Array.isArray(char.spells_known) ? char.spells_known : []).map(s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-')).filter(Boolean)
-known.includes(wanted) || err(`!施法者未收录:${a.spell} 不在 ${casterName} 的 spells_known${known.length ? '' : '（现表为空——施法族声明不全,查出生登记）'}`)
+const pool = [...(Array.isArray(char.spells_known) ? char.spells_known : []), ...(Array.isArray(char.spells_prepared) ? char.spells_prepared : [])].map(s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-')).filter(Boolean)
+pool.includes(wanted) || err(`!施法者未收录:${a.spell} 不在 ${casterName} 的法术面(spells_known/已备)${pool.length ? '' : '（现表空——施法族声明不全,查出生登记）'}`)
 
 const spellSlug = a.spell.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 const spellCore = SPELL_CORE[spellSlug]

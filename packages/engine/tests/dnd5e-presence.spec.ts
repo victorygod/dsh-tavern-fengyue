@@ -123,6 +123,17 @@ describe('dnd5e 附近 NPC 三态名单——注入与前端逐行镜像(2026-09
     rmSync(dirname(rt), { recursive: true, force: true })
   })
 
+  it('时间真值带分投影(2026-09-30):time_minute 出泵;旧档无分容缺→0', () => {
+    const withMin = rig(STATE_MD.replace('- 当前时间：第1日·18时', '- 当前时间：第1日·18时05分'))
+    const a = pump(withMin.cwd, 'hud-right')
+    expect(a.data?.state).toMatchObject({ time_day: 1, time_hour: 18, time_minute: 5 })
+    const legacy = rig()                     // STATE_MD=旧格式「18时」无分 → 0
+    const b = pump(legacy.cwd, 'hud-right')
+    expect(b.data?.state).toMatchObject({ time_minute: 0 })
+    rmSync(dirname(withMin.cwd), { recursive: true, force: true })
+    rmSync(dirname(legacy.cwd), { recursive: true, force: true })
+  })
+
   it('单列旧行兼容读(存量 state.md 平滑):无态列=中立', () => {
     const legacy = STATE_MD.replace('- 老铁 | 同伴', '- 老铁').replace('- 石牙 | 敌对', '- 石牙').replace('- 掌柜 | 中立', '- 掌柜')
     const { cwd: rt } = rig(legacy)

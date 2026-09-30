@@ -8,7 +8,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 
 | 分区 | 文件 | 格式 | 主要读者 | 内容域 |
 |---|---|---|---|---|
-| 人物 | `characters/player.json`（固定名）/ `<名>.json` | JSON | roll/trade/ui_data/尾代/前端 | 机件（六维/hp/熟练/施法位/资源池/装备引用/钱包）+ 叙事（persona/biography 行数组） |
+| 人物 | `characters/player.json`（固定名）/ `<名>.json` | JSON | roll/trade/ui_data/尾代/前端 | 机件（六维/hp/熟练/施法位/资源池/装备引用/钱包）+ 叙事（persona 人格七键 / history 履历行数组 / description 现况——三层律见二·B） |
 | 战斗 | `state.md`「## 战斗」节（combat.json 已废 2026-09-20） | md 行 | roll/尾代/前端/attack·cast 工具 | `- 回合：N`/`- 先攻：名:值 > …`/`- 参战行：名 | 状态`(2026-09-29b 敌我退役:参战名单即战斗名单,HP/AC 走档案)`——旧 敌行/友行 行式兼容读;解析归 core.parseCombat |
 | 世界 | `state.md` | md | 尾代/泵/DM | frontmatter time_* + 任务/伏笔 + 玩家所在（五级）+ 时间敏感项登记表 + 队伍 + 附近 NPC（三态名单,2026-09-30 stance 回锅——`- 名 | 同伴/中立/敌对`,在场关系快照）+ 战斗节（篇章/主线/支线/上回合变化 2026-09-28 退役——任务单节、开局不立项；变化不再另行登记＝注入快照+回执落盘行） |
 | 规则 | `dnd5e-srd-lorebook/` | md | runtimeRead/工具 join（书本 UI 已删） | 静态只读（1164 篇） |
@@ -63,7 +63,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 面 | 覆盖 | 归宿/定案 |
 |---|---|---|
 | **A 生存成长**（peer 统一） | 等级线/体质线/防护线/熟练线/施法线/资产线 | 全员同 schema 同规则链；**键能力裁剪律**：『没有什么能力，就没有相关字段』，对所有角色（玩家同律）——能力族见下 |
-| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 五件 / biography / 活状态（statuses·exhaustion·concentrating） / 位置 | **biography 双职能：出生段=背景，运行时追加行=记忆**——不设 memory 键（避免双真值）；位置不落盘（state.md「## 附近 NPC」三态名单路由——在场与敌我快照皆以行为准,尾代随剧情改列）；**秘密=biography 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
+| **B 推演**（NPC/同伴落盘，玩家自带脑内） | persona 七键 / history / description(现况) / 活状态（statuses·exhaustion·concentrating） / 位置 | **人设三层律（2026-09-30 翻案，正本=docs/persona-threelayer_zh.md）**：persona 七键（appearance/lens/reaction/voice/never/tension/alignment,女娲维度）答「怎么演」、history 行数组答「发生了什么」（[0]=出身+塑造往事,运行时追加行带日戳,追加 ⇔ description 刷新**同拍**）、description 现况一句答「现在怎么样」——biography 双职能/background 顶键/persona 五件退役（不设两处真值）；写法判据=生成力/辨识度/张力≥1对/禁形容词标签,创造面=spawn 键描述、维护面=maintenancePrompt（分工律）；位置不落盘（state.md「## 附近 NPC」三态名单路由——在场与敌我快照皆以行为准,尾代随剧情改列）；**秘密=history 行「[秘]」前缀**（永不主动叙述，揭示后去前缀归一般行） |
 | **C 交互**（工具链已跨 who） | gear/weapons/三币/languages/技能对抗/施法对冲 | 无新增键 |
 
 **键能力裁剪律（2026-09-19 定案，取代两档制；对所有角色含玩家）**——字段存在性跟随能力：无某能力/机制参与 → 对应键族**整族不出生**（不留 0/空壳）：
@@ -76,7 +76,7 @@ Schema 正本 = `preset/templates/character.tpl.json`（依 SRD 构造，人物�
 | 训练参与 | save_prof / skill_prof / expertise / armor_prof / weapon_prof / tool_prof | 不出生，检定/对抗按裸属性解析 |
 
 - **已整机制删除（非裁剪，与能力无关）**：inspiration（灵感=扮演奖励归 DM 叙事）/ resources（并入 features 行内池状态）/ origin / death_success·fail（濒死=参数中继+transcript）。
-- **核心键永不裁**：身份（class/level/race/background/subclass）/ 六维 / hp 族 / 防护（armor·shield·speed·darkvision·resist·immune）/ 资产三币 / gear / weapons / persona / biography / statuses·exhaustion / languages。
+- **核心键永不裁**：身份（class/level/race/subclass）/ 六维 / hp 族 / 防护（armor·shield·speed·darkvision·resist·immune）/ 资产三币 / gear / weapons / persona / history / description / statuses·exhaustion / languages。
 - 叙事示例：战士玩家天生无施法族，酒馆掌柜无训练面——与场景 NPC 同律（这正是『玩家=peer』的字段表达）；剧情需要时补族，schema 始终一份。
 - 工具侧：读缺席键=结构化报错（tools 一·可选键律），不得 NaN 崩读。
 

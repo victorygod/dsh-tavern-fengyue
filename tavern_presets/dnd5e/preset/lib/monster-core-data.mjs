@@ -1,4 +1,4 @@
-// monster-core-data.mjs — 334 statblock 核心面(2026-09-29b 由 scripts/extract-monster-core.mjs 从语料抽取;
+// monster-core-data.mjs — 334 怪物档案核心面(2026-09-29b 语料抽取入库——抽取链已退役,手工维护源;
 // assemble 重跑后重抽)。spawn 运行时零 lorebook 读取——数据断档时 monster-build 回退 md 现场解析(行为同源)。
 // 展开写(键序显式排稳)——行可 diff、可审;勿手改,重抽覆盖。
 export const MONSTER_CORE = {
@@ -2117,26 +2117,6 @@ export const MONSTER_CORE = {
   "immune": [],
   "vuln": [],
   "description": "Small monstrosity, CR 0.5 (100 XP)"
- },
- "commoner": {
-  "cr": 0,
-  "ac": 10,
-  "hp": 4,
-  "hp_roll": "1d8",
-  "str": 10,
-  "dex": 10,
-  "con": 10,
-  "int": 10,
-  "wis": 10,
-  "cha": 10,
-  "speed": 30,
-  "languages": [
-   "any one language (usually Common)"
-  ],
-  "resist": [],
-  "immune": [],
-  "vuln": [],
-  "description": "Medium humanoid, CR 0 (10 XP)"
  },
  "constrictor-snake": {
   "cr": 0.25,

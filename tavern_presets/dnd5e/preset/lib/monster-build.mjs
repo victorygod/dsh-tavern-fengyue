@@ -1,10 +1,10 @@
-// monster-build.mjs — statblock 怪物构造(纯数据版,2026-09-30 批3:MONSTER_CORE 快照单源,
+// monster-build.mjs — 怪物构造(纯数据版,2026-09-30 批3:MONSTER_CORE 快照单源,
 // 零 fs 零 lorebook 零回退;语料=卡根 corpus/(extract-monster-core.mjs 重抽))。
 // 职责:monster-core-data 的核心面 + 攻击/能力材料化(MONSTER_ATTACKS/RIDERS/STATUS_RIDERS/ABILITIES
 // 按 kind 前缀 join 进档案馆键)——spawn_monster 自动填全靠本件;查无快照即抛(spawn 收口)。
 import { MONSTER_CORE } from './monster-core-data.mjs'
-import { MONSTER_ATTACKS } from './monster-attack-data.mjs'
-import { ABILITIES, RIDERS, STATUS_RIDERS } from './monster-ability-data.mjs'
+import { MONSTER_ATTACKS, ABILITIES, RIDERS, STATUS_RIDERS } from './monster-extra-data.mjs'
+import { MONSTER_PERSONA } from './monster-persona-data.mjs'
 
 const slugOf = (s) => String(s).toLowerCase().replace(/\.[a-z]+$/i, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 
@@ -29,11 +29,12 @@ function materialize(slug) {
 export function buildMonster(from) {
   const slug = slugOf(String(from).replace(/^monsters\//i, ''))
   const core = MONSTER_CORE[slug]
-  if (!core) throw new Error(`!查无 statblock:${from}(语料快照缺——重跑 extract-monster-core.mjs)`)
+  if (!core) throw new Error(`!查无怪物档案:${from}(MONSTER_CORE 缺条目——数据源=lib/monster-core-data.mjs)`)
   return {
     ...core,
     kind: slug,
     hp_max: core.hp,
+    persona: MONSTER_PERSONA[slug],   // 数据面 persona 行(persona-threelayer_zh.md 定案 4:每怪预生成;缺席=裁剪)
     hp_roll: core.hp_roll ?? null,
     darkvision: core.darkvision ?? null,
     languages: core.languages ?? [],

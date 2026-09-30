@@ -14,7 +14,7 @@
 | **heal** | 掷骰回血+钳上限+苏醒双清 | dice/target（生命骰逐枚投=分次调） |
 | **hp_change** | 无骰直改/回满/临时生命(temp)三写 | amount/full/temp 选、直改值（独立事件） |
 | **death** | 濒死豁免 raw d20、成败计数落盘、nat1 双败/nat20 回血、三成稳定/三败死亡判词 | 何时调（玩家濒死每轮） |
-| **update_status** | 状态对象表增量更新(null 删字段/覆盖同名)、机械修正白名单校验、施加时间锚 | status/effect/mods、解除时刻 |
+| **update_character** | 人物卡更新器(2026-09-30):statuses 数组全量替换(每条=名+applied_at,effect/on_use/mods 机械按名自动匹配——STATUS_TEXT/spell-data 单源;未列=摘除)、平铺叙事字段(armor/shield/装备/现况/历史追加/role/力竭)、法术三检+spell_details 重铺、拒收字段点名(生成面/结算面)、整卡回执 | statuses/各字段、target(玩家名直通) |
 | **rest** | 短休 HD 掷+池回充+契术师整池；长休三铁轨+hp/hd/位表/力竭/专注清全链 | 何时休整、谁、滴/无饮食 food/water、HD 花费枚数 |
 | **gain_exp** | XP 查表求和均分、升级级联(PB/HP/HD/位表/pending) | who 名单、foes 战果/直值 |
 | **gain_money** | 钱包跨币换算+落账 | direction/amount |

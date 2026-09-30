@@ -1,5 +1,0 @@
----
-name: Abyssal
-description: Exotic
----
-

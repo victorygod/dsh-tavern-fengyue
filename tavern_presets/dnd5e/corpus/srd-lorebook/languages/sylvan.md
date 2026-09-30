@@ -1,5 +1,0 @@
----
-name: Sylvan
-description: Exotic
----
-

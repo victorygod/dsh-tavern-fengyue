@@ -1,5 +1,0 @@
----
-name: Lances
-description: Weapons
----
-

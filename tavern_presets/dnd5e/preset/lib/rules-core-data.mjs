@@ -1,6 +1,8 @@
-// rules-core-data.mjs — 34 规则章全文(2026-09-30 由 scripts/extract-rules-core.mjs 抽取;
-// 语料=卡根 corpus/srd-lorebook/rules;assemble 重跑后重抽)。LLM 查证走 rule 查章工具(章枚举),runtime 零 lorebook。
-// entry={name, text(原正文)}。勿手改,重抽覆盖。
+// rules-core-data.mjs — 规则正本数据(RULES_CORE 34 章全文;rule 查章工具消费)。
+// 出处=SRD 5.1(5e-bits/5e-database @3b124d8;OGL/CC-BY 4.0)。corpus/抽取链已退役——改动直改本件
+// (域家族:其余数据见 spell-core-data/spell-data/monster-core-data/monster-extra-data/glossary-cn)。
+
+// ── RULES_CORE · 规则 34 章全文(rule 查章工具)(原 rules-core-data.mjs) ──
 export const RULES_CORE = {
  "ability-checks": {
   "name": "Ability Checks",

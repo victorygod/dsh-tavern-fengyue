@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "判定结算器——一切判定类掷骰必经本工具。何时调：结果不确定且带后果的当口。怎么调：用技能传 skill；裸属性或豁免传 stat（豁免加 save:true）；对抗比大小双方各调、不传 dc；环境现象传 stat+save+dc；专注维持受伤只传 damage；群体检定每人各调，过半成功＝全队成功。细则见各参数。",
+  "description": "判定结算器——一切判定类掷骰必经本工具。何时调：结果不确定且带后果的当口，npc对话和做决定绝对不要调用本工具！怎么调：用技能传 skill；裸属性或豁免传 stat（豁免加 save:true）；对抗比大小双方各调、不传 dc；环境现象传 stat+save+dc；专注维持受伤只传 damage；群体检定每人各调，过半成功＝全队成功。细则见各参数。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概（反作弊铁则）：从上次玩家消息到本判定点之间你对剧情走向的承诺，骰值只裁定此刻成败、不得覆盖它。" },
     "who": { "type": "string", "description": "检定者姓名（默认玩家），按名读面板。" },

@@ -1,18 +1,15 @@
-// status.mjs — 临时状态单源(叶子模块,无 import):statuses 键名枚举 + 英文→中文译名 + 校验。
-// 键名口径(2026-09-29 定案):**英文规范键 + 展示译中文**——工具写的键已是英文规范键
-// (cast buff=fm.name Title Case / attack 骑手=小写条件名),display 层拿 STATUS_CN 译中文。
-// 临时生命是唯一的机制例外:通用池子键「临时生命」(hp_change 默认,已中文),法术赐临时生命(Fake Life)仍英文。
-// 同步纪律:法术/临时条目须与 lib/spell-data.mjs 的 buff/temp 字段 + cast.mjs 的 fm.name 对齐,
-// 条件译名以 docs/translation-protocol_zh.md §9 为锚(vitest dnd5e-status-enum 兜同步)。
+// status.mjs — 临时状态单源(叶子模块,无 import):statuses 键名枚举 + 英文→中文译名 + 校验
+// + STATUS_TEXT 条件/职业态机械文案(update_character statuses 数组按名自动落——LLM 不手写效果文本;
+// 法术类 buff 的 effect/mods 不在本表:运行时按名检索 spell-data buff/pool/onFail,文案不双源维护)。
 
-// 15 条 SRD 条件(对齐 preset/setup/dnd5e-srd-lorebook/conditions/*.md 文件名)
+// 15 条 SRD 条件(对齐 STATUS_KEYS 正本既定键名(语料抽取期遗产))
 export const CONDITIONS = [
   'blinded', 'charmed', 'deafened', 'exhaustion', 'frightened', 'grappled',
   'incapacitated', 'invisible', 'paralyzed', 'petrified', 'poisoned', 'prone',
   'restrained', 'stunned', 'unconscious',
 ]
 
-// 合法 statuses 键全量(枚举)——工具自动写 + 叙事施加(update_status)都只许这些键。
+// 合法 statuses 键全量(枚举)——工具自动写(cast/spawn/update_character statuses 数组)都只许这些键。
 export const STATUS_KEYS = new Set([
   ...CONDITIONS,
   // 法术 buff/temp(cast.mjs 写 fm.name;与 spell-data.mjs buff/temp 字段对应)
@@ -32,6 +29,32 @@ export const STATUS_KEYS = new Set([
   // 职业特征/消费型机制态(attack.mjs:120 rage 抗性、core.mjs consumeBonus on_use)
   'Rage', 'Bardic Inspiration',
 ])
+
+// 条件/职业态机械效果文案(HUD 浮签短注;update_character statuses 按 status 名自动匹配——LLM 只报名+时间)。
+// 法术类条目不在此表(bless/haste 等的 effect/mods 单源=spell-data buff/pool/onFail,update_character 运行时检索)。
+export const STATUS_TEXT = {
+  blinded: '目盲——攻击掷劣势,对它攻击掷优势',
+  charmed: '魅惑——不能伤魅惑者;魅惑者对其说话带魅力优势',
+  deafened: '耳聋——听不见,听觉相关感知自动失败',
+  exhaustion: '力竭——逐级递减(速度/豁免/攻击/检定,6 级死)',
+  frightened: '惊惧——对恐惧源攻击掷劣势,不能主动接近',
+  grappled: '被擒抱——速度归 0',
+  incapacitated: '失能——不能行动或反应',
+  invisible: '隐形——攻击对其劣势,其攻击掷优势',
+  paralyzed: '失能;近战 5 呎内命中自动暴击;力/敏豁免自动失败',
+  petrified: '失能,攻击对其劣势;豁免自动失败',
+  poisoned: '中毒——攻检与豁免掷劣势',
+  prone: '倒地——只能爬行;近战对其攻击占优势,远程劣势',
+  restrained: '束缚——速度 0;攻击掷劣势,敏豁免劣势',
+  stunned: '失能+攻检劣势,他人对其攻击占优势;力/敏豁免自动失败',
+  unconscious: '失能倒地;力/敏豁免自动失败;近战命中自动暴击',
+  // 通用池子键(机械例外):temp 数额随条目携带(hp_change 结算/reset——update_character 只补时间戳)
+  '临时生命': '独立缓冲池——受伤先扣此层再落 hp;治疗不回填;耗尽/到期归零',
+  // 职业特征/消费型机制态:attack.mjs 读 Rage 键做物理抗性;core consumeBonus 读 on_use
+  'Rage': '狂暴——挥砍/穿刺/钝击抗性(非魔法);战斗结束或失意识即止',
+  // 消费型机制态:core consumeBonus 读 on_use(attack/check 用掉即摘并加骰)
+  'Bardic Inspiration': { effect: '激励骰——一次攻检/检定/豁免可加(用掉即摘)', on_use: '1d6' },
+}
 
 // 英文键→中文(get Flask 展示层与工具回执共用;条件译名锚 translation-protocol §9,法术名同 view.mjs SPELL_CN)
 export const STATUS_CN = {

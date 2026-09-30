@@ -1,5 +1,0 @@
----
-name: Glaives
-description: Weapons
----
-

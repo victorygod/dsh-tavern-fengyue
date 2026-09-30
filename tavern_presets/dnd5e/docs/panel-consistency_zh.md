@@ -186,7 +186,7 @@ tick(Δ:"2小时"|"1天"|"3天", food:full|half|none, water:full|half|none, forc
 ```
 
 结算清单(给定 Δ 与声明,全部机械):
-1. **时钟重写**:state.md 当前时间行(第N日·H时)。
+1. **时钟重写**:state.md 当前时间行(第N日·H时M分,精到分)。
 2. **statuses 折算**:分/时/日单位按 Δt 递减,到 0 删行;变化日志行。
 3. **计数器族**(时间敏感项登记表为工作集):绝食日计数(无食超 3+CON 天→每日末力竭+1)、缺水(half→每日 CON DC15 失败+1/none→自动+1)、疾病/毒时间轴、downtime 进度、奥法回复 1/日重置、遭遇预算重置、长休窗口判定(last_long_rest≥24h→报告行提示可休)。
 4. **声明驱动的掷骰项**:强行军每小时 CON DC10+超时数(失败力竭+1);缺水豁免。掷骰与力竭写入一体。
@@ -642,7 +642,7 @@ err:`!缺必填 context` / `!角色不存在:{who}` / `!计数已满——稳定
     "darkvision": { "type": "integer", "description": "黑暗视觉范围(尺),无则不填。" },
     "languages": { "type": "array", "items": { "type": "string" }, "description": "语言,照卡。" },
     "caster_attr": { "type": "string", "description": "施法属性(int/wis/cha)——施法族声明则必全。" },
-    "spells_known": { "type": "array", "items": { "type": "string" }, "description": "已知法术——施法族声明则必全。" },
+    "spells_known": { "type": "array", "items": { "type": "string" }, "description": "已知法术——施法族声明则必全;含戏法(0 环并册,2026-09-30 翻案:官方纸卡/NPC 口径/原型正本三方一致,展示层 splitSpells 按卡 level:0 拆 戏法/法术两行)。" },
     "slots": { "type": "array", "items": { "type": "integer" }, "description": "施法位表(从 1 环起逐环数量,如 [4,2])——落档为 slots_l1..lN;施法族声明则必全。" },
     "persona": { "type": "string", "description": "一句话人设(伸缩:无设定的怪不填)。" },
     "biography": { "type": "string", "description": "背景首行(复杂 NPC 用,追加式)。" },

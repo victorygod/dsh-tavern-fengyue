@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..', '..')
 const CARD = join(ROOT, 'tavern_presets', 'dnd5e', 'preset')
-const { monsterArchive } = await import(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'scripts', 'test-fixtures.mjs')).href)
+const { monsterArchive } = await import(pathToFileURL(join(ROOT, 'tavern_presets', 'dnd5e', 'test', 'test-fixtures.mjs')).href)
 const PLAYER = { name: '梅西雅', role: 'pc', class: 'wizard', level: 5, hp: 60, hp_max: 60, str: 10, dex: 12, con: 12, int: 16, wis: 10, cha: 10 }
 async function dragonArchive(o: Record<string, unknown> = {}) {
   return monsterArchive(CARD, 'adult-red-dragon', { name: '红龙', role: 'npc', hp: 200, hp_max: 200, ...o })

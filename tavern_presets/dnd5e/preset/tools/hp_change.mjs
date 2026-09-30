@@ -8,7 +8,7 @@
     "full": { "type": "boolean", "description": "回满至 hp_max;三选一。" },
     "temp": { "type": "integer", "description": "临时生命量(正整数)——写独立 temp_hp 池,取高不叠,不动 hp/hp_max;三选一。" },
     "name": { "type": "string", "description": "临时生命条目标签(默认「临时生命」)——存 statuses 对象表的键。" },
-    "at": { "type": "string", "description": "施加时间(临时生命用)——你按当前叙事时间手写,如 '第 3 日 9 时'。" }
+    "at": { "type": "string", "description": "施加时间(临时生命用)——你按当前叙事时间手写,如 '第 3 日 9 时 30 分'(对齐「当前时间」行精到分)。" }
   }
 }
 */

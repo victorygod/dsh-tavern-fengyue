@@ -99,16 +99,18 @@ describe('ui_data op=panel spellSplit(戏法/环术拆行)', () => {
     })
     const out = runOp(rt, { op: 'panel', name: 'hud-left' })
     expect(out.ok).toBe(true)
-    const split = (out.data as { player: { spellSplit: { cantrips: string[]; known: string[] } } }).player.spellSplit
+    const split = (out.data as { player: { spellSplit: { cantrips: string[]; known: string[]; tips: Record<string, string> } } }).player.spellSplit
     expect(split.cantrips).toEqual(['Fire Bolt'])
     expect(split.known).toEqual(['Magic Missile'])
+    expect(split.tips['Fire Bolt']).toMatch(/攻击检定|目标/)   // hover 浮签(2026-09-30):glossary-cn 全量自喂
+    expect(split.tips['Magic Missile']).toMatch(/飞镖|力场/)
     rmSync(dirname(rt), { recursive: true, force: true })
   })
   it('未知卡名的存量(中文名无 slug) → 落环术行,绝不冒充戏法', () => {
     const { cwd: rt } = rig({ ...WIZ, spells_known: ['火球术'] }, {})
     const out = runOp(rt, { op: 'panel', name: 'hud-left' })
-    const split = (out.data as { player: { spellSplit: { cantrips: string[]; known: string[] } } }).player.spellSplit
-    expect(split).toEqual({ cantrips: [], known: ['火球术'] })
+    const split = (out.data as { player: { spellSplit: { cantrips: string[]; known: string[]; tips: Record<string, string> } } }).player.spellSplit
+    expect(split).toEqual({ cantrips: [], known: ['火球术'], tips: {} })   // 未知卡名查无简介=空 tips,绝不挂空签
     rmSync(dirname(rt), { recursive: true, force: true })
   })
 })

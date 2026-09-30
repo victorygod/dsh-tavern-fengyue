@@ -1,5 +1,0 @@
----
-name: Pikes
-description: Weapons
----
-

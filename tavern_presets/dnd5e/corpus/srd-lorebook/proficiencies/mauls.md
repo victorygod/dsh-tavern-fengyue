@@ -1,5 +1,0 @@
----
-name: Mauls
-description: Weapons
----
-

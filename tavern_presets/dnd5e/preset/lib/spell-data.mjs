@@ -1,8 +1,11 @@
-// 法术结算数据表(2026-09-28 由 lorebook 320 件正文批量抽取+人核;消费方=cast.mjs 选骰)。
-// 单一事实源=语料正文——再抽取/改语料须 diff 评审;手工条目:eldritch-blast(计数型,连调,非骰增)·spiritual-weapon(attrMod+两环一档)。
-// 字典:damage 基础骰/type 伤害类型/hitFlat Hit 行平值(attrMod 互斥)/cantripScale 戏法骰随角色档 5/11/17/upcast 每档增量/upcastBase 对照环/upcastStep 每 N 环一档/bolts 基础弹数/upcastBolts 每环增弹(分配=DM,dice 逃生舱)/heal 治疗 dice/healMod 加施法属性/healFlat 平值
-// 语义分类(2026-09-28 审计批,判决表=docs/audit-fixes_zh.md §1.3):suppress=伤害面整体封死(语料数字属实但非施放时点直伤——mishap/骑手/地形/条件/自险款,后续按 RAW 用 damage/check 工具逐事件结算);save=T 级豁免覆写(修 FM 洞:call-lightning 等 RAW 实为豁免型而 FM 缺 save 键);healMulti=群疗法术逐目标独立掷;buff 承接武器附伤骑手(stat:'damage',attack 伤害侧掷算)。
-// 2026-09-29 补录:池/断定/失败落状态三形态开槽 + 治疗翻生族 + buff 族——见表尾块注释;判决理由=docs/spell-coverage-audit_zh.md。
+// spell-data.mjs — 施法数值解析表(域家族:与 spell-core-data 缝/spell-build 同前缀)。
+// SPELL_DATA=157 有骰式(伤害骰/升环 Δ/戏法角色档/治疗/平值/临时生命)——cast 选骰唯一读口;
+// 另 162 件零骰不进表。
+// 出处=SRD 5.1(5e-bits/5e-database @3b124d8;OGL/CC-BY 4.0)。
+// corpus/抽取链已退役——本件与 spell-core-data/monster-core-data(夹具注入缝,纯单 export)
+// 同域家族同前缀;数据改动直改本件。
+
+// ── SPELL_DATA · 施法数值解析表(157 有骰式:伤害骰/升环 Δ/戏法角色档/治疗/平值/临时生命——cast 选骰唯一读口;另 162 件零骰不进表)(原 spell-data.mjs) ──
 export const SPELL_DATA = {
   'false-life': { temp: '1d4+4' },
   'bless': { buff: { effect: '攻/豁 +1d4，持续 1 分钟（专注）', mods: [{ stat: 'attack_save', magnitude: '1d4' }] } },
@@ -34,7 +37,7 @@ export const SPELL_DATA = {
   'dream': { suppress: true },   // 信使术,无施放时点伤害(3d6=误抽)
   'earthquake': { damage: '5d6', type: 'bludgeoning', save: 'dex' },
   'eldritch-blast': { damage: '1d10', type: 'force' },
-  'enlarge-reduce': { suppress: true },   // 体型武器补差 1d4=骑手而非法术直伤;安/减益叙述+update_status
+  'enlarge-reduce': { suppress: true },   // 体型武器补差 1d4=骑手而非法术直伤;安/减益叙述+statuses
   'faithful-hound': { damage: '4d8', type: 'piercing' },
   'feeblemind': { damage: '4d6', type: 'psychic' },
   'finger-of-death': { damage: '7d8', type: 'necrotic', hitFlat: 30 },

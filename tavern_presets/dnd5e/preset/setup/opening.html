@@ -110,8 +110,6 @@ summary { cursor: pointer; }
           <div class="av-cap">头像预览</div>
         </div>
       </div>
-      <div class="lbl">出身背景</div>
-      <input type="text" id="bg" placeholder="如：士兵 / 侍僧 / 罪犯 / 佣兵" maxlength="12">
     </div>
 
     <div class="card">
@@ -137,16 +135,23 @@ summary { cursor: pointer; }
     </div>
 
     <div class="card">
-      <div class="lbl">人设</div>
-      <div class="row" style="margin-bottom:6px">
-        <input type="text" id="p1" placeholder="个性特点" maxlength="20">
-        <input type="text" id="p2" placeholder="理想" maxlength="20">
+      <div class="lbl">人设 · 三层（外观＋行为逻辑，履历在下方）
+        <button type="button" class="act ghost" id="p-reroll" style="float:right;padding:4px 12px;font-size:11px">↺ 重掷</button>
       </div>
       <div class="row" style="margin-bottom:6px">
-        <input type="text" id="p3" placeholder="羁绊" maxlength="20">
-        <input type="text" id="p4" placeholder="缺点" maxlength="20">
+        <input type="text" id="p1" placeholder="外观（发/脸/特点部位＋穿搭）" maxlength="40">
+        <input type="text" id="p2" placeholder="底色（看人看事的独特镜片）" maxlength="30">
       </div>
-      <select id="align">
+      <div class="row" style="margin-bottom:6px">
+        <input type="text" id="p3" placeholder="遇事（遇X→Y，2-3条）" maxlength="60">
+        <input type="text" id="p4" placeholder="腔调（说话方式/口癖）" maxlength="30">
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <input type="text" id="p5" placeholder="红线（绝不做的1-3件）" maxlength="30">
+        <input type="text" id="p6" placeholder="张力（一对矛盾）" maxlength="40">
+      </div>
+      <textarea id="hist" placeholder="履历首行 —— 出身＋塑造往事：事件对『之所以是此/之所以在此』的因果，要有故事张力，不写流水账（可留空）" maxlength="120" style="width:100%;font:600 13px var(--sans);color:var(--ink2);background:rgba(0,0,0,.35);border:1px solid rgba(201,162,75,.4);border-radius:8px;padding:8px 10px;min-height:44px;resize:vertical"></textarea>
+      <select id="align" style="margin-top:8px">
         <option value="">阵营（可选）</option>
         <option>守序善良</option><option>中立善良</option><option>混乱善良</option>
         <option>守序中立</option><option>绝对中立</option><option>混乱中立</option>
@@ -172,7 +177,8 @@ summary { cursor: pointer; }
 <script>
 'use strict'
 // ── 静态数据（沙箱无网络；场景库以 preset/setup/openings.json 为单源经 opening-init 桥拉活,
-//    此内嵌副本仅兜底——手动 fork 本页时同步它的场景即可；dnd5e-srd-lorebook 键一致）──
+//    此内嵌副本仅兜底——手动 fork 本页时同步它的场景即可；dnd5e-srd-lorebook 键一致；人称律同库——
+//    开场白将以 user 消息发出,一律玩家第一人称「我」,禁「你」指玩家）──
 const RACES = [['human','人类'],['half-elf','半精灵'],['elf','精灵'],['dwarf','矮人'],['halfling','半身人'],['gnome','地侏'],['half-orc','半兽人'],['tiefling','提夫林'],['dragonborn','龙裔']]
 const CLASSES = [['fighter','战士'],['rogue','盗贼'],['wizard','法师'],['cleric','牧师'],['barbarian','野蛮人'],['bard','吟游诗人'],['druid','德鲁伊'],['monk','武僧'],['paladin','圣骑士'],['ranger','游侠'],['sorcerer','术士'],['warlock','契术师']]
 const SKILLS = [['athletics','运动'],['acrobatics','杂技'],['sleight_of_hand','巧手'],['stealth','隐匿'],['arcana','奥秘'],['history','历史'],['investigation','调查'],['nature','自然'],['religion','宗教'],['insight','洞悉'],['medicine','医药'],['perception','察觉'],['survival','生存'],['animal_handling','驯兽'],['deception','欺瞒'],['intimidation','威吓'],['performance','表演'],['persuasion','游说']]
@@ -180,11 +186,11 @@ const ARRAY = [15, 14, 13, 12, 10, 8]
 const ATTRS = [['力','str'],['敏','dex'],['体','con'],['智','int'],['感','wis'],['魅','cha']]
 const SCENARIOS = [
   { id: 'hamlet', title: '酒桶镇', tagline: '小镇攒起的第一个铜板，也攒得起一个英雄',
-    narration: '碧野丘陵的酒桶镇，西境地图上没人费心标注的一个小地方：一座磨坊、半身人的客栈、逢集才热闹的市口，和一群做梦都想出远门的年轻人。你就是其中一个。镇子口的告示板贴了三张单子，三天没人揭——荒坡有哥布林抢羊，磨坊主丢了祖传的账本，北口商路的邮差要个跑腿的。老镇长在井边叹气：「世道要乱喽，谷地的仗眼看要打过来，可这镇子连个撑门面的都没有。」没人指望你，也没人拦你。你的传奇，从井边这第一桩小活计开始。' },
+    narration: '碧野丘陵的酒桶镇，西境地图上没人费心标注的一个小地方：一座磨坊、半身人的客栈、逢集才热闹的市口，和一群做梦都想出远门的年轻人。我就是其中一个。镇子口的告示板贴了三张单子，三天没人揭——荒坡有哥布林抢羊，磨坊主丢了祖传的账本，北口商路的邮差要个跑腿的。老镇长在井边叹气：「世道要乱喽，谷地的仗眼看要打过来，可这镇子连个撑门面的都没有。」没人指望我，也没人拦我。我的传奇，从井边这第一桩小活计开始。' },
   { id: 'dragon', title: '屠龙道', tagline: '一条老龙盘踞雪巅，龙头运下山抵一座矿',
-    narration: '磐岩山脉积了千年的雪里，盘着一条老龙。「屠龙道」——矮人给上山朝圣的那条崖道起的名——溪水冻成乌黑，山坳里半个村的人都搬空了。铁锤堡的锻炉连日不熄，矮人在城门口挂出告示：谁把龙头运下山，抵一座矿。你已经站在崖道半腰，怀里是一张不知转过多少手的龙巢旧图，风从雪线上刮下来，带着硫磺味。往上，是那畜生的巢；往下，是回头还来得及的尘世。同路的猎龙队只剩你一个——其余的，都在山腰竖了碑。' },
+    narration: '磐岩山脉积了千年的雪里，盘着一条老龙。「屠龙道」——矮人给上山朝圣的那条崖道起的名——溪水冻成乌黑，山坳里半个村的人都搬空了。铁锤堡的锻炉连日不熄，矮人在城门口挂出告示：谁把龙头运下山，抵一座矿。我已经站在崖道半腰，怀里是一张不知转过多少手的龙巢旧图，风从雪线上刮下来，带着硫磺味。往上，是那畜生的巢；往下，是回头还来得及的尘世。同路的猎龙队只剩我一个——其余的，都在山腰竖了碑。' },
   { id: 'intrigue', title: '白堡', tagline: '王位、异端、银钱与刀，都在抢一个没有立场的人',
-    narration: '白堡的高台下，没有一个人是清白的。王位空悬，圣殿的正统派与革新派在告示墙上轮流撕对方的榜；革新派被正统唤作异端、被线人叫作邪教，夜里在剁手巷聚会；商行联盟雇人往北押镖，盗贼公会在码头收起「过路钱」；法师塔替两边算账，灰衣军的探子混在难民里进了城。而你，是个谁都不沾的自由人——也正因如此，谁都想把你拽进自己的局里。烛光昏暗的告示墙前，三张条子几乎同时塞进你手里：圣殿要个「清白的手」，商行要个「嘴严的镖头」，还有个披斗篷的，约你半夜到剁手巷见一面。' },
+    narration: '白堡的高台下，没有一个人是清白的。王位空悬，圣殿的正统派与革新派在告示墙上轮流撕对方的榜；革新派被正统唤作异端、被线人叫作邪教，夜里在剁手巷聚会；商行联盟雇人往北押镖，盗贼公会在码头收起「过路钱」；法师塔替两边算账，灰衣军的探子混在难民里进了城。而我，是个谁都不沾的自由人——也正因如此，谁都想把我拽进自己的局里。烛光昏暗的告示墙前，三张条子几乎同时塞进我手里：圣殿要个「清白的手」，商行要个「嘴严的镖头」，还有个披斗篷的，约我半夜到剁手巷见一面。' },
 ]
 
 // ── 随机分配池（一键 roll 全套,可再手动微调）──
@@ -202,11 +208,13 @@ const NAMES_BY_RACE = {
   dragonborn: { male: ['巴拉罕', '克罗夫', '火鳞·达克斯', '纳拉', '铁 луByte'], female: ['丝洛卡', '焰歌', '苍璧', '奈菲拉', '圃鳞'] },
 }
 const FALLBACK_NAMES = { male: ['凯尔', '布兰', '格雷', '达伦', '岚'], female: ['莉娜', '薇拉', '伊芙', '苏茉', '芙雅'] }
-const BACKGROUNDS = ['士兵', '佣兵', '罪犯', '侍僧', '学者', '工匠', '流浪儿', '没落贵族', '渔夫', '猎人', '酒保', '商队护卫', '矿工', '吟游学徒']
-const PERSONALITY = ['谨慎多疑', '豪爽仗义', '沉默寡言', '油嘴滑舌', '心思缜密', '暴烈易怒', '乐观豁达', '冷若冰霜', '古道热肠', '玩世不恭']
-const IDEALS = ['自由', '正义', '财富', '知识', '力量', '守护', '享乐', '秩序', '复仇', '扬名立万']
-const BONDS = ['为同伴而战', '欠了一屁股债', '寻找失踪的亲人', '向雇主证明自己', '守护一件信物', '为死去的朋友复仇', '还乡的路被断了', '一本没写完的书']
-const FLAWS = ['贪杯', '多疑', '好赌', '嘴硬', '见钱眼开', '嗜睡', '怕黑', '管不住手', '记仇', '嘴上没把门']
+// 人设三层随机池(2026-09-30 七键翻案):骨架句/契约式,非形容词标签——被掷出即是可以直演的设定
+const APPEAR = ['麦色短发,左颊烧疤,磨旧的皮甲', '黑辫齐腰,眉骨断痕,灰布旅装披旧斗篷', '金长发束辫,络腮短须,半身皮围裙', '红棕乱发,雀斑满脸,皮手套背着小圆盾', '银灰短发,绿眼睛,暗红斗篷', '黑发遮半脸,青灰眼,皮靴踏尘', '秃顶花白须,粗布短褂,腰间一串钥匙', '栗色马尾,鼻梁雀斑,皮束胸背箭袋', '灰白乱发,塌鼻梁,油腻旅人袍', '黑长直垂肩,右颊刺青,黑皮镶边甲']
+const LENS = ['情分是嘴上的,生意是眼里的', '看人先看手上的茧——手会说话', '世道是本账,人人挂在页上', '眼里人只分两等:欠我的和我欠的', '怕事,但更怕受人恩惠——欠下的总得还', '先怀疑,再证实;证据不动,人心不动', '规矩是弱者的墙,也是我的墙', '力气大的才有理——所以我练力气', '恩情要当场还,仇也要当场记', '小人物的命要不值钱,除非自己给它定价']
+const REACTION = ['被讨债→先掏一半再谈缓期;有人拔刀→侧身让过第一下', '生面孔→先掂量后搭话;被夸→警惕', '见伤患→先施救再问缘由;遭遇野兽→先护马匹', '被激将→不动声色记下名字;夜里有异响→先吹灯', '被赊账→嘴上骂、账本上留名;店里打架→先护柜台', '没人接话→自己开口;职位更高的开口→垂手听', '见到死人→先数伤口再喊人;看到钱袋→口令自己转三圈', '谈钱→换左手到右手;谈情→看别处', '被拦路→先亮家伙再开口;迎面叫得出名字的→对方先欠我一问', '被人抓住袖子→不动声色退半步再抬眼']
+const VOICE = ['嗓门大,骂人带笑,口头禅『这世道』', '低声慢语,尾音轻,每句话都像掂过分量', '说话像背文书,词句一丝不乱', '乡音重,十个字省成三个', '习惯用问句收尾——或是不想担责任,或是留个余地', '粗着嗓子短句噎人,转头对小辈绵', '带点口哨的花腔,故事讲一半收钱', '声音平得像账本,报数不带情绪']
+const NEVER = ['不出卖投宿客人;白天绝不谈买卖', '不对妇人孩子动刀;不喝主人家倒的酒', '不接没讲清价钱的活;不碰来路不明的钱袋子', '不先动手;不在同一个地方赌两次', '不为钱出卖雇主;不踩刚翻过土的坟头', '不问客人从哪来;不碰死人的戒指', '不睡在露天;不欠人情过夜', '不碰地窖的门;不与同一个人讨两次价']
+const TENSION = ['趋利,却给跑路的落难客也留饭', '惜命,却总管闲事管到刀口上', '嘴上说信不过任何人,却总第一个跳出去', '心里搁着金子,手上护着那件不值钱的信物', '恨透了教士,却在女儿的病榻前低声祈祷', '守规矩守到刻板,却为一个人破过例', '贪杯,却从不误事——误的是自己的身体', '浪子做派,床头压着一封没寄出去的家书']
 const pick = arr => arr[Math.floor(Math.random() * arr.length)]
 const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] } return a }
 // META(桥下发;缺席=简版降级——机械层仍是最后闸)
@@ -269,14 +277,16 @@ let rolledSpells = { cantrips: [], spells: [], prepared: [] }
 const levelNow = () => Math.max(1, Math.min(20, Number($('lv').value) || 1))
 // 期望施法面(等级感知;SRD 逐级列;桥缺席时降级 L1 表——机械层最终闸):
 // cantrips=逐级戏法数;known=逐级已知数(wizard 走 4+2·L 进书线=gain_exp 每级新法术×2 同一曲线);
-// prepared=施法属性调整值+等级(SRD Preparing and Casting Spells;仅准备制 cleric/druid)。
+// prepared=施法属性调整值+等级(SRD Preparing and Casting Spells;准备制四职 cleric/druid/paladin/ranger,
+// 施法属性按职取——半施法 L1 无环位,wholePool 空 → pEff=0 不出生法术)。
 function wantCounts(cls, lv) {
   const cN = (META?.cantripsBy ?? META?.CANTRIPS_BY_LEVEL)?.[cls]?.[lv - 1] ?? META?.cantripsL1?.[cls] ?? META?.CANTRIPS_L1?.[cls] ?? 0
   const kN = cls === 'wizard'
     ? 4 + 2 * lv
     : (META?.knownBy ?? META?.KNOWN_BY_LEVEL)?.[cls]?.[lv - 1] ?? META?.knownL1?.[cls] ?? META?.KNOWN_L1?.[cls] ?? 0
-  const wisM = Math.floor(((Number($('abilities')?.querySelector('[data-attr=wis]')?.value) || 10) - 10) / 2)
-  const pN = (cls === 'cleric' || cls === 'druid') ? lv + Math.max(wisM, 0) : 0
+  const abM = (at) => Math.floor(((Number($('abilities')?.querySelector(`[data-attr=${at}]`)?.value) || 10) - 10) / 2)
+  const pA = { cleric: 'wis', druid: 'wis', paladin: 'cha', ranger: 'wis' }[cls]
+  const pN = pA ? lv + Math.max(abM(pA), 0) : 0
   return { cN, kN, pN }
 }
 // 本职业 1..最高可施环位 的联合法术池(SRD:「known 须为可施环位的法术」);slotMax 由 opening_data 三族位表派生
@@ -435,7 +445,6 @@ $('roll').onclick = () => {
   $('cls').value = clsV
   rebuildClass()
   askAvatar()
-  $('bg').value = pick(BACKGROUNDS)
   // 主属性序吃标准数组:主属性拿 15/14,副属性那条吃次高,其余随机排——法师不会再滚出智 8
   const primary = (META?.primary?.[clsV] ?? META?.PRIMARY?.[clsV] ?? ['str', 'dex']).filter(k => ATTRS.some(([, k2]) => k2 === k))
   const rest = ATTRS.map(([, key]) => key).filter(k => !primary.includes(k))
@@ -457,15 +466,23 @@ $('roll').onclick = () => {
     $('subclass').value = pick(Array.from($('subclass').options).slice(1).map(o => o.value))
   // 施法成套
   rerollSpells()
-  $('p1').value = pick(PERSONALITY)
-  $('p2').value = pick(IDEALS)
-  $('p3').value = pick(BONDS)
-  $('p4').value = pick(FLAWS)
-  $('align').value = pick(Array.from($('align').options).slice(1).map(o => o.value || o.textContent))
+  rollPersona()
   delete $('avprev').dataset.img
   renderAvPreview()
   flash('已随机分配——名字/属性/技能互相咬合,可再手动微调', true)
 }
+
+// 人设三层重掷(独立于一键 roll,可随时单掷人设组)
+function rollPersona() {
+  $('p1').value = pick(APPEAR)
+  $('p2').value = pick(LENS)
+  $('p3').value = pick(REACTION)
+  $('p4').value = pick(VOICE)
+  $('p5').value = pick(NEVER)
+  $('p6').value = pick(TENSION)
+  $('align').value = pick(Array.from($('align').options).slice(1).map(o => o.value || o.textContent))
+}
+$('p-reroll').onclick = rollPersona
 
 // ── 提交：opening-commit → 宿主桥 → opening_commit.mjs 落盘 → ack ──
 // 宿主（卡 UI 桥）回执 {t:'opening-commit-ack', ok, detail}；detail=脚本 stdout JSON 串
@@ -486,7 +503,8 @@ $('go').onclick = () => {
   if (!name) return flash('缺姓名')
   if (!race) return flash('选一个种族')
   if (!cls) return flash('选一个职业')
-  if (!$('bg').value.trim()) return flash('写一句出身背景')
+  { const missingP = ['p2', 'p3', 'p4', 'p6'].find(id => !$(`${id}`).value.trim())
+    if (missingP) return flash(`人设四件缺一(底色/遇事/腔调/张力)——↺ 重掷或手填`) }
   if (Object.keys(abilities).length < 6) return flash('六维属性分配未完成')
   if (skState.size !== curSpec.count) return flash(`技能熟练须选 ${curSpec.count} 项(本职业白名单)`)
   const birthLevel = levelNow()
@@ -504,13 +522,12 @@ $('go').onclick = () => {
   const payload = {
     character: {
       name, race, class: cls, gender, level: birthLevel,
-      background: $('bg').value.trim(),
       abilities,
       skills: Array.from(skState),
       subclass: $('subcard').style.display !== 'none' ? ($('subclass').value || null) : null,
       spells: spellCaster ? { cantrips: [...rolledSpells.cantrips], spells: [...rolledSpells.spells], prepared: [...rolledSpells.prepared] } : undefined,
-      persona: { personality: $('p1').value.trim(), ideals: $('p2').value.trim(), bonds: $('p3').value.trim(), flaws: $('p4').value.trim(), alignment: $('align').value || null },
-      backstory: '',
+      persona: { appearance: $('p1').value.trim(), lens: $('p2').value.trim(), reaction: $('p3').value.trim(), voice: $('p4').value.trim(), never: $('p5').value.trim(), tension: $('p6').value.trim(), alignment: $('align').value || null },
+      history: $('hist').value.trim(),
     },
     scenario: scnId,
     narration: $('narr').value.trim() || SCENARIOS.find(s => s.id === scnId).narration,

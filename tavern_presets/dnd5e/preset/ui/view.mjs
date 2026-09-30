@@ -163,8 +163,11 @@ const WEATHER_SVG = {
 }
 const WEATHER_ZH = { 晴: 'sunny', 多云: 'cloudy', 阴: 'cloudy', 雨: 'rain', 小雨: 'rain', 大雨: 'rain', 暴雨: 'rain', 雷暴: 'storm', 雷雨: 'storm', 雪: 'snow', 小雪: 'snow', 大雪: 'snow', 雾: 'fog' }
 const weatherId = t => { const k = norm(t); if (WEATHER_SVG[k]) return k; return WEATHER_ZH[String(t ?? '').trim()] ?? null }
-function dialSvg(h) {
-  const ang = (h % 24) / 24 * 360
+// 12 时表盘(2026-09-30):旧版 h/24 旋转骑在 12 刻度面上,既非 12 时也非 24 时——改为正经
+// 双针钟:时针=(h%12)/12 圈+分针拨 0.5°/分,分针=m/60 圈;时/分由带分真值行喂(view 消费方)。
+function dialSvg(h, m) {
+  const hourAng = ((h % 12) / 12 + (m % 60) / 720) * 360
+  const minAng = (m % 60) / 60 * 360
   const night = h >= 21 || h < 5
   const ticks = Array.from({ length: 12 }, (_, i) => {
     const a = i * Math.PI / 6
@@ -176,7 +179,13 @@ function dialSvg(h) {
   const icon = night
     ? `<path d="M22.9 21.6a4.4 4.4 0 1 1-5.2-5.8 3.5 3.5 0 1 0 5.2 5.8z" fill="#cfd8f2"/>`
     : `<circle cx="20" cy="20" r="1.9" fill="#f0d28a"/><g stroke="#f0d28a" stroke-width="1" stroke-linecap="round"><line x1="20" y1="16.6" x2="20" y2="17.9"/><line x1="20" y1="22.1" x2="20" y2="23.4"/><line x1="16.6" y1="20" x2="17.9" y2="20"/><line x1="22.1" y1="20" x2="23.4" y2="20"/></g>`
-  return `<svg class="dial" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18.4" fill="rgba(0,0,0,.4)" stroke="rgba(201,162,75,.55)" stroke-width="1.4"/>${ticks}<g transform="rotate(${ang.toFixed(1)} 20 20)"><line x1="20" y1="20" x2="20" y2="6.2" stroke="#f0d28a" stroke-width="1.6" stroke-linecap="round"/><circle cx="20" cy="6.2" r="1.5" fill="#f0d28a"/></g><circle cx="20" cy="20" r="4.7" fill="rgba(20,14,6,.78)" stroke="rgba(201,162,75,.4)" stroke-width=".8"/>${icon}</svg>`
+  const hand = (ang, len, w, cap) => `<g transform="rotate(${ang.toFixed(1)} 20 20)"><line x1="20" y1="${20 + len * .2}" x2="20" y2="${20 - len}" stroke="#f0d28a" stroke-width="${w}" stroke-linecap="round"/>${cap}</g>`
+  return `<svg class="dial" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18.4" fill="rgba(0,0,0,.4)" stroke="rgba(201,162,75,.55)" stroke-width="1.4"/>${ticks}${hand(hourAng, 10.5, 2.1, `<circle cx="20" cy="${20 - 10.5}" r="1.6" fill="#f0d28a"/>`)}${hand(minAng, 14.5, 1.2, `<circle cx="20" cy="${20 - 14.5}" r="1.1" fill="#f0d28a"/>`)}<circle cx="20" cy="20" r="3.2" fill="rgba(20,14,6,.78)" stroke="rgba(201,162,75,.4)" stroke-width=".8"/>${icon}</svg>`
+}
+// 数字读数(12 小时制)+ 上下大夜标:a.m./p.m. 单独一行(用户案:时间精到分,段标放数字下)。
+const clock12 = (h, m) => {
+  const hh = h % 12 === 0 ? 12 : h % 12
+  return { text: `${hh}:${String(Math.floor(m) % 60).padStart(2, '0')}`, ampm: h < 12 ? 'a.m.' : 'p.m.' }
 }
 const sec = (t, inner, tip) => `<div class="bk-sec"><div class="bk-cap"${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(t)}</div>${inner}</div>`
 const chip = (k, v) => `<span class="bk-chip"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></span>`
@@ -210,7 +219,9 @@ function capPend(t, pend, kind, tip) {
 function worldHtml(st) {
   if (!st || (st.place ?? '') === '') return ''
   const h = st.time_hour ?? 18
+  const m = Math.floor(st.time_minute ?? 0)                    // 旧档无分 → 0(真值行容缺,2026-09-30 起带分)
   const [dp, dpName] = daypart(h)
+  const clock = clock12(h, m)
   const wKey = st.weather ? weatherId(st.weather) : null
   const lines = [
     st.region ? `<div class="l up">${esc(st.region)}</div>` : '',
@@ -220,7 +231,8 @@ function worldHtml(st) {
   return `
       <div class="wcard" style="--sky:${SKY[dp]}">
         ${dp === 'night' ? `<i class="star" style="left:24%;top:14%"></i><i class="star" style="left:62%;top:26%;animation-delay:.8s"></i><i class="star" style="left:10%;top:52%;animation-delay:1.4s"></i><i class="star" style="left:74%;top:66%;animation-delay:.4s"></i><i class="star" style="left:40%;top:8%;animation-delay:1.9s"></i>` : ''}
-        <div class="w-top"><span class="w-dial" data-tip="第 ${esc(st.time_day ?? 1)} 日 · ${esc(st.time_hour ?? 18)} 时">${dialSvg(h)}</span>
+        <div class="w-top"><span class="w-dial" data-tip="第 ${esc(st.time_day ?? 1)} 日 · ${esc(h)} 时 ${esc(m)} 分">${dialSvg(h, m)}</span>
+          <div class="w-clock" data-tip="第 ${esc(st.time_day ?? 1)} 日 · ${esc(h)} 时 ${esc(m)} 分（24 时制）"><div class="t1">${esc(clock.text)}</div><div class="ampm">${esc(clock.ampm)}</div></div>
           <div class="w-date"><div class="d1">第 ${esc(st.time_day ?? 1)} 日 · ${dpName}</div>
             <div class="wchips">${wKey ? WEATHER_SVG[wKey] : ''}<span>${st.weather ? esc(st.weather) : ''}</span>${st.terrain ? `<span class="terr">${esc(st.terrain)}</span>` : ''}</div>
           </div>
@@ -321,7 +333,7 @@ export function bookHtml(c, avatars = {}) {
         <div class="bk-hd">
           <div class="bk-nm">${esc(c.name ?? '')}</div>
           <div class="bk-sub">LV${esc(c.level ?? '???')} ${esc(cn(CLS_CN, c.class))}${c.subclass ? '·' + esc(cn(SUBCLASS_CN, c.subclass)) : ''}·${esc(cn(RACE_CN, c.race))}${g.glyph ? `<span class="bk-g ${g.cls}">${g.glyph}</span>` : ''}</div>
-          <div class="bk-sub2">${c.background ? esc(c.background) : ''}${c.background && c.persona?.alignment ? ' · ' : ''}${c.persona?.alignment ? esc(c.persona.alignment) : ''}</div>
+          <div class="bk-sub2">${c.persona?.alignment ? esc(c.persona.alignment) : ''}</div>
         </div>
         <div class="bk-hp">
           <div class="hph" data-tip="HP ${esc(hpText(c))}">
@@ -348,13 +360,16 @@ export function bookHtml(c, avatars = {}) {
       ${radarSvg(c, d)}
       ${sec('豁免', `<div class="bk-saves">${(d.saves ?? []).filter(s2 => s2.prof).map(s2 => `<span class="bk-sv prof">${esc(ATTRS.find(a => a[1] === s2.key)?.[0] ?? s2.key)} ${sign(s2.mod)}</span>`).join('') || NONE_ROW}</div>`, CAP_TIPS.saves)}
       ${sec('速览', vitChips, CAP_TIPS.vitals)}
-      ${sec('技能', `<div class="bk-skills">${(d.skills ?? []).filter(s2 => s2.prof).map(s2 => `
-        <div class="bk-sk prof"><span class="dot"></span><span class="nm2">${esc(cn(SKILL_CN, s2.key))}${s2.exp ? '<span class="exp">★</span>' : ''}</span><span class="attr-tag">${esc((ATTRS.find(a => a[1] === s2.attr)?.[0] ?? s2.attr).toUpperCase())}</span><span class="md2">${sign(s2.mod)}</span></div>`).join('') || NONE_ROW}</div>`, CAP_TIPS.skills)}
+      ${sec('技能', `<div class="bk-skills">${(d.skills ?? []).filter(s2 => s2.prof).map(s2 => { const sT = (c.skillTips ?? {})[s2.key]; return `
+        <div class="bk-sk prof"${sT ? ` data-tip="${esc(sT)}"` : ''}><span class="dot"></span><span class="nm2">${esc(cn(SKILL_CN, s2.key))}${s2.exp ? '<span class="exp">★</span>' : ''}</span><span class="attr-tag">${esc((ATTRS.find(a => a[1] === s2.attr)?.[0] ?? s2.attr).toUpperCase())}</span><span class="md2">${sign(s2.mod)}</span></div>` }).join('') || NONE_ROW}</div>`, CAP_TIPS.skills)}
       ${sec('训练与语言', `<div class="bk-pb" data-tip="熟练加值——随等级 2→6,只加在熟练事项上(攻检/豁免/检定/DC)">熟练加值<b>+${d.pb ?? 2}</b></div><div class="bk-prof-groups">${profGroups(c).map(([lb, items]) => `<div class="bk-pg"><span class="gl">${esc(lb)}</span><span class="gs">${items.map(x => `<span data-tip="${esc(PROF_TIPS[lb] ?? '')}">${esc(x)}</span>`).join('') || NONE_ROW}</span></div>`).join('')}</div>`, CAP_TIPS.profs)}` : ''
 
   /* 右栏：施法(呼吸+学习框入口) → 状态 → 装备/背包 → 特征 → 抗性 / 免疫 */
   const spFaces = c.spellSplit ?? { cantrips: [], known: c.spells_known ?? [] }
-  const spRow = (lb, arr) => `<div class="bk-sp-row"><span class="lv">${lb}</span><span class="nms">${(arr ?? []).length ? esc((arr ?? []).map(n => cn(SPELL_CN, n)).join(' · ')) : NONE_ROW}</span></div>`
+  // 法术名逐词 span:spellSplit.tips 在册法术名→中文简介(glossary-cn 文案面)——有才挂 data-tip,查无不挂(vtip 不出空签)
+  const spTips = spFaces.tips ?? {}
+  const spellChip = n => { const t = spTips[n]; return `<span${t ? ` data-tip="${esc(t)}"` : ''}>${esc(cn(SPELL_CN, n))}</span>` }
+  const spRow = (lb, arr) => `<div class="bk-sp-row"><span class="lv">${lb}</span><span class="nms">${(arr ?? []).length ? (arr ?? []).map(spellChip).join(' · ') : NONE_ROW}</span></div>`
   const castInner = (d.slotsLv ?? []).length ? `
         <div class="bk-cast-top">
           ${chip('主属性', ({ wis: '感知', cha: '魅力', int: '智力' })[c.caster_attr] ?? c.caster_attr ?? '—')}${chip('法术DC', d.dc ?? '—')}${chip('法术攻击', sign(d.atk ?? 0))}
@@ -389,24 +404,27 @@ export function bookHtml(c, avatars = {}) {
           ${(c.immune ?? []).map(r => chip('免', r)).join('')}
           ${((c.resist ?? []).length + (c.immune ?? []).length) === 0 ? NONE_ROW : ''}
         </div>`, CAP_TIPS.resists)
-  /* 小传：[秘] 行 NPC 永不显示；玩家显示但去前缀（biography 双职能=背景+记忆） */
+  /* 小传：persona 七键(人格层=怎么演,2026-09-30 三层律 docs/persona-threelayer_zh.md)；
+     history 履历两档=[0]长期设定+运行时追加行——[秘] 行 NPC 永不显示、玩家显示但去前缀;阵营在卡头。
+     当前想法 thought=NPC/怪常驻条目(内心一句,update_character 唯一写入;玩家卡不落=自主权)。 */
   const isPC = c.role === 'pc'
-  const bio = (c.biography ?? [])
+  const hist = (c.history ?? [])
     .map(b => String(b).replace(/^·\s*/, ''))
     .filter(b => isPC || !b.startsWith('[秘]'))
     .map(b => b.replace(/^\[秘\]\s*/, ''))
     .filter(Boolean)
-  const taleHtml = bio.length || c.description || c.persona ? `
+  const P7 = [['外观', 'appearance'], ['底色', 'lens'], ['遇事', 'reaction'], ['腔调', 'voice'], ['红线', 'never'], ['张力', 'tension']]
+  const persoRows = c.persona
+    ? P7.filter(([, k]) => c.persona[k]).map(([l, k]) => `<span class="pl">${l}</span><span class="pv">${esc(c.persona[k])}</span>`).join('')
+    : ''
+  const thoughtHtml = isPC ? '' : `<div class="desc">💭 当前想法：${esc(c.thought || '无')}</div>`
+  const taleHtml = hist.length || c.description || persoRows || thoughtHtml ? `
       <div class="bk-sec bk-tale">
         <div class="bk-cap">小传</div>
         ${c.description ? `<div class="desc">${esc(c.description)}</div>` : ''}
-        ${c.persona ? `<div class="bk-perso">
-          <span class="pl">性格</span><span class="pv">${esc(c.persona.personality ?? '')}</span>
-          <span class="pl">理想</span><span class="pv">${esc(c.persona.ideals ?? '')}</span>
-          <span class="pl">羁绊</span><span class="pv">${esc(c.persona.bonds ?? '')}</span>
-          <span class="pl">缺陷</span><span class="pv">${esc(c.persona.flaws ?? '')}</span>
-        </div>` : ''}
-        ${bio.length ? `<div class="bk-mems"><div class="mt">追忆</div>${bio.map(m => `<p>${esc(m)}</p>`).join('')}</div>` : ''}
+        ${thoughtHtml}
+        ${persoRows ? `<div class="bk-perso">${persoRows}</div>` : ''}
+        ${hist.length ? `<div class="bk-mems"><div class="mt">履历</div>${hist.map(m => `<p>${esc(m)}</p>`).join('')}</div>` : ''}
       </div>` : ''
   const CHROME = `<div class="bk-fade" data-act="bookClose"></div><div class="bk-arrow"><svg width="18" height="10" viewBox="0 0 18 10"><path d="M2 2l7 6 7-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`
   return `<div class="book open">${head}<div class="bk-body">

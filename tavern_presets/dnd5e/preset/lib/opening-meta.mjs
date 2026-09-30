@@ -2,6 +2,7 @@
 // 语料里没有的创角数(canvas 选择数/戏法数/首环数/主属性序/1 级子职标记/起装表)在此内嵌,
 // 先例同 ui_data 的 FULL_CASTER_SLOTS(panel 不读它,只有 opening_data/opening_commit 消费)。
 // 口径=SRD 5.1 / PHB 2014(基线同 rules_zh §11)。
+import { isCasterClass } from './core.mjs'
 
 export const CLASS_CN = {
   fighter: '战士', rogue: '盗贼', wizard: '法师', cleric: '牧师', barbarian: '野蛮人',
@@ -13,9 +14,10 @@ export const RACE_CN = {
   gnome: '地侏', 'half-orc': '半兽人', tiefling: '提夫林', dragonborn: '龙裔',
 }
 
-// 全施法者(含 warlock——Pact Magic L1=1 位 2 戏法 2 已知;此前漏排,RAW 错)
-export const CASTERS = ['wizard', 'cleric', 'sorcerer', 'druid', 'bard', 'warlock']
-// 半施法者 L1 无施法(圣骑士 L2 起、游侠 L2 起)——出生无施法族是**正确**行为,不算薄。
+// 施法者名录(创角表单 spellcard 现身/法术池与 slotMax 的构建口)——派生自 core 施法家族判定单源,
+// 名单不再手抄(旧案:只抄全施六族,ranger/paladin 被判非施法族,出生无位表无施法属性)。
+// 半施法 L1 无施法(圣骑士/游侠 L2 起)是**正确**行为,位表/环位闸自然收口,不算薄。
+export const CASTERS = Object.keys(CLASS_CN).filter(isCasterClass)
 
 export const SUBCLASS_LEVEL = {
   cleric: 1, sorcerer: 1, warlock: 1,      // SRD:三职 1 级分岔
