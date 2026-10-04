@@ -29,7 +29,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ShellExecRequest, ShellExecSpec, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import { defineTool, parameterSchemaSpecToJsonSchema, type ParameterSchemaSpec, type ToolRunContext } from '@deepseek-ai/dsh-tools'
-import { fenceIn, PRESET_DIR, RUNTIME_DIR } from './workspace.ts'
+import { fenceIn, PRESET_DIR, readCardMeta, RUNTIME_DIR } from './workspace.ts'
 
 /** Byte cap on one runtime document read. */
 const READ_CAP = 1_000_000
@@ -247,35 +247,81 @@ const GENERIC_ARGS_SPEC: ParameterSchemaSpec = {
 }
 
 /**
+ * The engine's fixed runtime tools, in registration order (read pair, write
+ * pair, delete). Their per-face assignment is a card-identity concern driven
+ * by `meta.json`'s `toolFaces`, not by a hardcoded split.
+ */
+export const FIXED_TOOL_NAMES = ['runtimeRead', 'runtimeGrep', 'runtimeWrite', 'runtimeEdit', 'runtimeDelete'] as const
+/** One of the engine's fixed runtime tools. */
+export type FixedToolName = (typeof FIXED_TOOL_NAMES)[number]
+
+/**
+ * The faces one fixed runtime tool registers on, resolved from the card's
+ * `meta.json` at call time. An explicit `toolFaces[name]` entry wins outright
+ * (an empty array = the tool registers on neither face); absent, the legacy
+ * default applies: the write trio is tail-only, the read pair rides 'tail'
+ * always and 'main' only while the `narratorTools` flag reads on. Re-read per
+ * call — zero hidden state, the field is visible in `meta.json`.
+ * @param root - absolute workspace root.
+ * @param name - the fixed tool's name.
+ * @returns the face names, in registration order ('main' before 'tail').
+ */
+export function fixedToolFaces(root: string, name: FixedToolName): readonly string[] {
+  const meta = readCardMeta(root)
+  const explicit = meta?.toolFaces?.[name]
+  if (explicit !== undefined) return explicit
+  if (name === 'runtimeWrite' || name === 'runtimeEdit' || name === 'runtimeDelete') return ['tail']
+  return meta?.narratorTools === false ? ['tail'] : ['main', 'tail']
+}
+
+/**
+ * The five fixed tool definitions on one shared write-pair chain — the write
+ * pair serializes same-path mutations over one per-registration chain, so a
+ * face's runtimeWrite/runtimeEdit must come from a single build.
+ * @param root - absolute workspace root.
+ * @returns the tool name → definition map.
+ */
+function buildFixedTools(root: string): Record<FixedToolName, ReturnType<typeof defineTool>> {
+  const chain = pathChain()
+  return {
+    runtimeRead: runtimeReadTool(root),
+    runtimeGrep: runtimeGrepTool(root),
+    runtimeWrite: runtimeWriteTool(root, chain),
+    runtimeEdit: runtimeEditTool(root, chain),
+    runtimeDelete: runtimeDeleteTool(root),
+  }
+}
+
+/**
  * Register the main agent's tool face: every `preset/tools/*.mjs` script as its
- * own tool entry plus, while the workspace's narrator-tools flag reads on, the
- * read pair over `runtime/`. Registration re-syncs at every assembly from a
- * cheap directory probe — a changed or added script re-registers (its disposer
- * retires the stale entry), a removed script's entry is disposed; an unchanged
- * directory re-registers nothing. The flag re-reads on every sync the same
- * way, so the read pair is disposable and re-registrable mid-session. The
- * kernel collects tool schemas BEFORE the assemble waterfall fires, so a
- * caller that mutates `preset/tools/` or the flag through the engine calls the
- * returned sync function to make the change visible on the CURRENT request;
- * the assembly-point sync remains the net for out-of-band file writes.
+ * own tool entry plus the fixed runtime tools whose faces (see
+ * {@link fixedToolFaces}) include `'main'`. Registration re-syncs at every
+ * assembly from a cheap directory probe — a changed or added script
+ * re-registers (its disposer retires the stale entry), a removed script's
+ * entry is disposed; an unchanged directory re-registers nothing. The faces
+ * re-read on every sync the same way, so a fixed tool is disposable and
+ * re-registrable mid-session. The kernel collects tool schemas BEFORE the
+ * assemble waterfall fires, so a caller that mutates `preset/tools/` or
+ * `meta.json` through the engine calls the returned sync function to make the
+ * change visible on the CURRENT request; the assembly-point sync remains the
+ * net for out-of-band file writes.
  * @param agentCtx - the main agent's scoped context.
  * @param root - absolute workspace root.
  * @param shell - the deployment's shell executor.
- * @param runtimeToolsOn - the workspace's narrator-tools flag (re-read per
- *   sync); omitted means always on — the unconditional historical face.
  * @returns the re-sync; idempotent, free when nothing changed.
  */
-export function registerMainAgentTools(agentCtx: Context, root: string, shell: ShellSeam, runtimeToolsOn?: () => boolean): () => void {
+export function registerMainAgentTools(agentCtx: Context, root: string, shell: ShellSeam): () => void {
   const toolsDir = fenceIn(root, join(PRESET_DIR, 'tools'))
   /** Live per-file registrations: file name → its mtime and registry disposer. */
   const registered = new Map<string, { mtimeMs: number; dispose: () => void }>()
-  /** Live read-pair registrations: tool name → its registry disposer. */
+  /** Live fixed-tool registrations: tool name → its registry disposer. */
   const fixed = new Map<string, () => void>()
-  /** Diff-manage one fixed tool behind the flag: registered while on. */
-  const manageFixed = (name: 'runtimeRead' | 'runtimeGrep', register: () => () => void): void => {
+  const fixedDefs = buildFixedTools(root)
+  /** Diff-manage one fixed tool behind its face: registered while it rides 'main'. */
+  const manageFixed = (name: FixedToolName): void => {
     const known = fixed.get(name)
-    if (runtimeToolsOn === undefined || runtimeToolsOn()) {
-      if (known === undefined) fixed.set(name, register())
+    if (fixedToolFaces(root, name).includes('main')) {
+      if (known === undefined) fixed.set(name, agentCtx.tools.register(fixedDefs[name]))
       return
     }
     if (known !== undefined) {
@@ -305,10 +351,9 @@ export function registerMainAgentTools(agentCtx: Context, root: string, shell: S
         registered.set(file, { mtimeMs, dispose: registerCardTool(agentCtx, toolsDir, root, shell, file) })
       }
     }
-    // Card entries first, the pair last — the historical registration order
-    // (card diff, then the fixed pair) stays observable in the registry.
-    manageFixed('runtimeRead', () => agentCtx.tools.register(runtimeReadTool(root)))
-    manageFixed('runtimeGrep', () => agentCtx.tools.register(runtimeGrepTool(root)))
+    // Card entries first, the fixed tools last — the historical registration
+    // order (card diff, then the fixed pair) stays observable in the registry.
+    for (const name of FIXED_TOOL_NAMES) manageFixed(name)
   }
   sync()
   agentCtx.on('system-prompt/assemble', (_assembly, _context, next) => {
@@ -356,11 +401,12 @@ function registerCardTool(
 }
 
 /**
- * Register the tail agent's tool face: the fixed read pair, the write pair
+ * Register the tail agent's tool face: the fixed runtime tools whose faces (see
+ * {@link fixedToolFaces}) include `'tail'` — the read pair, the write pair
  * (`runtimeWrite`/`runtimeEdit`, sharing one per-path mutation chain) and
- * `runtimeDelete`, plus card tools whose schema declares `'tail'` in `agents`
+ * `runtimeDelete` — plus card tools whose schema declares `'tail'` in `agents`
  * (e.g. the ledger writers gain_exp/gain_money). The tail re-composes every
- * fork, so card changes land on the next turn with no mtime sync.
+ * fork, so card-identity changes land on the next turn with no mtime sync.
  * @param agentCtx - the tail fork child's scoped context.
  * @param root - absolute workspace root.
  * @param shell - the deployment's shell executor (card tool spawns).
@@ -377,13 +423,10 @@ export function registerTailAgentTools(agentCtx: Context, root: string, shell: S
       registerCardTool(agentCtx, toolsDir, root, shell, file)
     }
   }
-  agentCtx.tools.register(runtimeReadTool(root))
-  agentCtx.tools.register(runtimeGrepTool(root))
-  // 写对共用一条 path 串行链：同文件按序落盘，跨文件并行。
-  const chain = pathChain()
-  agentCtx.tools.register(runtimeWriteTool(root, chain))
-  agentCtx.tools.register(runtimeEditTool(root, chain))
-  agentCtx.tools.register(runtimeDeleteTool(root))
+  const fixedDefs = buildFixedTools(root)
+  for (const name of FIXED_TOOL_NAMES) {
+    if (fixedToolFaces(root, name).includes('tail')) agentCtx.tools.register(fixedDefs[name])
+  }
 }
 
 function runtimePath(root: string, rel: string): string {

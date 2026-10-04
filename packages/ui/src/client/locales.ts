@@ -20,7 +20,7 @@ export type TavernKey =
   | 'id.titlePlaceholder' | 'id.descPlaceholder' | 'id.coverEmpty' | 'id.coverUpload' | 'id.coverClear'
   | 'id.metaBroken' | 'id.coverBadType' | 'id.coverUploadFailed'
   | 'maintenance.on' | 'maintenance.off'
-  | 'narrator.tools' | 'narrator.toolsHint'
+  | 'tools.faces' | 'tools.facesHint' | 'tools.main' | 'tools.tail'
   | 'tab.files' | 'tab.saves' | 'tab.opening'
   | 'files.editable' | 'files.readonly' | 'files.prompt' | 'files.confirmDelete'
   | 'files.newDir' | 'files.renamePrompt' | 'files.moveConfirm'
@@ -114,8 +114,10 @@ export const zh: Record<TavernKey, string> = {
   'id.coverUploadFailed': '封面上传失败：{message}',
   'maintenance.on': '数据维护：启用',
   'maintenance.off': '数据维护：关闭（maintenancePrompt 为空）',
-  'narrator.tools': '叙事agent默认工具（runtimeRead/Grep）',
-  'narrator.toolsHint': '关闭后叙事agent不能主动读取工作区；尾agent维护与卡自带工具不受影响。开关即卡的 meta.json 里显式的 narratorTools 字段，发布/编辑保存/导入都随卡携带；对话开始后锁定',
+  'tools.faces': '默认工具',
+  'tools.facesHint': '勾选主 / 尾 agent 各自可用的引擎默认工具（runtimeRead / runtimeGrep / runtimeWrite / runtimeEdit / runtimeDelete）。写入卡 meta.json 的 toolFaces 字段，发布 / 编辑保存 / 导入都随卡携带；对话开始后锁定',
+  'tools.main': '主',
+  'tools.tail': '尾',
   'tab.files': '文件',
   'tab.saves': '存档',
   'tab.opening': '开场页',
@@ -296,8 +298,10 @@ export const en: Record<TavernKey, string> = {
   'id.coverUploadFailed': 'Cover upload failed: {message}',
   'maintenance.on': 'tail agent: on',
   'maintenance.off': 'tail agent: off (maintenance prompt empty)',
-  'narrator.tools': 'narrator default tools (runtimeRead/Grep)',
-  'narrator.toolsHint': 'off: the narrator agent cannot read the workspace; the tail agent and card tools are unaffected. The toggle is the explicit narratorTools field in the card meta.json, carried by publish / edit-save / import; locked once the conversation starts',
+  'tools.faces': 'Default tools',
+  'tools.facesHint': 'tick which engine default tools the main / tail agent may each use (runtimeRead / runtimeGrep / runtimeWrite / runtimeEdit / runtimeDelete). Written to the toolFaces field of the card meta.json, carried by publish / edit-save / import; locked once the conversation starts',
+  'tools.main': 'main',
+  'tools.tail': 'tail',
   'tab.files': 'Files',
   'tab.saves': 'Saves',
   'tab.opening': 'Opening',

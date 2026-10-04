@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "生命结算器(恢复四态+直改)——不掷骰的 HP 变动直接落账;传 dice 则代掷恢复骰(药水/外部掷骰回血——原 heal 件并入,2026-09-30)。何时调:恢复面归户本件——掷骰回血传 dice(短休生命骰归 rest 内嵌,不在此)、剧情恩赐传 amount(正)、回满传 full、临时生命传 temp;减损(不掷骰、无攻检)传 amount(负)。Four 选一。本件只登记全新事件——已结算的骰果不得用它涂改。",
+  "description": "生命结算器(恢复四态+直改)——不掷骰的 HP 变动直接落账;传 dice 则代掷恢复骰(药水/外部掷骰回血)。何时调:恢复面归户本件——掷骰回血传 dice(短休生命骰归 rest 内嵌,不在此)、剧情恩赐传 amount(正)、回满传 full、临时生命传 temp;减损(不掷骰、无攻检)传 amount(负)。四选一。本件只登记全新事件——已结算的骰果不得用它涂改。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概:本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起,后续叙事必须遵守。" },
     "target": { "type": "string", "required": true, "description": "角色名。" },
@@ -15,7 +15,7 @@
 }
 */
 import { pathToFileURL } from 'node:url'
-const { rollExpr, resolveTarget, deathHitFail, grantTemp, injure, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rollExpr, resolveTarget, deathHitFail, deathSettleLine, grantTemp, injure, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context')
 a.target || err('缺必填 target')
@@ -60,7 +60,10 @@ if (a.temp !== undefined) {                       // 临时生命授予(H 线):�
   console.log(`  落盘: hp ${before}→${after}${note}${extra} [${tg.file}]`)
   if (woke) console.log(`  ◇ 已苏醒`)
   else if (extra && (j.death_fail ?? 0) >= 3) console.log(`  ◇ 三败——死亡(终局)`)
-  else if (after === 0 && before > 0) console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+  else if (after === 0 && before > 0) {
+    console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+    const settle = deathSettleLine(tg.j); if (settle) console.log(settle)
+  }
 }
 console.log(`  ◇ 梗概: ${a.context}`)
 console.log(`  ◇ 铁则: 后续剧情必须遵守梗概与结果，不得篡改！`)

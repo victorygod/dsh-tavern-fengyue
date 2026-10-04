@@ -47,6 +47,39 @@ export function mount(tavern) {
   }
   add(() => tools.remove())
 
+  // ── ③ 文末行动选项:点选 → 复制到输入框。正文里模型输出的 class 被富文本管线加了
+  //    custom- 前缀(实际 DOM=`.custom-choice-options .custom-choice`);composer 是 React
+  //    受控 textarea,须原生 value setter + 派发 input 事件才能让宿主 onChange 收到。──
+  const onChoiceClick = (e) => {
+    const btn = e.target instanceof Element ? e.target.closest('.custom-choice-options .custom-choice') : null
+    if (btn === null) return
+    const text = (btn.textContent ?? '').trim()
+    if (text === '') return
+    const ta = document.querySelector('textarea.tavern-textarea')
+    if (ta === null) return
+    const set = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set
+    if (set) set.call(ta, text); else ta.value = text
+    ta.dispatchEvent(new Event('input', { bubbles: true }))
+    ta.focus()
+  }
+  document.addEventListener('click', onChoiceClick)
+  add(() => document.removeEventListener('click', onChoiceClick))
+
+  // ── ④ mvu 块展开时把 JSON 重排成缩进:模型可能输出紧凑单行,纯 CSS 只能管字体/换行,
+  //    无法把单行 JSON 拆成缩进——这里在点开 summary 的当拍 parse + JSON.stringify(,2) 重排。──
+  const onMvuOpen = (e) => {
+    const sum = e.target instanceof Element ? e.target.closest('.custom-mvu-block summary') : null
+    if (sum === null) return
+    const pre = sum.parentElement?.querySelector('pre[data-mvu]')
+    if (pre === null || pre.dataset['mvuFmt'] === '1') return
+    try {
+      pre.textContent = JSON.stringify(JSON.parse(pre.textContent ?? ''), null, 2)
+      pre.dataset['mvuFmt'] = '1'
+    } catch { /* 非合法 JSON = 不折腾,保持原样 */ }
+  }
+  document.addEventListener('click', onMvuOpen)
+  add(() => document.removeEventListener('click', onMvuOpen))
+
   // ── 头像兜底(opening 预览用;HUD 面板的头像由运行时自取)──
   const AVATARS = new Map()
   async function ensureAvatar(key) {

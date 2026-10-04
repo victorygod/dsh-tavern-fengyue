@@ -56,7 +56,7 @@
   "slots_l9": 0,
   "features": {{features}},
   "pending": [],
-  "statuses": {},  // 临时状态(唯一家,对象表):key=状态名,value={applied_at, effect?, mods?:[{stat,magnitude}], temp?, on_use?}——覆盖式更新(同名 key 覆盖);mods=机械修正(白名单 ac/attack/save/attack_save/damage);temp=临时生命数额(组合池三写,取高不叠,到期回收);effect 文本带效果+持续+解除;applied_at=施加时游戏时间(agent 手写);写入者=cast 自动写 / update_character 的 statuses 数组(条目 effect/mods 机械按名自动匹配,替换式未列即摘除)
+  "statuses": {},  // 临时状态(唯一家,对象表):key=状态名,value={applied_at, effect?, mods?:[{stat,magnitude}], temp?, on_use?}——覆盖式更新(同名 key 覆盖);mods=机械修正(白名单 ac/attack/save/attack_save/damage);temp=临时生命数额(组合池三写,取高不叠,到期回收);effect 文本带效果+持续+解除;applied_at=施加时游戏时间(agent 手写);写入者=cast 自动写 / update_status 的 statuses 数组(条目 effect/mods 机械按名自动匹配,替换式未列即摘除)
   "persona": { "appearance": "{{appearance}}", "lens": "{{lens}}", "reaction": "{{reaction}}", "voice": "{{voice}}", "never": "{{never}}", "tension": "{{tension}}", "alignment": "{{alignment}}" },   // 人格七键(v10,女娲维度):appearance外观(西幻:头发/脸/特点部位+当前穿搭)/lens底色/reaction遇事契约/voice腔调/never红线/tension张力/alignment阵营——单行短串,字数闸见 lib/persona.mjs;写法与判据=docs/persona-threelayer_zh.md §2/§5
   "history": {{history}},   // 履历层(v10,行数组追加式,只增):[0]=出身+塑造往事(≤120字,事件对「之所以是此」的因果;秘密子句行首「[秘]」),运行时追加行带日戳(「第N日·」)——追加与 description 刷新同拍(同一笔写档,维护面=maintenancePrompt)
   "weapons": {{weapons}},

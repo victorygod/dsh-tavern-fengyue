@@ -48,7 +48,7 @@ import {
   registerAssembleRender, registerCardSections, registerWriterGuide, renderPlaceholders,
   renderPostMessage, runCardScript, stripInstructions,
 } from './prompting.ts'
-import { registerMainAgentTools, registerTailAgentTools } from './tools.ts'
+import { fixedToolFaces, registerMainAgentTools, registerTailAgentTools } from './tools.ts'
 import { noticeCompatRecord, withHostGuidance } from './compat-notice.ts'
 import { livePendingIds, repairSeedInbox } from './inbox-repair.ts'
 import { tailTranscriptFrom, type TailTranscript } from './tail-transcript.ts'
@@ -169,12 +169,12 @@ function readPersistedMarker(root: string, file: string): string | null {
   }
 }
 
-/** Read one workspace's narrator-tools flag from the CARD's meta.json (see
- *  {@link CARD_META_FILE}): `narratorTools` absent or true = on — every stock
- *  card needs no migration — `false` = the narrator is workspace-blind.
- *  Re-read per call; 零隐藏态：要找旗标，打开 meta.json 就看得见。 */
+/** Whether the main agent keeps its default read pair visibility — derived from
+ *  the card's `meta.json` resolved faces (see {@link fixedToolFaces}):
+ *  `narratorTools: false` or a `toolFaces.runtimeRead` that drops 'main' both
+ *  read as blind. Re-read per call; 零隐藏态：要找旗标，打开 meta.json 就看得见。 */
 function narratorToolsOn(root: string): boolean {
-  return readCardMeta(root)?.narratorTools !== false
+  return fixedToolFaces(root, 'runtimeRead').includes('main')
 }
 
 /**
@@ -1569,7 +1569,7 @@ export class TavernRuntime extends Service {
     // The narrator-tools flag rides the same sync handle as the card tools —
     // it re-reads per sync (the client's writeText/fileOp flip), so a flag
     // flip lands on the current request boundary without extra bookkeeping.
-    this.toolSyncs.set(agent, registerMainAgentTools(agent.ctx, root, this.ctx.shell, () => narratorToolsOn(root)))
+    this.toolSyncs.set(agent, registerMainAgentTools(agent.ctx, root, this.ctx.shell))
     // A fresh binding rewrites the card's history snapshot from this session's
     // durable log — the disposable cache heals whatever the runtime carried in
     // (a loaded save's stale copy, a hand-mangled one, anything).

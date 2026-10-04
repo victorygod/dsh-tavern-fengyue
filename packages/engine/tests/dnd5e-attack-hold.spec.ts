@@ -36,7 +36,7 @@ describe('dnd5e 持有闸——weapons/gear 行查无即拒(背包律)', () => {
     const r = runAttack({ weapons: ['rapier'] }, 'longbow')
     expect(r.status).toBe(1)
     expect(r.out).toContain('武器没带:longbow')
-    expect(r.out).toContain('update_character')
+    expect(r.out).toContain('update_inventory')
     expect(r.out).not.toContain('命中判定')
   })
   it('gear 自由文本包含式(CHN): gear「10 支飞镖」传 dart →放行+正常结算', () => {

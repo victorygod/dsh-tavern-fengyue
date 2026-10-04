@@ -1,13 +1,13 @@
-// persona 三层闸(docs/persona-threelayer_zh.md 定案 4/5,2026-09-30):spawn_npc/opening_commit 专属——人格七键形量硬闸
+// persona 三层闸(docs/persona-threelayer_zh.md 定案 4/5,2026-09-30):spawn_npc/opening_commit 专属——人格七键闸(字数不设限,2026-10-04 翻案)
 // +alignment 枚举+分级必填(同伴=lens/reaction/voice/tension+history;其余=lens/reaction 行为契约最小对;
 // 分级闸对传没传 persona 都生效——spawn_npc 出生的角色必带人设)。机械事实进工具——内容判断归 LLM;
 // 返回 tips=缺项软提示名单(回执 ◇ 行用)。怪不走本闸:怪人设=数据面 persona 行预生成(spawn_monster 只读)。
 // 分层语义:persona=怎么演 / history 行数组=发生了什么([0]=长期设定,可含[秘]) / description=现在怎么样。
 // 校验聚合(2026-09-30):错误**记账不即断**——全字段查完随返回值上账(errors),调用方并入字段账本一次报全
 // (spawn_npc 聚合回执一行一错;opening_commit join 成一条 fail,出生面此点无写盘,清账安全)。首错即断会把其余
-// 字段问题藏到下一轮调用。逐键账语义:同键只记一罪(在且字符串=已供,超长记超长不再补必填;缺席才记必填)。
+// 字段问题藏到下一轮调用。逐键账语义:同键只记一罪(在且字符串=已供;缺席才记必填)。
 export const PERSONA_KEYS = ['appearance', 'lens', 'reaction', 'voice', 'never', 'tension']
-export const PERSONA_LIMITS = { appearance: 40, lens: 30, reaction: 60, voice: 30, never: 30, tension: 40, description: 40, history: 120 }
+export const PERSONA_LIMITS = { description: 40, history: 120 }   // 人格七键字数不设限(2026-10-04 翻案)——仅 description/history 保留上限
 export const PERSONA_ALIGNMENTS = ['守序善良', '中立善良', '混乱善良', '守序中立', '绝对中立', '混乱中立', '守序邪恶', '中立邪恶', '混乱邪恶']
 
 export function personaGate(a, { role = 'npc', requireHistory = false } = {}) {
@@ -29,7 +29,7 @@ export function personaGate(a, { role = 'npc', requireHistory = false } = {}) {
       if (v === undefined || v === null) continue
       if (typeof v === 'string' && v.trim()) {
         got.add(k)
-        if (gate(v.length <= PERSONA_LIMITS[k], `!persona.${k} 超长(≤${PERSONA_LIMITS[k]} 字,得 ${v.length})`)) persona[k] = v.trim()
+        persona[k] = v.trim()   // 七键字数不设限(2026-10-04 翻案)——质量归判据,长度归 LLM
       } else gate(false, `!persona.${k} 须为非空字符串`)
     }
     // 必填面=分级闸,对传了 persona 的调用逐键点名(缺席键逐个记账,与超枚举/超长并排一次修净)

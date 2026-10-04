@@ -225,8 +225,8 @@ function worldHtml(st) {
   const wKey = st.weather ? weatherId(st.weather) : null
   const lines = [
     st.region ? `<div class="l up">${esc(st.region)}</div>` : '',
-    st.area ? `<div class="l up">${esc(st.area)}</div>` : '',
-    `<div class="l now">${esc(st.place)}</div>`,
+    (st.place && st.spot) ? `<div class="l up">${esc(st.place)}</div>` : '',
+    `<div class="l now">${esc(st.spot || st.place)}</div>`,
   ]
   return `
       <div class="wcard" style="--sky:${SKY[dp]}">
@@ -314,6 +314,7 @@ function radarSvg(c, d) {
     + `<polygon class="poly" points="${poly}"/>` + labels + `</svg>`
 }
 const hasKind = (c, kind) => (c?.pending ?? []).some(x => String(x).includes(kind))
+const hasChoice = (c) => (c?.pending ?? []).some(x => /待选\s*$/.test(String(x)))   // 成长选项待办(2026-10-03)
 const profGroups = (c) => [
   (c.armor_prof ?? []).length ? ['护甲熟练', c.armor_prof] : null,
   (c.weapon_prof ?? []).length ? ['武器熟练', c.weapon_prof] : null,
@@ -349,8 +350,9 @@ export function bookHtml(c, avatars = {}) {
   /* 左栏：六维(呼吸+学习框入口) → 豁免 → 速览 → 技能 → 训练与语言（2026-09-24 版面定案;标题沿用 hud-proto-v8 中文正本,2026-09-29 收编） */
   const asiPend = c.role === 'pc' && hasKind(c, 'ASI')
   const spellsPend = c.role === 'pc' && hasKind(c, '新法术')
+  const choicePend = c.role === 'pc' && hasChoice(c)
   const vitChips = `<div class="bk-chips">
-      ${chip('AC', d.ac != null && d.ac_base != null && d.ac !== d.ac_base ? `${d.ac}(${d.ac_base})` : (d.ac ?? '???'))}${c.speed != null ? chip('速度', c.speed + '尺') : ''}
+      ${chip('AC', d.ac != null && d.ac_base != null && d.ac !== d.ac_base ? `${d.ac}(${d.ac_base})` : (d.ac ?? '???'))}${(d.speed ?? c.speed) != null ? chip('速度', (d.speed ?? c.speed) + '尺') : ''}
       ${c.darkvision ? chip('暗视', c.darkvision + '尺') : ''}${chip('被动察觉', d.passive ?? '???')}
       ${c.exhaustion > 0 ? chip('力竭', c.exhaustion + '级') : ''}
       ${(c.hd_available != null && c.level != null) ? chip('治愈骰', c.hd_available + '/' + c.level) : ''}
@@ -394,10 +396,10 @@ export function bookHtml(c, avatars = {}) {
           <div class="bk-cap" data-tip="${esc(CAP_TIPS.gear)}">背包</div>
           <div class="bk-rows bk-note-rows">${(c.gear ?? []).map(t => `<div class="bk-row"><span class="a">${esc(t)}</span></div>`).join('') || NONE_ROW}</div>
         </div>`, CAP_TIPS.equip)
-  const ftHtml = sec('特征', `
+  const ftHtml = `<div class="bk-sec">${capPend('特征', choicePend, 'choice', CAP_TIPS.feats)}
         <div class="bk-rows bk-note-rows">
-          ${(c.features ?? []).map(f => { const seg = String(f).split('|'); const right = [seg[1], seg[2]].filter(Boolean).join(' · '); return `<div class="bk-row"><span class="a">${esc(featureNameCn(seg[0]))}</span>${right ? `<span class="b">${esc(right)}</span>` : ''}</div>` }).join('') || NONE_ROW}
-        </div>`, CAP_TIPS.feats)
+          ${(c.features ?? []).map(f => { const seg = String(f).split('|'); const right = [seg[1], seg[2]].filter(Boolean).join(' · '); const ft = (c.featureTips ?? {})[seg[0]]; return `<div class="bk-row"><span class="a"${ft ? ` data-tip="${esc(ft)}"` : ''}>${esc(featureNameCn(seg[0]))}</span>${right ? `<span class="b">${esc(right)}</span>` : ''}</div>` }).join('') || NONE_ROW}
+        </div></div>`
   const defHtml = sec('抗性 / 免疫', `
         <div class="bk-chips">
           ${(c.resist ?? []).map(r => chip('抗', r)).join('')}
@@ -406,7 +408,7 @@ export function bookHtml(c, avatars = {}) {
         </div>`, CAP_TIPS.resists)
   /* 小传：persona 七键(人格层=怎么演,2026-09-30 三层律 docs/persona-threelayer_zh.md)；
      history 履历两档=[0]长期设定+运行时追加行——[秘] 行 NPC 永不显示、玩家显示但去前缀;阵营在卡头。
-     当前想法 thought=NPC/怪常驻条目(内心一句,update_character 唯一写入;玩家卡不落=自主权)。 */
+     当前想法 thought=NPC/怪常驻条目(内心一句,update_memory 唯一写入;玩家卡不落=自主权)。 */
   const isPC = c.role === 'pc'
   const hist = (c.history ?? [])
     .map(b => String(b).replace(/^·\s*/, ''))

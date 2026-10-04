@@ -4,7 +4,7 @@
 // 参战者 HP/先攻 join 参战行(战斗节=参战名单,2026-09-29b 保留);缺档行双通道示警;单列旧行兼容读=中立;
 // rev 扩容(state.md 进左栏 rev)后差量协议仍成立。
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -34,8 +34,8 @@ const STATE_MD = `## 时间敏感项
 
 ## 玩家所在
 - 大区：边境边地
-- 区域：灰鸦丘陵
-- 地点：边境小镇·北门
+- 地点：边境小镇
+- 具体地点：北门
 - 地形：温带丘陵
 - 天气：小雨
 `
@@ -181,6 +181,65 @@ describe('dnd5e 附近 NPC 三态名单——注入与前端逐行镜像(2026-09
     expect(left.data?.companions).toEqual([])
     const right = pump(rt, 'hud-right')
     expect(right.data?.foes).toEqual([])
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+
+  it('同名重复行=首行胜出去重(前端一卡、注入一档,2026-10-03)', () => {
+    const dup = STATE_MD.replace('- 老铁 | 同伴', '- 老铁 | 同伴\n- 老铁 | 中立')   // 同名两行且立场不同
+    const { cwd: rt } = rig(dup)
+    // 注入:老铁只一档,取首行立场(同伴)
+    const rows = injectRows(rt)
+    expect(rows.filter(r => r.name === '老铁').map(r => r.label)).toEqual(['同伴'])
+    // 前端:老铁只进同伴池一次,第二行不误入中立池
+    const left = pump(rt, 'hud-left')
+    expect((left.data?.companions ?? []).map((c: any) => c.name)).toEqual(['老铁'])
+    expect((left.data?.neutrals ?? []).map((c: any) => c.name)).toEqual(['掌柜', '幽灵客'])
+    const right = pump(rt, 'hud-right')
+    expect((right.data?.foes ?? []).map((c: any) => c.name)).toEqual(['石牙'])
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+})
+
+// presenceAdd 幂等直测(2026-10-03):presenceAdd 是 spawn 建档时「上榜」的唯一写口(ignored 之外)。
+// 补档场景=名单已有该名而档案缺(前端「缺档」占位)→ 再调 spawn 使 saveChar+presenceAdd 双写,
+// 名单再插一遍会因 presence() 不去重而前端同名双卡。必须只改态不追加。
+function runPresenceAdd(rt: string, name: string, stance: string) {
+  const coreUrl = pathToFileURL(join(rt, '..', 'preset', 'lib', 'core.mjs')).href
+  const code = `const m = await import(${JSON.stringify(coreUrl)}); m.presenceAdd(${JSON.stringify(name)}, ${JSON.stringify(stance)})`
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: rt, encoding: 'utf8' })
+  if (r.status !== 0) throw new Error(`presenceAdd exit ${r.status}: ${r.stderr.slice(0, 300)}`)
+  return readFileSync(join(rt, 'state.md'), 'utf8')
+}
+const nearbyRows = (md: string) => (/## 附近 NPC[^\n]*\n([\s\S]*?)(?=\n## |$)/.exec(md)?.[1] ?? '')
+  .split('\n')
+  .map(l => { const t = /^-\s*([^|]+?)\s*(?:\|\s*(同伴|中立|敌对))?\s*$/.exec(l.trim()); return t && t[1].trim() !== '（无）' ? { name: t[1].trim(), stance: t[2] ?? '中立' } : null })
+  .filter((r): r is { name: string; stance: string } => r !== null)
+
+describe('presenceAdd 幂等(2026-10-03)——补档不刷同名双卡', () => {
+  it('同名已上榜(带态列)=就地改态,名下仅一行不追加', () => {
+    const { cwd: rt } = rig()
+    const md = runPresenceAdd(rt, '老铁', '中立')   // STATE_MD 里老铁=同伴
+    const rows = nearbyRows(md)
+    expect(rows.filter(r => r.name === '老铁')).toEqual([{ name: '老铁', stance: '中立' }])
+    expect(rows).toHaveLength(4)   // 老铁/石牙/掌柜/幽灵客,无一多
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+
+  it('同名在册(单列旧行)=补态列,不追加第二行', () => {
+    const legacy = STATE_MD.replace('- 老铁 | 同伴', '- 老铁')
+    const { cwd: rt } = rig(legacy)
+    const md = runPresenceAdd(rt, '老铁', '同伴')
+    expect(nearbyRows(md).filter(r => r.name === '老铁')).toEqual([{ name: '老铁', stance: '同伴' }])
+    rmSync(dirname(rt), { recursive: true, force: true })
+  })
+
+  it('新名=首插一行;再次同名=改态不新增', () => {
+    const { cwd: rt } = rig()
+    runPresenceAdd(rt, '新人', '同伴')             // 首插(新在场者在前)
+    const md = runPresenceAdd(rt, '新人', '敌对')  // 二次同名(等价补档双写)→改态不追加
+    const rows = nearbyRows(md)
+    expect(rows.filter(r => r.name === '新人')).toEqual([{ name: '新人', stance: '敌对' }])
+    expect(rows[0].name).toBe('新人')
     rmSync(dirname(rt), { recursive: true, force: true })
   })
 })

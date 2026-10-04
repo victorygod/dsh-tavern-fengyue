@@ -34,7 +34,7 @@ describe('spawn_monster 枚举选怪+档案自含(真实脚本)', () => {
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('[创建 · 狗布林哨兵乙 · 敌对]')
     expect(readFileSync(join(rt, 'state.md'), 'utf8')).toContain('- 狗布林哨兵乙 | 敌对')
-    expect(r.stdout).toMatch(/hp [1-9]=2d6-2/)   // hp_roll 掷,RAW 生命至少 1,回执带骰式作证
+    expect(r.stdout).toMatch(/hp \d+=2d6-2/)   // hp_roll 掷,RAW 生命至少 1(2d6-2 → 1..10),回执带骰式作证
     const p = j(rt, '狗布林哨兵乙.json')
     expect(p).toMatchObject({ level: 0.125, ac: 12, str: 7, dex: 15, con: 9, monster_kind: 'kobold', role: 'npc' })
     expect(p.path).toBeUndefined()              // 旧外链键退役

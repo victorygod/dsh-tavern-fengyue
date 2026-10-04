@@ -16,7 +16,7 @@
 }
 */
 import { pathToFileURL } from 'node:url'
-const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, saveChar, rollMods, dropConcentration, consumeBonus, SKILL_STAT, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, saveChar, rollMods, dropConcentration, consumeBonus, hasFeature, SKILL_STAT, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context(剧情梗概——反作弊铁则)')
 
@@ -31,8 +31,11 @@ if (a.damage !== undefined) {            // 专注维持·受伤入口：内部=
   const st = SKILL_STAT[a.skill] ?? a.stat ?? 'dex'
   const v = char[st]; v === undefined && err(`!角色无属性键 ${st}（键裁剪?）`)
   bonus += mod(v); parts.push(`${st}${mod(v) >= 0 ? '+' + mod(v) : mod(v)}`)
-  if ((char.skill_prof ?? []).includes(a.skill)) { bonus += PB; parts.push(`熟练+${PB}`) }
-  if ((char.expertise ?? []).includes(a.skill)) { bonus += PB; parts.push(`专精+${PB}`) }
+  const prof = (char.skill_prof ?? []).includes(a.skill)
+  const exp = (char.expertise ?? []).includes(a.skill)
+  if (prof) { bonus += PB; parts.push(`熟练+${PB}`) }
+  if (exp) { bonus += PB; parts.push(`专精+${PB}`) }
+  else if (!prof && hasFeature(char, 'jack of all trades')) { const h = Math.floor(PB / 2); bonus += h; parts.push(`万事通+${h}`) }   // 未熟练技能半熟练(2026-10-03)
 } else if (a.stat) {
   stat = a.stat; save = a.save === true
 } else if (a.modifier !== undefined) {
@@ -44,7 +47,7 @@ if (a.save === true && !stat && !focus) err('save:true 须配 stat(豁免走属�
 if (stat) {
   const v = char[stat]; v === undefined && err(`!角色无属性键 ${stat}`)
   const m = mod(v); bonus += m; parts.push(`${stat}${m >= 0 ? '+' + m : m}`)
-  if (save && (char.save_prof ?? []).includes(stat)) { bonus += PB; parts.push(`豁免熟练+${PB}`) }
+  if (save && ((char.save_prof ?? []).includes(stat) || hasFeature(char, 'diamond soul') || (stat === 'wis' && hasFeature(char, 'slippery mind')))) { bonus += PB; parts.push(`豁免熟练+${PB}`) }   // 钻石之魂/油滑心智=特征补熟练(2026-10-03)
   if (save) {  // B1/B2(2026-09-28):豁免掷吃 save/attack_save 修正——statusesMod 旧正则通道(effect 文本式)退役
     const bm = rollMods(char, ['save', 'attack_save'])
     bonus += bm.flat; parts.push(...bm.parts)
@@ -65,12 +68,17 @@ if (focus) { dc = Math.max(10, Math.floor(a.damage / 2)); label = `专注维持 
 else if (a.dc !== undefined) { dc = a.dc; label = `DC ${dc}` }
 
 const d1 = rnd(20), d2 = rnd(20)
-const d = a.mode === 'adv' ? Math.max(d1, d2) : a.mode === 'dis' ? Math.min(d1, d2) : d1
+let d = a.mode === 'adv' ? Math.max(d1, d2) : a.mode === 'dis' ? Math.min(d1, d2) : d1
+// 可靠天赋(2026-10-03):熟练技能的检定 d20<10 抬到 10(骰面,非加值)——机械进工具
+let rt = false
+if (a.skill && hasFeature(char, 'reliable talent') && ((char.skill_prof ?? []).includes(a.skill) || (char.expertise ?? []).includes(a.skill))) {
+  if (d < 10) { d = 10; rt = true }
+}
 const total = d + bonus
 const tail = a.mode === 'adv' ? `(优:${d1},${d2})` : a.mode === 'dis' ? `(劣:${d1},${d2})` : ''
 const tag = a.skill ? ` · ${a.skill}` : focus ? ' · 专注维持' : save ? ' · 豁免' : ''
 console.log(`[判定 · ${char.name ?? a.who ?? '玩家'}${tag}]`)
-console.log(`  判定: d20${bonus ? (bonus >= 0 ? '+' + bonus : bonus) : ''}${tail} = ${total} ${dc === undefined ? '——无 DC,与对侧比大小' : `vs ${label} → ${total >= dc ? '成功' : '失败'}`}`)
+console.log(`  判定: d20${bonus ? (bonus >= 0 ? '+' + bonus : bonus) : ''}${tail}${rt ? '(可靠天赋抬10)' : ''} = ${total} ${dc === undefined ? '——无 DC,与对侧比大小' : `vs ${label} → ${total >= dc ? '成功' : '失败'}`}`)
 if (focus && dc !== undefined && total < dc) {   // 专注维持失败→断链级联(唯一写盘例外,audit-fixes §7:判词即写)
   const dr = dropConcentration(char.name ?? a.who ?? '玩家')
   for (const r of dr.removed) console.log(`  落盘: ${r.name} statuses −「${r.key}」 [${r.file}]`)

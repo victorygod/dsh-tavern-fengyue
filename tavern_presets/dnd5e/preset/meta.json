@@ -1,9 +1,16 @@
 {
   "title": "DND 5e · 原味跑团",
-  "desc": "D&D 5e 原味单人跑团：SRD 语料 1164 篇，六件骰算计算器+两条级联工具+转录落账，悬浮 HUD。",
+  "desc": "D&D 5e 原味单人跑团，去尾代理：主面文末结算块 + main.after 钩子机械维护 state.md；SRD 语料 1164 篇，六件骰算计算器，悬浮 HUD。",
   "cover": "preset/assets/cover.webp",
   "creator": "fengyue 卡工坊",
-  "version": "0.1.0-m3",
+  "version": "0.1.0",
+  "toolFaces": {
+    "runtimeRead": ["main"],
+    "runtimeGrep": ["main"],
+    "runtimeWrite": ["main"],
+    "runtimeEdit": ["main"],
+    "runtimeDelete": ["main"]
+  },
   "tags": [
     "dnd",
     "5e",

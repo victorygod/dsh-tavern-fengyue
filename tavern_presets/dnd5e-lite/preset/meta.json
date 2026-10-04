@@ -1,0 +1,21 @@
+{
+  "title": "DND 5e · 轻量原味",
+  "desc": "D&D 5e 原味单人跑团（轻量版）：去掉 attack/cast/damage/check/rest 等机械引擎，只留 roll 掷骰 + spawn 建档 + gain 结算五件工具；完整 SRD 语料转成可查文档（规则 34 章 + 法术 319 + 怪物 333 + 职业 + 种族 + 装备）放进 setup 供 runtimeRead/Grep 查询；主/尾代理全开内置工具，状态由 LLM 手工记账。",
+  "cover": "preset/assets/cover.webp",
+  "creator": "fengyue 卡工坊",
+  "version": "0.1.0-lite",
+  "toolFaces": {
+    "runtimeRead": ["main", "tail"],
+    "runtimeGrep": ["main", "tail"],
+    "runtimeWrite": ["main", "tail"],
+    "runtimeEdit": ["main", "tail"],
+    "runtimeDelete": ["main", "tail"]
+  },
+  "tags": [
+    "dnd",
+    "5e",
+    "跑团",
+    "轻量",
+    "原味"
+  ]
+}

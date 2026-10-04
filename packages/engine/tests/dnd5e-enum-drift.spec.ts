@@ -1,5 +1,5 @@
 // dnd5e 枚举漂移钉(2026-09-30 枚举政策批):schema 级枚举=死规则/语料单源——
-// 重复字面量对写(stance ×2)、glossary-cn 正典单源(languages 16/伤害类型 13)、闭域闭环(rest kind/role)。
+// 重复字面量对写(stance ×2)、glossary-cn 正典单源(伤害类型 13)、闭域闭环(rest kind/role)。
 // 枚举即名录的核:数据/正本改动漏改 schema 时,本件红(heads-up:漂移=测试兜同步)。
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
@@ -19,12 +19,7 @@ describe('枚举漂移钉(schema=单源/正本)', () => {
       .toEqual(schemaOf('spawn_npc').parameters.stance.enum)
     expect(schemaOf('spawn_npc').parameters.stance.enum).toEqual(['同伴', '中立', '敌对'])
   })
-  it('languages 16 键==glossary-cn LANGUAGE_CN 单源', async () => {
-    const { LANGUAGE_CN } = await import(pathToFileURL(join(CARD, 'lib', 'glossary-cn.mjs')).href)
-    expect(schemaOf('update_character').parameters.languages.items.enum)
-      .toEqual([...Object.keys(LANGUAGE_CN)])
-  })
-  it('damage type 13 型==glossary-cn DAMAGE_TYPE_CN 单源;数据面(spell-data/EQ_CORE)全在 13 内', async () => {
+    it('damage type 13 型==glossary-cn DAMAGE_TYPE_CN 单源;数据面(spell-data/EQ_CORE)全在 13 内', async () => {
     const { DAMAGE_TYPE_CN } = await import(pathToFileURL(join(CARD, 'lib', 'glossary-cn.mjs')).href)
     const thirteen = [...Object.keys(DAMAGE_TYPE_CN)]
     expect(thirteen).toHaveLength(13)
@@ -41,6 +36,6 @@ describe('枚举漂移钉(schema=单源/正本)', () => {
   })
   it('rest kind/role 闭域枚举闭环', () => {
     expect(schemaOf('rest').parameters.kind.enum).toEqual(['short', 'long'])
-    expect(schemaOf('update_character').parameters.role.enum).toEqual(['companion', 'npc'])
+    expect(schemaOf('update_status').parameters.role.enum).toEqual(['companion', 'npc'])
   })
 })

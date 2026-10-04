@@ -44,16 +44,14 @@ describe('spawn_npc 错误聚合回执(真实脚本)', () => {
     expect(existsSync(join(rt, 'characters', '全坏甲.json'))).toBe(false)
     rmSync(base, { recursive: true, force: true })
   })
-  it('同字段多罪并排:两条法术同报(旧首错即断只剩一条);单键超长不再补必填(同键一罪)', () => {
+  it('同字段多罪并排:三条法术同报(旧首错即断只剩一条)', () => {
     const { cwd: rt, base } = rig()
     // cleric L1:Fireball=非本职业表+超环两罪;not-a-spell=查无——三罪一张回执
-    const r = runTool(rt, 'spawn_npc', { context: 'x', name: '串表', stance: '敌对', class: 'cleric', level: 1, abilities: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 12 }, spells_known: ['Fireball', 'not-a-spell'], persona: { lens: '一'.repeat(31), reaction: '被质疑→冷笑' } })
+    const r = runTool(rt, 'spawn_npc', { context: 'x', name: '串表', stance: '敌对', class: 'cleric', level: 1, abilities: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 12 }, spells_known: ['Fireball', 'not-a-spell'], persona: { lens: '看人先看钱路', reaction: '被质疑→冷笑' } })
     expect(r.status).toBe(1)
     expect(r.stdout).toContain('!法术非本职业表:Fireball')
     expect(r.stdout).toContain('!法术环位超可施:Fireball')
     expect(r.stdout).toContain('!查无法术:not-a-spell')
-    expect(r.stdout).toContain('!persona.lens 超长(≤30 字,得 31)')
-    expect(r.stdout).not.toContain('persona.lens 必填')   // 同键一罪:超长记超长,不再补必填
     rmSync(base, { recursive: true, force: true })
   })
   it('同伴多键缺项:逐键点名(voice/tension/history 一并记账)', () => {

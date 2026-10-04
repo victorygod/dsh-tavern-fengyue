@@ -9,7 +9,7 @@
 */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { rnd, mod, findCharFile, combatWrite, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rnd, mod, findCharFile, combatWrite, hasFeature, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context')
 const names = String(a.combatants ?? '').split(/[,，]/).map(s => s.trim()).filter(Boolean)
@@ -20,7 +20,10 @@ for (const name of names) {
   const f = findCharFile(name)
   if (!f) err(`!未建档:${name}——先用角色创建工具建档再开战`)
   const j = JSON.parse(readFileSync(f, 'utf8'))
-  rows.push({ name, j, init: rnd(20) + mod(j.dex ?? 10) })
+  // 野性本能(2026-10-03):先攻优势——机械进工具(2d20 取高)
+  let roll = rnd(20)
+  if (hasFeature(j, 'feral instinct')) { const r2 = rnd(20); roll = Math.max(roll, r2) }
+  rows.push({ name, j, init: roll + mod(j.dex ?? 10), adv: hasFeature(j, 'feral instinct') })
 }
 rows.sort((x, y) => y.init - x.init)
 

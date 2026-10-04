@@ -255,7 +255,7 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
     const { cwd: rt, base } = rig()
     runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林', count: 2, stance: '敌对', monster_kind: 'goblin' })
     // seed 2 → d20=8: scimitar +4 → 12 vs AC 11 命中;1d6+2 ∈ 3..8,玩家 hp 10 不至 0
-    const r = runTool(rt, 'attack', { context: '夜袭', who: '哥布林乙', target: '梅西雅', attack: 'scimitar' }, 2)
+    const r = runTool(rt, 'attack', { context: '夜袭', who: '哥布林乙', target: '梅西雅', weapon: 'scimitar' }, 2)
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/伤害判定: 1d6\+2=\d+ = \d+ slashing/)
     expect(r.stdout).toMatch(/落盘: 梅西雅 hp 10→[2-7] \[characters\/player\.json\]/)
@@ -264,7 +264,7 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   it('attack 濒死自动暴击(表路径):reach5 咬击 2d4+2 翻 4d4+2,败+2,三败判词', () => {
     const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
     runTool(rt, 'spawn_monster', { context: 'x', name: '狼', stance: '敌对', monster_kind: 'wolf'  })
-    const r = runTool(rt, 'attack', { context: '狼牙锁喉', who: '狼', target: '梅西雅', attack: 'bite' }, 2)
+    const r = runTool(rt, 'attack', { context: '狼牙锁喉', who: '狼', target: '梅西雅', weapon: 'bite' }, 2)
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('4d4+2')
     expect(r.stdout).toContain('濒死败+2(濒死·5尺自动暴击)')
@@ -275,7 +275,7 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   it('attack 出生登记+长触及 beyond_5ft:5 尺外不自动暴击,败+1', () => {
     const { cwd: rt, base } = rig({ ...PLAYER, hp: 0, death_fail: 1 })
     runTool(rt, 'spawn_monster', { context: 'x', name: '大蜥蜴', stance: '敌对', monster_kind: 'goblin', attacks: ['bite|melee|+4|2d4+2|piercing|10'] })
-    const r = runTool(rt, 'attack', { context: '十尺外甩尾', who: '大蜥蜴', target: '梅西雅', attack: 'bite', beyond_5ft: true }, 2)
+    const r = runTool(rt, 'attack', { context: '十尺外甩尾', who: '大蜥蜴', target: '梅西雅', weapon: 'bite', beyond_5ft: true }, 2)
     expect(r.status).toBe(0)
     expect(r.stdout).toContain('濒死败+1')
     expect(r.stdout).toContain('death_fail 1→2')
@@ -286,7 +286,7 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
     const { cwd: rt, base } = rig()
     runTool(rt, 'spawn_monster', { context: 'x', name: '蜥蜴人', stance: '敌对', monster_kind: 'goblin', attacks: ['bite|melee|+4|1d10+9|piercing|5'] })
     runTool(rt, 'spawn_npc', { context: 'x', name: '路人甲', stance: '敌对', class: 'commoner', level: 1, persona: { lens: '混口饭吃', reaction: '遇乱→躲' } })   // 普通人=spawn_npc 职业(2026-09-30 迁出 spawn_monster 枚举)
-    const r = runTool(rt, 'attack', { context: '一口定音', who: '蜥蜴人', target: '路人甲', attack: 'bite' }, 2)
+    const r = runTool(rt, 'attack', { context: '一口定音', who: '蜥蜴人', target: '路人甲', weapon: 'bite' }, 2)
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/落盘: 路人甲 hp \d→0 \[characters\/路人甲\.json\]/)   // commoner hp=d8+con0=8
     expect(r.stdout).toContain('0HP——即死')
@@ -295,9 +295,9 @@ describe('attack/cast 当拍写盘(真实脚本)', () => {
   it('attack 表外攻击名响亮报错', () => {
     const { cwd: rt, base } = rig()
     runTool(rt, 'spawn_monster', { context: 'x', name: '哥布林甲', stance: '敌对', monster_kind: 'goblin'  })
-    const r = runTool(rt, 'attack', { context: 'x', who: '哥布林甲', target: '梅西雅', attack: 'nope' })
+    const r = runTool(rt, 'attack', { context: 'x', who: '哥布林甲', target: '梅西雅', weapon: 'nope' })
     expect(r.status).toBe(1)
-    expect(r.stdout).toContain('!攻击名查不到:nope')
+    expect(r.stdout).toContain('!攻击无源:nope')
     rmSync(base, { recursive: true, force: true })
   })
   it('cast 豁免型:位检落盘+专注 RAW 覆写(顶替 bless)', () => {

@@ -137,7 +137,6 @@ function TavernWorkspace(props: WorkspaceProps): ReactNode {
   const { rpc, sessionId, t, onLoaded } = props
   const [mode, setMode] = useState<Mode>(props.start)
   const [maintenanceOn, setMaintenanceOn] = useState(false)
-  const [narratorToolsOn, setNarratorToolsOn] = useState(true)
   const [dialogStarted, setDialogStarted] = useState(false)
   const [editing, setEditing] = useState<string | null>(props.editMode ?? null)
   // 依赖 onLoaded 本体（上游 useCallback 稳定）而非 props 对象——props 每次父渲染
@@ -147,7 +146,6 @@ function TavernWorkspace(props: WorkspaceProps): ReactNode {
     onLoaded()
     void rpc.state({ sessionId }).then((value) => {
       setMaintenanceOn(value.maintenanceOn)
-      setNarratorToolsOn(value.narratorToolsOn)
       setDialogStarted(value.dialogStarted)
       setEditing(value.editing)
     }, () => { setMaintenanceOn(false) })
@@ -177,7 +175,7 @@ function TavernWorkspace(props: WorkspaceProps): ReactNode {
       )}
       {mode.kind === 'preview' && <ImportPreviewPanel rpc={rpc} sessionId={sessionId} setMode={setMode} reloadState={reloadState} onCardReady={props.onCardReady ?? (() => undefined)} t={t} title={mode.title} files={mode.files} cover={mode.cover} />}
       {mode.kind === 'draft' && <DraftPanel rpc={rpc} sessionId={sessionId} setMode={setMode} reloadState={reloadState} onCardReady={props.onCardReady ?? (() => undefined)} editMode={props.editMode ?? null} onSessionSwitch={props.onSessionSwitch} sessions={props.sessions} models={props.models} conversation={props.conversation} checkKey={props.checkKey} onNeedKey={props.onNeedKey} t={t} />}
-      {mode.kind === 'workspace' && <WorkspacePanel rpc={rpc} sessionId={sessionId} t={t} maintenanceOn={maintenanceOn} narratorToolsOn={narratorToolsOn} dialogStarted={dialogStarted} initialTab={props.initialTab} onSessionSwitch={props.onSessionSwitch} editing={editing} onBackToLibrary={editing !== null ? backToLibrary : undefined} sessions={props.sessions} models={props.models} conversation={props.conversation} checkKey={props.checkKey} onNeedKey={props.onNeedKey} />}
+      {mode.kind === 'workspace' && <WorkspacePanel rpc={rpc} sessionId={sessionId} t={t} maintenanceOn={maintenanceOn} dialogStarted={dialogStarted} initialTab={props.initialTab} onSessionSwitch={props.onSessionSwitch} editing={editing} onBackToLibrary={editing !== null ? backToLibrary : undefined} sessions={props.sessions} models={props.models} conversation={props.conversation} checkKey={props.checkKey} onNeedKey={props.onNeedKey} />}
     </div>
   )
 }
@@ -686,9 +684,6 @@ function DraftPanel(base: PanelBase & {
   const [published, setPublished] = useState<string | null>(null)
   // 尾代理状态只由 maintenancePrompt 内容决定（空 = 关）；失焦保存后周期刷新 chip。
   const [tailOn, setTailOn] = useState(false)
-  // 叙事agent默认工具 checkbox（与工作空间页同旗）：preset 标记缺席 = 开；
-  // 随卡携带 —— 保存并开始后新会话里的 checkbox 即建卡时的选择。
-  const [narratorToolsOn, setNarratorToolsOn] = useState(true)
   // 写卡列活动信号：驱动编辑器与 meta 轮询的双档节奏（活动 2s / 空闲 8s）。
   const [writerActive, setWriterActive] = useState(true)
   // 写卡列挂载期间轮询 meta（agent 可改 title/desc/cover）；身份行编辑中暂停。
@@ -713,26 +708,11 @@ function DraftPanel(base: PanelBase & {
       void rpc.readText({ sessionId, path: TAIL_PATH }).then((value) => {
         setTailOn(value.text.trim() !== '')
       }, () => { setTailOn(false) })
-      // 旗标在卡身份 meta.json 的 narratorTools 字段上（缺席/解析失败 = 开）。
-      void rpc.readText({ sessionId, path: META_PATH }).then((value) => {
-        try {
-          const parsed = JSON.parse(value.text) as { narratorTools?: unknown }
-          setNarratorToolsOn(parsed.narratorTools !== false)
-        } catch { setNarratorToolsOn(true) }
-      }, () => { setNarratorToolsOn(true) })
     }
     refresh()
     const timer = window.setInterval(refresh, 2000)
     return () => { window.clearInterval(timer) }
   }, [ready, rpc, sessionId])
-  // 乐观翻转（失败回滚）；写/删走 flipNarratorToolsRpc 的既有端点。
-  const flipNarratorTools = (next: boolean): void => {
-    setNarratorToolsOn(next)
-    void flipNarratorToolsRpc(rpc, sessionId, next).catch((error: unknown) => {
-      setNarratorToolsOn(!next)
-      console.warn('[tavern] narrator tools toggle failed', error)
-    })
-  }
   const publish = (): void => {
     void rpc.publishCard({ sessionId }).then((value) => {
       setPublished(value.name)
@@ -788,14 +768,7 @@ function DraftPanel(base: PanelBase & {
               <span className={`${css.chip} ${tailOn ? css.on : ''}`}>
                 {tailOn ? t('maintenance.on') : t('maintenance.off')}
               </span>
-              <label className={css.optRow} title={t('narrator.toolsHint')}>
-                <input
-                  type="checkbox"
-                  checked={narratorToolsOn}
-                  onChange={(event) => { flipNarratorTools(event.currentTarget.checked) }}
-                />
-                {t('narrator.tools')}
-              </label>
+              <DefaultToolsControl rpc={rpc} sessionId={sessionId} t={t} />
             </div>
           </>
         }
@@ -829,11 +802,9 @@ function WorkspacePanel(props: {
   sessionId: string
   t: TranslateNS<typeof NS>
   maintenanceOn: boolean
-  /** The narrator default-tools flag (engine-owned; the checkbox mirrors it
-   *  optimistically and reloadState is the correction path). */
-  narratorToolsOn: boolean
-  /** The conversation already started — greys the narrator checkbox out: the
-   *  flag part of the card's identity, editable only before the first turn. */
+  /** The conversation already started — greys the default-tools dropdown out:
+   *  the faces are part of the card's identity, editable only before the first
+   *  turn. */
   dialogStarted: boolean
   /** The modal opens straight into one page: 设置 → files, 加载 → saves. */
   initialTab?: WorkspaceTab | undefined
@@ -856,18 +827,6 @@ function WorkspacePanel(props: {
   const dialogStarted = props.dialogStarted === true
   const [savedName, setSavedName] = useState<string | null>(null)
   const [confirmBack, setConfirmBack] = useState(false)
-  // 叙事agent默认工具 checkbox：本地镜像做乐观翻转（失败回滚），权威值随
-  // reloadState 的 props 修正，与数据维护 chip 的「引擎为真、视图跟读」同型。
-  const [narratorToolsOn, setNarratorToolsOn] = useState(props.narratorToolsOn)
-  const { narratorToolsOn: narratorToolsOnProp } = props
-  useEffect(() => { setNarratorToolsOn(narratorToolsOnProp) }, [narratorToolsOnProp])
-  const flipNarratorTools = (next: boolean): void => {
-    setNarratorToolsOn(next)
-    void flipNarratorToolsRpc(rpc, sessionId, next).catch((error: unknown) => {
-      setNarratorToolsOn(!next)
-      console.warn('[tavern] narrator tools toggle failed', error)
-    })
-  }
   // 写卡列活动信号：驱动编辑器与 meta 轮询的双档节奏（活动 2s / 空闲 8s）。
   const [writerActive, setWriterActive] = useState(true)
   // 写卡列挂载期间轮询 meta；身份行编辑中暂停（同 DraftPanel）。
@@ -931,24 +890,12 @@ function WorkspacePanel(props: {
                 }}
               >{t('preview.commit')}</button>
             )}
-            {/* 数据维护指示与 narrator 旗标 checkbox 同一竖列；该列与保存类按钮同一排。 */}
+            {/* 数据维护指示与默认工具下拉同一竖列；该列与保存类按钮同一排。 */}
             <div className={css.actionCol}>
               <span className={`${css.chip} ${maintenanceOn ? css.on : ''}`}>
                 {maintenanceOn ? t('maintenance.on') : t('maintenance.off')}
               </span>
-              {/* 对话一旦开始即锁灰：旗标是卡的身份（还没开始对话才可改）。 */}
-              <label
-                className={dialogStarted ? `${css.optRow} ${css.optRowLocked}` : css.optRow}
-                title={t('narrator.toolsHint')}
-              >
-                <input
-                  type="checkbox"
-                  checked={narratorToolsOn}
-                  disabled={dialogStarted}
-                  onChange={(event) => { flipNarratorTools(event.currentTarget.checked) }}
-                />
-                {t('narrator.tools')}
-              </label>
+              <DefaultToolsControl rpc={rpc} sessionId={sessionId} t={t} locked={dialogStarted} />
             </div>
           </>}
           t={t}
@@ -1007,19 +954,58 @@ const READONLY_PREFIXES = ['savings/']
 const TAIL_PATH = 'preset/prompt/maintenancePrompt'
 
 /**
- * Flip the narrator-tools flag where it lives — an explicit `narratorTools`
- * boolean on the CARD's own `preset/meta.json` (visible, hand-editable JSON).
- * Read → tolerant parse → set field → write back through the frozen wire's
- * existing `writeText` (engine re-syncs the tool face on this exact path). No
- * dedicated wire method — the typert manifest is frozen (2026-09-20 devlog).
- * Every preset whole-copy boundary (发布 / 编辑保存 / 导卡) carries meta.json,
- * so the flag follows the card into every new session.
+ * The engine's fixed runtime tools, in display order (mirrors
+ * engine/tools.ts FIXED_TOOL_NAMES). Their per-face assignment is the card's
+ * `toolFaces` identity field the dropdown edits.
+ */
+const FIXED_TOOL_KEYS = ['runtimeRead', 'runtimeGrep', 'runtimeWrite', 'runtimeEdit', 'runtimeDelete'] as const
+
+/** Face name one tool column toggles. */
+type ToolFace = 'main' | 'tail'
+
+/**
+ * The effective face matrix of the five fixed tools for a parsed meta.json —
+ * the dropdown's seed and the write path's materialization. An explicit,
+ * well-formed `toolFaces` entry wins outright (empty array = neither face);
+ * absent, the legacy default applies: the read pair rides 'tail' always and
+ * 'main' unless `narratorTools` is false, the write trio is tail-only. This is
+ * the UI-side mirror of the engine's `fixedToolFaces` legacy fallback.
+ * @param record - the parsed meta.json record (may be empty for a broken card).
+ * @returns tool name → face names ('main' first, then 'tail').
+ */
+function facesFromMeta(record: Record<string, unknown>): Record<string, readonly string[]> {
+  const narratorOn = record.narratorTools !== false
+  const explicit = record.toolFaces
+  const faces: Record<string, readonly string[]> = {}
+  for (const key of FIXED_TOOL_KEYS) {
+    const entry = explicit !== null && typeof explicit === 'object' && !Array.isArray(explicit)
+      ? (explicit as Record<string, unknown>)[key]
+      : undefined
+    if (Array.isArray(entry) && entry.every(face => face === 'main' || face === 'tail')) {
+      faces[key] = entry as string[]
+      continue
+    }
+    const writable = key === 'runtimeWrite' || key === 'runtimeEdit' || key === 'runtimeDelete'
+    faces[key] = writable ? ['tail'] : (narratorOn ? ['main', 'tail'] : ['tail'])
+  }
+  return faces
+}
+
+/**
+ * Write the face matrix back where it lives — an explicit `toolFaces` object on
+ * the CARD's own `preset/meta.json`. Read → tolerant parse → materialize the
+ * full five-tool matrix → write through the frozen wire's existing `writeText`
+ * (the engine re-syncs the tool face on this exact path). No dedicated wire
+ * method — the typert manifest is frozen (2026-09-20 devlog). The legacy
+ * `narratorTools` field is left in place: an explicit `toolFaces` supersedes it
+ * on the engine side. Every preset whole-copy boundary (发布 / 编辑保存 / 导卡)
+ * carries meta.json, so the matrix follows the card into every new session.
  * @param rpc - the tavern rpc face.
  * @param sessionId - session identity.
- * @param on - whether the narrator keeps its default read pair.
- * @returns the flip's settlement promise.
+ * @param faces - the full materialized face matrix to write.
+ * @returns the write's settlement promise.
  */
-async function flipNarratorToolsRpc(rpc: TavernRpc, sessionId: string, on: boolean): Promise<unknown> {
+async function writeToolFaces(rpc: TavernRpc, sessionId: string, faces: Record<string, readonly string[]>): Promise<unknown> {
   let record: Record<string, unknown> = {}
   try {
     const { text } = await rpc.readText({ sessionId, path: META_PATH })
@@ -1028,8 +1014,85 @@ async function flipNarratorToolsRpc(rpc: TavernRpc, sessionId: string, on: boole
   } catch {
     // meta.json 缺席或解析失败：从空身份起写（引擎侧状态读取同此容错）。
   }
-  record.narratorTools = on
+  record.toolFaces = faces
   return rpc.writeText({ sessionId, path: META_PATH, text: `${JSON.stringify(record, undefined, 2)}\n` })
+}
+
+/**
+ * The default-tools dropdown: a tool list with two checkbox columns (主 / 尾)
+ * that patches the card's `toolFaces` identity. Seeded from a single
+ * `readText(META_PATH)`; each toggle optimistically updates the local matrix
+ * and writes it back, rolling back on failure. `locked` (the conversation
+ * already started) greys it out — the faces are fixed once the card ships.
+ */
+function DefaultToolsControl(props: { rpc: TavernRpc; sessionId: string; t: TranslateNS<typeof NS>; locked?: boolean }): ReactNode {
+  const { rpc, sessionId, t, locked } = props
+  const [faces, setFaces] = useState<Record<string, readonly string[]> | null>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void rpc.readText({ sessionId, path: META_PATH }).then((value) => {
+      if (!alive) return
+      try {
+        setFaces(facesFromMeta(JSON.parse(value.text) as Record<string, unknown>))
+      } catch {
+        setFaces(facesFromMeta({}))
+      }
+    }, () => { if (alive) setFaces(facesFromMeta({})) })
+    return () => { alive = false }
+  }, [rpc, sessionId])
+  const toggle = (name: string, face: ToolFace): void => {
+    if (locked || faces === null) return
+    const current = faces[name] ?? []
+    const next = current.includes(face) ? current.filter(entry => entry !== face) : [...current, face]
+    const nextFaces = { ...faces, [name]: next }
+    setFaces(nextFaces)
+    void writeToolFaces(rpc, sessionId, nextFaces).catch((error: unknown) => {
+      setFaces(faces)
+      console.warn('[tavern] tool faces write failed', error)
+    })
+  }
+  return (
+    <div className={css.toolFaces}>
+      <button
+        type="button"
+        className={`${css.toolFacesTrigger} ${open ? css.toolFacesOpen : ''}`}
+        title={t('tools.facesHint')}
+        onClick={() => { setOpen(current => !current) }}
+      >
+        {t('tools.faces')}
+        <span className={css.toolFacesCaret}>▾</span>
+      </button>
+      {open && (
+        <div className={css.toolFacesMenu}>
+          <div className={`${css.toolFacesRow} ${css.toolFacesHead}`}>
+            <span className={css.toolFacesName} />
+            <span className={css.toolFacesCol}>{t('tools.main')}</span>
+            <span className={css.toolFacesCol}>{t('tools.tail')}</span>
+          </div>
+          {FIXED_TOOL_KEYS.map(name => (
+            <div key={name} className={css.toolFacesRow}>
+              <span className={css.toolFacesName}>{name}</span>
+              <input
+                type="checkbox"
+                aria-label={`${name} ${t('tools.main')}`}
+                checked={(faces?.[name] ?? []).includes('main')}
+                disabled={locked || faces === null}
+                onChange={() => toggle(name, 'main')}
+              />
+              <input
+                type="checkbox"
+                aria-label={`${name} ${t('tools.tail')}`}
+                checked={(faces?.[name] ?? []).includes('tail')}
+                disabled={locked || faces === null}
+                onChange={() => toggle(name, 'tail')}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 const ASSET_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|bmp|mp3|wav|ogg|m4a|mp4|webm|mov)$/i
 /** Editor poll cadence: fast while the writer session is active, slow once idle. */

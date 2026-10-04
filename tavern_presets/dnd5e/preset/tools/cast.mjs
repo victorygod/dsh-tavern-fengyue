@@ -14,7 +14,7 @@
 */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, resolveTarget, resolveSave, deathHitFail, dropConcentration, grantTemp, injure, saveChar, rollMods, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, resolveTarget, resolveSave, deathHitFail, deathSettleLine, dropConcentration, grantTemp, injure, saveChar, rollMods, hasFeature, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { SPELL_DATA } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-data.mjs').href)
 const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
 const a = globalThis.argv ?? {}
@@ -105,7 +105,10 @@ function hurt(t, dmg, crit = false) {
     lines.push(`  ◇ 0HP 受击——濒死败+${crit ? 2 : 1}${crit ? '(暴击源)' : ''}`)
     if (tg.j.death_fail >= 3) lines.push(`  ◇ 三败——死亡(终局)`)
   }
-  else if (after === 0 && dmg > 0) lines.push(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+  else if (after === 0 && dmg > 0) {
+    lines.push(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+    const settle = deathSettleLine(tg.j); if (settle) lines.push(settle)
+  }
 }
 function resistNote(tg, typeKey) {
   // 2026-09-28 审计批 B3:豁免/自动弹分支同律接入(与 attack 同一函数,易伤×2 补齐)。
@@ -255,10 +258,12 @@ if ((healDice || healFlat || T?.healPool || T?.raise || T?.stabilize) && !fm.att
   if (dice) for (const r of rolls) {
     const roll = rollExpr(String(dice)); roll || err(`!骰式不合法:${dice}`)
     const base = roll.total + hitFlat
+    // 闪避(2026-10-03):敏豁免半伤型——成功免伤(非半伤),失败半伤(非全伤)。机械进工具。
+    const eva = fm.half_on_save === true && String(save).toLowerCase() === 'dex' && hasFeature(r.tg, 'evasion')
     const half = r.pass && fm.half_on_save === true
-    const halfDmg = half ? Math.floor(base / 2) : base
-    lines.push(`  伤害判定: ${r.t} ${dice}=${roll.total}${hitFlat ? '+' + hitFlat : ''}${half ? '(半伤:对总额减半)' : ''} → ${halfDmg} ${fm.damage_type ?? T?.type ?? ''}`)
-    hurt(r.t, resistNote(r.tg, typeKey)(halfDmg))
+    const halfDmg = eva ? (r.pass ? 0 : Math.floor(base / 2)) : (half ? Math.floor(base / 2) : base)
+    lines.push(`  伤害判定: ${r.t} ${dice}=${roll.total}${hitFlat ? '+' + hitFlat : ''}${eva ? (r.pass ? '(闪避→免伤)' : '(闪避→半伤)') : half ? '(半伤:对总额减半)' : ''} → ${halfDmg} ${fm.damage_type ?? T?.type ?? ''}`)
+    if (halfDmg > 0) hurt(r.t, resistNote(r.tg, typeKey)(halfDmg))
   }
   else lines.push(`  ◇ 无伤害骰——豁免即效果`)
   if (T?.onFail) for (const r of rolls) if (!r.pass) onFailApply(r)

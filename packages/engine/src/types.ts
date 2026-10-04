@@ -19,8 +19,15 @@ export interface TavernCardMeta {
   tags?: readonly string[]
   /** Whether the narrator agent starts with its default workspace-visibility
    *  read pair (runtimeRead/runtimeGrep). Explicit JSON on the card identity —
-   *  absent/true = on, `false` = the narrator is workspace-blind. */
+   *  absent/true = on, `false` = the narrator is workspace-blind. Retained as
+   *  the legacy fallback for the read pair while `toolFaces` is absent. */
   narratorTools?: boolean
+  /** Per-tool face assignments for the engine's fixed runtime tools
+   *  (`runtimeRead`/`runtimeGrep`/`runtimeWrite`/`runtimeEdit`/`runtimeDelete`):
+   *  tool name → face names (`'main'`/`'tail'`), an empty array = the tool is
+   *  registered on neither face. Absent = legacy defaults (the read pair rides
+   *  `narratorTools` on the main face, the write trio is tail-only). */
+  toolFaces?: Readonly<Record<string, readonly string[]>>
 }
 
 /** One library card directory under the configured library root. */

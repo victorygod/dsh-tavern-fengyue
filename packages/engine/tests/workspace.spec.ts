@@ -195,6 +195,28 @@ describe('seed / tree / reads', () => {
     expect(readCardMeta(imported)?.narratorTools).toBe(true)
   })
 
+  it('toolFaces parses well-formed face arrays and drops invalid entries', () => {
+    const root = freshRoot()
+    writeCardSkeleton(root)
+    writeWorkspaceText(root, 'preset/meta.json', `${JSON.stringify({
+      title: '面矩阵卡',
+      toolFaces: {
+        runtimeRead: ['main', 'tail'],
+        runtimeWrite: ['tail'],
+        runtimeDelete: [],
+        runtimeGrep: 'unexpected-string', // 非法：非数组，整条丢弃
+        runtimeEdit: ['sidecar'],        // 非法：面名越界，整条丢弃
+      },
+    }, undefined, 2)}\n`)
+
+    const meta = readCardMeta(root)
+    expect(meta?.toolFaces).toEqual({
+      runtimeRead: ['main', 'tail'],
+      runtimeWrite: ['tail'],
+      runtimeDelete: [],
+    })
+  })
+
   it('reads are fenced and byte-capped', () => {
     const root = freshRoot()
     writeCardSkeleton(root)

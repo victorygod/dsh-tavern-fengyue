@@ -233,6 +233,115 @@
   cursor: not-allowed;
 }
 
+/* 默认工具下拉（actionCol 一格）：触发按钮 + 绝对定位选单（工具行 × 主/尾两列）。
+ * 选单右对齐动作列，向下展开盖在内容上；触发按钮只在未锁定时可开。 */
+.toolFaces {
+  position: relative;
+}
+
+.toolFacesTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--t-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.toolFacesTrigger:hover,
+.toolFacesTrigger.toolFacesOpen {
+  color: var(--t-fg);
+}
+
+.toolFacesCaret {
+  font-size: 9px;
+}
+
+.toolFacesMenu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 214px;
+  padding: 6px 0;
+  background: var(--t-surface-card);
+  border: 1px solid var(--t-border);
+  border-radius: 9px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  z-index: 20;
+}
+
+.toolFacesRow {
+  display: grid;
+  grid-template-columns: 1fr 26px 26px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+}
+
+.toolFacesHead {
+  padding-bottom: 2px;
+}
+
+.toolFacesHead .toolFacesName {
+  height: 0;
+}
+
+.toolFacesName {
+  font-size: 11px;
+  color: var(--t-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolFacesCol {
+  font-size: 10px;
+  color: var(--t-muted);
+  text-align: center;
+}
+
+/* 自绘 checkbox：白底方框，勾选后实心绿 + 白色对勾（暗色主题下也白底清晰）。 */
+.toolFacesRow input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  border: 1px solid var(--t-border);
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+}
+
+.toolFacesRow input:checked {
+  background: var(--t-ok);
+  border-color: var(--t-ok);
+}
+
+.toolFacesRow input:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.toolFacesRow input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn {
   padding: 6px 14px;
   border-radius: 9px;

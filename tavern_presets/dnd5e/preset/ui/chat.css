@@ -1,0 +1,60 @@
+/* dnd5e-mvu 聊天区改造（自动作用域 .tavern-stage）——
+   正文里模型输出的 class 会被富文本管线加 `custom-` 前缀，故此处选择器一律带 custom-；
+   元素选择器（summary/pre）不加前缀。mvu 块默认折叠，行动选项点选复制到输入框。 */
+
+/* 文末 mvu 块：默认折叠的回合结算 JSON */
+.custom-mvu-block {
+  margin: 0.6em 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px dashed rgba(127, 127, 127, 0.45);
+  border-radius: 6px;
+  overflow: hidden;
+  opacity: 0.92;
+}
+.custom-mvu-block summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 10px;
+  color: rgba(120, 120, 120, 0.95);
+  list-style: none;
+}
+.custom-mvu-block summary::marker,
+.custom-mvu-block summary::-webkit-details-marker {
+  display: none;
+}
+.custom-mvu-block summary::before { content: '▸ '; }
+.custom-mvu-block[open] summary::before { content: '▾ '; }
+.custom-mvu-block pre {
+  margin: 0;
+  padding: 8px 12px;
+  white-space: pre;
+  max-height: 16em;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  background: rgba(127, 127, 127, 0.07);
+}
+
+/* 行动选项：点击复制到输入框 */
+.custom-choice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.6em;
+}
+.custom-choice-options .custom-choice {
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.4);
+  background: transparent;
+  color: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.custom-choice-options .custom-choice:hover {
+  background: rgba(127, 127, 127, 0.12);
+  border-color: rgba(127, 127, 127, 0.7);
+}

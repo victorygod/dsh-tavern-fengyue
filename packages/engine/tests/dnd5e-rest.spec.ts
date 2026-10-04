@@ -1,5 +1,5 @@
 // rest 件钉(2026-09-28,audit-fixes §8 G 线):短休掷骰+池+契术师 / 长休 hd 公式 / slots 三位表回满 /
-// 力竭 food 闸 / hp0 err + 24h 铁轨 err。位表 slotsFor 已迁 core 单源(gain_exp 回归绿由现有 suite 保证)。
+// 力竭 food 闸 / hp0 err(24h 窗口已随 mvu 卡撤除)。位表 slotsFor 已迁 core 单源。
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -50,7 +50,6 @@ describe('rest 休整件(真实脚本)', () => {
     expect(r.stdout).toMatch(/slots_l3 0→2/)
     expect(j(rt)).toMatchObject({ hp: 30, slots_l1: 4, slots_l2: 3, slots_l3: 2 })
     expect(j(rt).hd_available).toBe(5)              // 3 + max(1,⌊5/2⌋)=3 → min(5,5)=5
-    expect(readFileSync(join(rt, 'state.md'), 'utf8')).toContain('last_long_rest=第3日·10时')
     rmSync(base, { recursive: true, force: true })
   })
   it('长休清临时生命(RAW "last until long rest"):temp_hp 归零,hp/hp_max 不动', () => {
@@ -72,19 +71,12 @@ describe('rest 休整件(真实脚本)', () => {
     expect(j(rt).exhaustion).toBe(2)
     rmSync(base, { recursive: true, force: true })
   })
-  it('长休铁轨:hp0 濒死 err + 24h 窗口 err', () => {
+  it('长休铁轨:hp0 濒死 err', () => {
     const a1 = rig({ ...WIZARD, hp: 0 })
     const dead = runTool(a1.cwd, 'rest', { context: '濒死长休', kind: 'long', who: '梅西雅' })
     expect(dead.status).toBe(1)
     expect(dead.stdout).toContain('hp<1 濒死不能长休')
     rmSync(a1.base, { recursive: true, force: true })
-
-    const a2 = rig()
-    writeFileSync(join(a2.cwd, 'state.md'), STATE.replace('无 last_long_rest 记录＝随时可长休', 'last_long_rest=第3日·0时'))
-    const early = runTool(a2.cwd, 'rest', { context: '刚醒又睡', kind: 'long', who: '梅西雅' })
-    expect(early.status).toBe(1)
-    expect(early.stdout).toContain('距上次长休仅 10 小时')
-    rmSync(a2.base, { recursive: true, force: true })
   })
   it('半施法/契术师位表回满(slotsFor 单源)', () => {
     const p = rig({ name: '老铁', role: 'npc', class: 'paladin', level: 5, hp: 10, hp_max: 40, hd_available: 2, str: 14, dex: 10, con: 12, int: 10, wis: 12, cha: 14, slots_l1: 0, slots_l2: 0 })

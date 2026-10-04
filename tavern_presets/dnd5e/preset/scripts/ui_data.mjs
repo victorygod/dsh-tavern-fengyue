@@ -4,10 +4,12 @@
 // 心跳协议就此退役(从未接线,由 rev 参数短路取代,少一跳)。契约:docs/ui_zh.md 数据流架构。
 import { statSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { mod, pbOf, parseCombat, deriveAC, XP_THRESHOLDS, presence } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
-const { spellCn, SPELL_INTRO_CN, SKILL_TIP_CN } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
+const { mod, pbOf, parseCombat, deriveAC, XP_THRESHOLDS, presence, hasFeature } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { spellCn, SPELL_INTRO_CN, SKILL_TIP_CN, FEATURE_INTRO_CN, SUBCLASS_CN, norm: normCn } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
 const { EQ_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/equip-core-data.mjs').href)
+const { CLASS_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-core-data.mjs').href)
+const { CHOICES, pendingKind } = await import(pathToFileURL(process.cwd() + '/../preset/lib/choice-data.mjs').href)
 const a = globalThis.argv?.[0] ? JSON.parse(globalThis.argv[0]) : (globalThis.argv ?? {})
 const op = a.op
 
@@ -78,20 +80,18 @@ try {
   const md = readFileSync('state.md', 'utf8')
   const grab = (h) => { const i = md.indexOf('## ' + h); if (i < 0) return []; const j = md.indexOf('\n## ', i + 1); return (j < 0 ? md.slice(i) : md.slice(i, j)).split('\n').slice(1).filter(l => l.trim().startsWith('-')).map(l => l.replace(/^\s*-\s*/, '')) }
   const tm = /当前时间：第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md)   // 分=2026-09-30 起;旧档无分容缺→0
-  const locLines = grab('玩家所在')
-  // v8 层级约定：大区/区域/地点/地形/天气 五行 key：value；兼容旧单行（无 key 前缀=地点）
+  // mvu 六节结构:「## 地点」=地点ID/地点名两行,「## 天气」「## 地形」各单行;大区/具体地点已退场(在 world.md/地点卡)
   const locKV = {}
-  let legacyPlace = null
-  for (const raw of locLines) {
-    const m = /^(大区|区域|地点|地形|天气)[：:]\s*(.*)$/.exec(raw.trim())
+  for (const raw of grab('地点')) {
+    const m = /^(地点ID|地点名)[：:]\s*(.*)$/.exec(raw.trim())
     if (m) locKV[m[1]] = m[2].trim()
-    else if (raw.trim() && legacyPlace === null) legacyPlace = raw.trim()
   }
   state = {
     time_day: +(tm?.[1] ?? 1), time_hour: +(tm?.[2] ?? 18), time_minute: +(tm?.[3] ?? 0),
-    region: locKV['大区'] ?? null, area: locKV['区域'] ?? null,
-    place: locKV['地点'] ?? legacyPlace ?? '',
-    terrain: locKV['地形'] ?? null, weather: locKV['天气'] ?? null,
+    region: null,
+    place: locKV['地点名'] ?? '',
+    spot: '',
+    terrain: grab('地形').join('').trim() || null, weather: grab('天气').join('').trim() || null,
     tasks: grab('任务'),
   }
 } catch {}
@@ -164,6 +164,7 @@ function derive(c) {
     pb: PB, expBar, skills, saves, weapons, attrMods: ATTR_KEYS.map(k => ({ key: k, mod: c[k] == null ? null : mod(c[k]) })),
     dc: isCaster ? 8 + PB + casterMod : null,          // 法术DC=8+PB+主属性
     atk: isCaster ? PB + casterMod : null,              // 法术攻击=PB+主属性
+    speed: c.speed == null ? null : c.speed + (hasFeature(c, 'fast movement') ? 10 : 0),   // 快速移动+10尺(2026-10-03)
     passive: c.wis == null ? null : 10 + (skills.find(s2 => s2.key === 'perception')?.mod ?? 0),   // 被动察觉=10+察觉技巧（wis 缺席=未知）
   }
 }
@@ -212,7 +213,22 @@ const skillTipsOf = c => {
   }
   return out
 }
-const withSpells = c => c ? { ...c, spellSplit: splitSpells(c), skillTips: skillTipsOf(c) } : null
+// 特征 hover 浮签(2026-10-03):特征名→一行释义(FEATURE_INTRO_CN 单源;查无不供——与技能浮签同律)。
+const featureKey = n => {
+  const s = String(n).split('|')[0].split('(')[0].trim()
+  if (/^spellcasting\s*:/i.test(s)) return 'spellcasting'
+  return normCn(s)
+}
+const featureTipsOf = c => {
+  const out = {}
+  for (const f of (c?.features ?? [])) {
+    const name = String(f).split('|')[0].trim()
+    const t = FEATURE_INTRO_CN[featureKey(f)]
+    if (t) out[name] = t
+  }
+  return out
+}
+const withSpells = c => c ? { ...c, spellSplit: splitSpells(c), skillTips: skillTipsOf(c), featureTips: featureTipsOf(c) } : null
 const projMate = r => r.j === null
   ? { name: r.name, _file: r.file, _missing: true }
   : withSpells({ ...r.j, _file: r.file, derived: derive(r.j) })
@@ -222,6 +238,25 @@ const projFoe = r => {
   const eff = row && row.hp != null ? { ...r.j, hp: row.hp, hp_max: row.hp_max ?? r.j.hp_max } : r.j
   const init = row && row.init != null ? { init: row.init } : {}
   return withSpells({ ...eff, ...init, _file: r.file, derived: derive(eff) })
+}
+if (op === 'choices') {  // 成长选项待办(2026-10-03):pending 里「待选」→选项集下发(前端对话框用);子职按职业动态取
+  const c = player
+  const list = []
+  for (const p of (c?.pending ?? [])) {
+    const kind = pendingKind(p)
+    if (!kind) continue
+    if (kind === 'spells') continue   // 法术选择走 candidates 流,不出现在本 op
+    if (list.some(x => x.kind === kind)) continue
+    if (kind === 'subclass') {
+      const cls = norm(c?.class ?? '')
+      const subs = (CLASS_CORE[cls]?.fm?.subclass ?? []).map(s => String(s))
+      list.push({ kind, field: 'subclass', min: 1, max: 1, pending: p, options: subs.map(s => ({ key: norm(s), name: SUBCLASS_CN[norm(s)] ?? s })) })
+      continue
+    }
+    const def = CHOICES[kind]
+    list.push({ kind, field: def.field, min: def.min, max: def.max, pending: p, options: Object.entries(def.options).map(([k, v]) => ({ key: k, name: v })) })
+  }
+  await emit({ ok: true, choices: list }); process.exit(0)
 }
 if (op === 'candidates') {  // 学新法术候选:本职业表 ∩ 环位≤当前可施 ∩ 未收录 ∩ 非戏法（SRD「Learning Spells」限制）
   const c = player

@@ -202,15 +202,18 @@ describe('card tools', () => {
     const root = join(base, 'flag')
     writeCardSkeleton(root)
     writeFileSync(join(root, 'preset/tools/roll.mjs'), SCHEMA_BLOCK)
-    let on = false
+    const setFlag = (on: boolean): void => {
+      writeFileSync(join(root, 'preset/meta.json'), `${JSON.stringify({ narratorTools: on }, undefined, 2)}\n`)
+    }
+    setFlag(false)
     const { defs, assembleListeners, ctx } = registry()
-    registerMainAgentTools(ctx, root, fakeShell(() => ''), () => on)
+    registerMainAgentTools(ctx, root, fakeShell(() => ''))
     // 卡条目照常在场，固定 pair 被收走 —— 盲叙事面。
     expect([...defs.keys()].sort()).toEqual(['roll'])
-    on = true
+    setFlag(true)
     await assemble(assembleListeners)
     expect([...defs.keys()].sort()).toEqual(['roll', 'runtimeGrep', 'runtimeRead'])
-    on = false
+    setFlag(false)
     await assemble(assembleListeners)
     expect([...defs.keys()].sort()).toEqual(['roll'])
   })
@@ -219,13 +222,71 @@ describe('card tools', () => {
     const root = join(base, 'toolless')
     writeCardSkeleton(root)
     rmSync(join(root, 'preset/tools'), { recursive: true, force: true })
-    let on = false
+    writeFileSync(join(root, 'preset/meta.json'), `${JSON.stringify({ narratorTools: false }, undefined, 2)}\n`)
     const { defs, assembleListeners, ctx } = registry()
-    registerMainAgentTools(ctx, root, fakeShell(() => ''), () => on)
+    registerMainAgentTools(ctx, root, fakeShell(() => ''))
     expect([...defs.keys()]).toEqual([])
-    on = true
+    writeFileSync(join(root, 'preset/meta.json'), `${JSON.stringify({ narratorTools: true }, undefined, 2)}\n`)
     await assemble(assembleListeners)
     expect([...defs.keys()].sort()).toEqual(['runtimeGrep', 'runtimeRead'])
+  })
+})
+
+describe('fixed runtime tool faces (meta.json toolFaces)', () => {
+  const writeMeta = (root: string, toolFaces: Record<string, readonly string[]>): void => {
+    writeFileSync(join(root, 'preset/meta.json'), `${JSON.stringify({ toolFaces }, undefined, 2)}\n`)
+  }
+
+  it('toolFaces moves a write tool onto the main face and off the tail face', () => {
+    const root = join(base, 'tf-leak')
+    writeCardSkeleton(root)
+    writeMeta(root, { runtimeWrite: ['main'] })
+    const main = registry()
+    registerMainAgentTools(main.ctx, root, fakeShell(() => ''))
+    expect(main.defs.has('runtimeWrite')).toBe(true)
+    expect(main.defs.has('runtimeEdit')).toBe(false)
+    const tail = registry()
+    registerTailAgentTools(tail.ctx, root, fakeShell(() => ''))
+    expect(tail.defs.has('runtimeWrite')).toBe(false)
+    expect(tail.defs.has('runtimeEdit')).toBe(true)
+  })
+
+  it('an empty face array disables a fixed tool on both faces', () => {
+    const root = join(base, 'tf-none')
+    writeCardSkeleton(root)
+    writeMeta(root, { runtimeDelete: [] })
+    const main = registry()
+    registerMainAgentTools(main.ctx, root, fakeShell(() => ''))
+    expect(main.defs.has('runtimeDelete')).toBe(false)
+    const tail = registry()
+    registerTailAgentTools(tail.ctx, root, fakeShell(() => ''))
+    expect(tail.defs.has('runtimeDelete')).toBe(false)
+  })
+
+  it('dropping the read pair off main via toolFaces leaves it on the tail face', () => {
+    const root = join(base, 'tf-readmain')
+    writeCardSkeleton(root)
+    writeMeta(root, { runtimeRead: ['tail'], runtimeGrep: ['tail'] })
+    const main = registry()
+    registerMainAgentTools(main.ctx, root, fakeShell(() => ''))
+    expect(main.defs.has('runtimeRead')).toBe(false)
+    expect(main.defs.has('runtimeGrep')).toBe(false)
+    const tail = registry()
+    registerTailAgentTools(tail.ctx, root, fakeShell(() => ''))
+    expect(tail.defs.has('runtimeRead')).toBe(true)
+    expect(tail.defs.has('runtimeGrep')).toBe(true)
+  })
+
+  it('explicit both-face toolFaces overrides the legacy tail-only default', () => {
+    const root = join(base, 'tf-both')
+    writeCardSkeleton(root)
+    writeMeta(root, { runtimeEdit: ['main', 'tail'] })
+    const main = registry()
+    registerMainAgentTools(main.ctx, root, fakeShell(() => ''))
+    expect(main.defs.has('runtimeEdit')).toBe(true)
+    const tail = registry()
+    registerTailAgentTools(tail.ctx, root, fakeShell(() => ''))
+    expect(tail.defs.has('runtimeEdit')).toBe(true)
   })
 })
 

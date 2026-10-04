@@ -1,5 +1,5 @@
 // status.mjs — 临时状态单源(叶子模块,无 import):statuses 键名枚举 + 英文→中文译名 + 校验
-// + STATUS_TEXT 条件/职业态机械文案(update_character statuses 数组按名自动落——LLM 不手写效果文本;
+// + STATUS_TEXT 条件/职业态机械文案(update_status statuses 数组按名自动落——LLM 不手写效果文本;
 // 法术类 buff 的 effect/mods 不在本表:运行时按名检索 spell-data buff/pool/onFail,文案不双源维护)。
 
 // 15 条 SRD 条件(对齐 STATUS_KEYS 正本既定键名(语料抽取期遗产))
@@ -9,7 +9,7 @@ export const CONDITIONS = [
   'restrained', 'stunned', 'unconscious',
 ]
 
-// 合法 statuses 键全量(枚举)——工具自动写(cast/spawn/update_character statuses 数组)都只许这些键。
+// 合法 statuses 键全量(枚举)——工具自动写(cast/spawn/update_status statuses 数组)都只许这些键。
 export const STATUS_KEYS = new Set([
   ...CONDITIONS,
   // 法术 buff/temp(cast.mjs 写 fm.name;与 spell-data.mjs buff/temp 字段对应)
@@ -30,8 +30,8 @@ export const STATUS_KEYS = new Set([
   'Rage', 'Bardic Inspiration',
 ])
 
-// 条件/职业态机械效果文案(HUD 浮签短注;update_character statuses 按 status 名自动匹配——LLM 只报名+时间)。
-// 法术类条目不在此表(bless/haste 等的 effect/mods 单源=spell-data buff/pool/onFail,update_character 运行时检索)。
+// 条件/职业态机械效果文案(HUD 浮签短注;update_status statuses 按 status 名自动匹配——LLM 只报名+时间)。
+// 法术类条目不在此表(bless/haste 等的 effect/mods 单源=spell-data buff/pool/onFail,update_status 运行时检索)。
 export const STATUS_TEXT = {
   blinded: '目盲——攻击掷劣势,对它攻击掷优势',
   charmed: '魅惑——不能伤魅惑者;魅惑者对其说话带魅力优势',
@@ -48,10 +48,11 @@ export const STATUS_TEXT = {
   restrained: '束缚——速度 0;攻击掷劣势,敏豁免劣势',
   stunned: '失能+攻检劣势,他人对其攻击占优势;力/敏豁免自动失败',
   unconscious: '失能倒地;力/敏豁免自动失败;近战命中自动暴击',
-  // 通用池子键(机械例外):temp 数额随条目携带(hp_change 结算/reset——update_character 只补时间戳)
+  // 通用池子键(机械例外):temp 数额随条目携带(hp_change 结算/reset——update_status 只补时间戳)
   '临时生命': '独立缓冲池——受伤先扣此层再落 hp;治疗不回填;耗尽/到期归零',
   // 职业特征/消费型机制态:attack.mjs 读 Rage 键做物理抗性;core consumeBonus 读 on_use
-  'Rage': '狂暴——挥砍/穿刺/钝击抗性(非魔法);战斗结束或失意识即止',
+  // (2026-10-03 狂暴机械化):对象态带 mods(力攻+2)+resist(钝/刺/砍)——attack 读 resist、rollMods 读 mods,零手抄
+  'Rage': { effect: '狂暴——力攻+2、钝击/穿刺/挥砍抗性(非魔法);战斗结束或失意识即止', mods: [{ stat: 'damage', magnitude: '2' }], resist: ['bludgeoning', 'piercing', 'slashing'] },
   // 消费型机制态:core consumeBonus 读 on_use(attack/check 用掉即摘并加骰)
   'Bardic Inspiration': { effect: '激励骰——一次攻检/检定/豁免可加(用掉即摘)', on_use: '1d6' },
 }

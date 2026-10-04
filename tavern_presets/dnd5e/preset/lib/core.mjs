@@ -19,6 +19,20 @@ export function rollExpr(expr) { // '2d6+3' → {dice:[..], mod, total}
   const mod = m[3] ? +m[3] : 0
   return { dice, mod, total: dice.reduce((a, b) => a + b, 0) + mod }
 }
+// 多用升骰映射(2026-10-04 武器机械进工具):versatile 双手握持时骰面 +2 档(d6→d8/d8→d10)。
+export const VERSATILE_UP = { 6: 8, 8: 10 }
+// GWF 重掷(2026-10-04 巨武战斗进工具):双手握持近战武器伤害骰,1/2 重掷一次(必须用新值,新值仍 1/2 也认)。
+// 与 rollExpr 同形多回 rerolled(是否真发生过重掷,供回执标注不虚标);seed 可重放(重掷也吃 rnd,单测钉)。
+// 仅武器伤害骰调用(主骰+凶蛮暴击追加),附伤骑手/神圣打击/extra_dice 不调。
+export function rollGreatWeapon(expr) {
+  const m = /^(\d+)d(\d+)([+-]\d+)?$/.exec(String(expr).replace(/\s/g, ''))
+  if (!m) return null
+  const dice = Array.from({ length: +m[1] }, () => rnd(+m[2]))
+  let rerolled = false
+  for (let i = 0; i < dice.length; i++) if (dice[i] <= 2) { dice[i] = rnd(+m[2]); rerolled = true }
+  const mod = m[3] ? +m[3] : 0
+  return { dice, mod, total: dice.reduce((a, b) => a + b, 0) + mod, rerolled }
+}
 export const mod = (stat) => Math.floor((stat - 10) / 2)
 // 单键统一律(2026-09-26):level 一键承载双语义——成长者=等级,怪=CR(0.25 小数合法)。
 // pbOf 两端 clamp(1,30):旧 pb 的 min(,20) 双端皆错(0.25 算 +1 虚低;CR21+ 封顶 +6 错杀 +7..+9)。
@@ -41,6 +55,17 @@ export function readChar(who) {
   const f = findCharFile(who)
   if (!f) err(`!角色不存在:${who}`)
   return JSON.parse(readFileSync(f, 'utf8'))
+}
+
+// 特征判据(2026-10-03):j.features 行「名(级变)|回充|已用N」是否含某特征——按基础名比对
+// (剥「|回充|已用」与「(级变)」括注,大小写不敏)。战斗机制进工具的地基:被动特征由工具按此自检,
+// 无需 LLM 读特征文本心算(机械进工具)。如 hasFeature(j, 'unarmored defense')。
+export function hasFeature(j, name) {
+  const base = String(name).toLowerCase().split('(')[0].split(':')[0].trim()
+  return (j?.features ?? []).some(f => {
+    const s = String(f).split('|')[0].trim().toLowerCase().split('(')[0].split(':')[0].trim()
+    return s === base
+  })
 }
 
 // ── 战斗节（state.md「## 战斗」——combat.json 已废,2026-09-20 定案战斗入 state.md）──
@@ -87,12 +112,17 @@ export function presence() {
   try {
     const md = readFileSync('state.md', 'utf8')
     const m = /## 附近 NPC[^\n]*\n([\s\S]*?)(?=\n## |$)/.exec(md)
+    const seen = new Set()
     for (const l of (m?.[1] ?? '').split('\n')) {
       const t = /^-\s*([^|]+?)\s*(?:\|\s*(同伴|中立|敌对))?\s*$/.exec(l.trim())
-      if (t && t[1] && t[1].trim() !== '（无）') rows.push({ name: t[1].trim(), stance: t[2] ?? '中立' })   // 占位行跳过;单列旧行=中立
+      if (!t?.[1]) continue
+      const nm = t[1].trim()
+      if (nm === '（无）' || seen.has(nm)) continue   // 占位行跳过;同名重复行=首行胜出(行序即注入序,新登场在前)
+      seen.add(nm)
+      rows.push({ name: nm, stance: t[2] ?? '中立' })   // 单列旧行=中立
     }
   } catch { /* 无 state.md → 空名单 */ }
-  // 行在而档缺/坏 → j=null(消费方示警勿采信——裂缝可见,不静默吞);名字撞车不去重,行序即注入序。
+  // 行在而档缺/坏 → j=null(消费方示警勿采信——裂缝可见,不静默吞);同名读到即去重(见上),行序即注入序。
   const pools = { mates: [], neutrals: [], foes: [] }
   for (const r of rows) {
     const file = `characters/${r.name}.json`
@@ -173,11 +203,24 @@ export function deriveAC(j, skipBuffs = false) {
   // AC 的 buff 侧=statMods('ac') 一行——非专属机制;skipBuffs=基值视图(ui_data 最终(基) 展示)。
   const dexM = j.dex == null ? null : mod(j.dex)
   let ac = dexM == null ? null : 10 + dexM
+  if (!j.armor) {
+    // 无甲被动特征(2026-10-03 战斗机制进工具):无甲时按特征改 AC 底——barbarian 10+敏+体/monk 10+敏+感/
+    // draconic resilience 13+敏。有甲则走甲 AC,不叠加。
+    const uad = hasFeature(j, 'unarmored defense')
+    const dra = hasFeature(j, 'draconic resilience')
+    if (uad || dra) {
+      const cls = String(j.class ?? '').toLowerCase()
+      if (dra && !uad) ac = dexM == null ? null : 13 + dexM
+      else if (cls === 'monk') ac = dexM == null ? null : 10 + dexM + mod(j.wis ?? 10)
+      else ac = dexM == null ? null : 10 + dexM + mod(j.con ?? 10)
+    }
+  }
   if (j.armor) {
     const fm = equipmentFM(j.armor)
     if (fm) ac = fm.ac_dex_bonus === true ? (dexM == null ? null : fm.ac_base + (fm.ac_dex_cap ? Math.min(dexM, fm.ac_dex_cap) : dexM)) : fm.ac_base
   }
   if (ac != null && (j.shield === true || j.shield === 'true')) ac += 2
+  if (ac != null && j.fighting_style === 'defense' && j.armor) ac += 1   // 战斗风格·防御(穿甲 AC+1,2026-10-03)
   if (ac != null && !skipBuffs) for (const m of statMods(j, 'ac')) if (Number.isFinite(+m.magnitude)) ac += +m.magnitude
   return ac
 }
@@ -208,6 +251,22 @@ export function deathHitFail(j, crit = false) {
   if (stab) j.death_success = 0 // 稳定打破：重开濒死,败从当前+1起算
   j.death_fail = Math.min(3, f0 + (crit ? 2 : 1))
   return { stab, f0, f1: j.death_fail, dead: j.death_fail >= 3 }
+}
+// 死亡结算提醒(2026-10-04):非 PC 敌人(npc)即死时,挤出 DM 需落账的三件套机械事实,并点名对应工具——
+// 经验=xpOf(level,与 foes 战果通道同源)→gain_exp·钱款=档 gp/sp/cp→gain_money·掉落=档 gear→update_inventory。
+// 只产回执不落账;同伴(companion)阵亡=损失非战利品、PC 走濒死→三败,均不产本提醒;空串=无事可结。
+export function deathSettleLine(j) {
+  if ((j.role ?? '') !== 'npc') return ''
+  const parts = [], tools = []
+  const cr = j.level ?? j.cr
+  const xp = xpOf(cr)
+  if (xp != null) { parts.push(`经验 ${xp} XP(${j.monster_kind != null ? 'CR ' + cr : 'LV ' + cr})`); tools.push('gain_exp') }
+  const coins = [['gp', j.gp], ['sp', j.sp], ['cp', j.cp]].filter(([, v]) => Number(v) > 0).map(([k, v]) => `${k.toUpperCase()} ${v}`)
+  if (coins.length) { parts.push(`钱款 ${coins.join(' · ')}`); tools.push('gain_money') }
+  const gear = Array.isArray(j.gear) ? j.gear.filter(Boolean) : []
+  if (gear.length) { parts.push(`掉落 ${gear.join('、')}`); tools.push('update_inventory') }
+  if (!parts.length) return ''
+  return `  ◇ 死亡结算待办: 立刻调 ${tools.join(' / ')} 结算\n  ◇ 结算明细: ${parts.join(' · ')}`
 }
 // 专注断链当拍级联(2026-09-28 audit-fixes §7 定案 F 线):判词即写——判定件零写盘律的唯一显式例外。
 // 孤儿 statuses 条目是工具读域,回合尾弱清理=每次掷骰被过期 bless 污染(§3.1 自立法的既案)。
@@ -322,11 +381,30 @@ export const saveChar = (file, j) => {
   writeFileSync(file, JSON.stringify(j, null, 1))
 }
 // presence 行追加(spawn 工具用):插在「## 附近 NPC」节首(行序即注入序,新登场在前);节缺则建于「## 战斗」前。
-// 2026-09-30 三态回锅——`- 名 | 同伴/中立/敌对`(在场关系快照;战斗节仍=参战名单)。)
+// 2026-09-30 三态回锅——`- 名 | 同伴/中立/敌对`(在场关系快照;战斗节仍=参战名单)。
+// 2026-10-03 幂等:同名已上榜则就地改态(单列旧行补态列),不追加第二行。补档场景=spawn 的 saveChar+presenceAdd
+// 双写,而该名已因「缺档」在册——再插一遍会因 presence() 不去重(见上注)而前端同名双卡。
 export function presenceAdd(name, stance) {
+  const nm = String(name).trim()
+  const st = stance === '同伴' ? '同伴' : stance === '敌对' ? '敌对' : '中立'
+  const row = `- ${nm} | ${st}`
   let md = readFileSync('state.md', 'utf8')
-  const row = `- ${name} | ${stance === '同伴' ? '同伴' : stance === '敌对' ? '敌对' : '中立'}`
-  md = /## 附近 NPC/.test(md) ? md.replace(/(## 附近 NPC[^\n]*\n)/, `$1${row}\n`) : md.replace(/(## 战斗)/, `## 附近 NPC\n${row}\n\n$1`)
+  const secRe = /## 附近 NPC[^\n]*\n([\s\S]*?)(?=\n## |$)/
+  const secM = secRe.exec(md)
+  if (!secM) {  // 节缺:建于「## 战斗」前(历史行为保持);无战斗节则缀于文末
+    md = /## 战斗/.test(md) ? md.replace(/(## 战斗)/, `## 附近 NPC\n${row}\n\n$1`) : md.replace(/\s*$/, `\n## 附近 NPC\n${row}\n`)
+    writeFileSync('state.md', md)
+    return
+  }
+  const header = secM[0].slice(0, secM[0].indexOf('\n') + 1)   // `## 附近 NPC…\n`
+  let hit = false
+  const body = secM[1].split('\n').map(l => {
+    if (hit) return l
+    const m = /^-\s*([^|]+?)\s*(?:\|\s*(同伴|中立|敌对))?\s*$/.exec(l.trim())
+    if (m && m[1].trim() === nm) { hit = true; return row }    // 同名在册→就地改态,幂等不重复
+    return l
+  }).join('\n')
+  md = md.slice(0, secM.index) + header + (hit ? body : row + '\n' + body) + md.slice(secM.index + secM[0].length)
   writeFileSync('state.md', md)
 }
 // 战斗节整节重写(initiative 物化/尾代清场用):state=null → 清回「（无战斗）」。

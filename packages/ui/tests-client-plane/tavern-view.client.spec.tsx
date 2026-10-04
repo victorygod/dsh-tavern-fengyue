@@ -186,33 +186,39 @@ describe('tavern view routing', () => {
     expect(screen.queryByText(/preset\/ 与 runtime\/ 可编辑/)).toBeNull()
   })
 
-  it('the narrator default-tools checkbox mirrors the engine flag and patches meta.json', async () => {
-    // 开旗默认卡：checkbox 勾选；点击翻转 = 读 meta → 写回 narratorTools:false
-    // （typert 冻结，无专用 wire 方法 —— 翻转走既有 writeText 通道的身份补丁）。
-    const face = rpc({ hasCard: true, narratorToolsOn: true })
+  it('the default-tools dropdown seeds from the card meta and patches toolFaces', async () => {
+    // 缺 toolFaces 的默认卡：读对主✓尾✓、写删只尾✓（旧 narratorTools 默认）。
+    // 勾上 runtimeWrite 主列 = 读 meta → 物化 toolFaces 全矩阵写回既有 writeText。
+    const face = rpc({ hasCard: true })
     render(<TavernView {...writerFaces()} rpc={face} sessionId={SESSION} t={t} />)
-    const box = await screen.findByRole('checkbox', { name: /叙事agent默认工具/ }) as HTMLInputElement
-    expect(box.checked).toBe(true)
-    fireEvent.click(box)
+    fireEvent.click(await screen.findByRole('button', { name: /默认工具/ }))
+    const readMain = await screen.findByRole('checkbox', { name: 'runtimeRead 主' }) as HTMLInputElement
+    const readTail = screen.getByRole('checkbox', { name: 'runtimeRead 尾' }) as HTMLInputElement
+    const writeMain = screen.getByRole('checkbox', { name: 'runtimeWrite 主' }) as HTMLInputElement
+    expect(readMain.checked).toBe(true)
+    expect(readTail.checked).toBe(true)
+    expect(writeMain.checked).toBe(false)
+    fireEvent.click(writeMain)
     await waitFor(() => {
       const write = face.writes.find(row => row.path === 'preset/meta.json')
       expect(write).toBeDefined()
-      const record = JSON.parse(write!.text) as { title?: string; narratorTools?: boolean }
-      expect(record.narratorTools).toBe(false)
+      const record = JSON.parse(write!.text) as { title?: string; toolFaces?: Record<string, string[]> }
+      expect(record.toolFaces?.runtimeWrite).toContain('main')
+      expect(record.toolFaces?.runtimeWrite).toContain('tail')
       // 身份字段保真：读到的 meta 原字段不因翻转丢失。
       expect(record.title).toBe('小镇酒馆')
     })
-    expect(box.checked).toBe(false)
+    expect(writeMain.checked).toBe(true)
   })
 
-  it('the narrator checkbox greys out once the conversation has started', async () => {
-    // 对话已开始 = 卡的身份已定，checkbox 只读且勾选态仍如实展示。
-    const face = rpc({ hasCard: true, narratorToolsOn: false, dialogStarted: true })
+  it('the default-tools dropdown locks once the conversation has started', async () => {
+    // 对话已开始 = 卡的身份已定；下拉可开、勾选如实展示，但输入全锁灰不可点。
+    const face = rpc({ hasCard: true, dialogStarted: true })
     render(<TavernView {...writerFaces()} rpc={face} sessionId={SESSION} t={t} />)
-    const box = await screen.findByRole('checkbox', { name: /叙事agent默认工具/ }) as HTMLInputElement
-    expect(box.disabled).toBe(true)
-    expect(box.checked).toBe(false)
-    fireEvent.click(box)
+    fireEvent.click(await screen.findByRole('button', { name: /默认工具/ }))
+    const readMain = await screen.findByRole('checkbox', { name: 'runtimeRead 主' }) as HTMLInputElement
+    expect(readMain.disabled).toBe(true)
+    fireEvent.click(readMain)
     expect(face.writes.some(row => row.path === 'preset/meta.json')).toBe(false)
   })
 

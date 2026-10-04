@@ -1,12 +1,14 @@
 // front_commit — 前端决策通道(runScript 面,非 LLM 工具):玩家点选→校验→窄写→清 pending→JSON 回执。
 // op=asi(恰 2 点/上限20/CON 追溯 hp_max);op=spells(恰 2 个+存在性)。
-// （op=prepare 已删 2026-09-27:「长休换准备表」UI 从未建成;spells_prepared 写入者=出生 roll + update_character(叙事期已备表)。）
+// （op=prepare 已删 2026-09-27:「长休换准备表」UI 从未建成;spells_prepared 写入者=出生 roll + update_status(叙事期已备表,长休换备)。）
 // 每笔成功在 .front-ops.jsonl 落一行「做了什么·产生什么效果」——{{get_player_ops()}} 注给 DM(玩家操作
 // 不进 transcript,面板只体现结果现值,行为事件由此单独到桌;tail 无权此文件,maintenancePrompt 未提)。
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
 const { materializeSpellDetails } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-build.mjs').href)
+const { CHOICES, pendingKind } = await import(pathToFileURL(process.cwd() + '/../preset/lib/choice-data.mjs').href)
+const { CLASS_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-core-data.mjs').href)
 const inp = JSON.parse(globalThis.argv?.[0] ?? globalThis.argv ?? '{}')
 const who = inp.who
 const file = `characters/${who}.json`
@@ -72,4 +74,35 @@ if (inp.op === 'asi') {
   writeFileSync(file, JSON.stringify(j, null, 1))
   logOp(`学习新法术：${learned.join('、')}`)
   okR({ who, learned, pending: j.pending })
+} else if (inp.op === 'choice') {   // 成长选项(2026-10-03):静态(战斗风格/宿敌/专精/祈唤/游侠子选择)选落字段;子职特判落 j.subclass
+  const kind = String(inp.kind ?? '').trim()
+  if (kind === 'subclass') {
+    const cls = String(j.class ?? '').toLowerCase()
+    const subs = (CLASS_CORE[cls]?.fm?.subclass ?? []).map(s => String(s))
+    subs.length || fail(`职业 ${cls} 无子职可选`)
+    const sel = (Array.isArray(inp.selected) ? inp.selected : []).map(s => String(s).trim()).filter(Boolean)
+    sel.length === 1 || fail('子职恰选 1 个')
+    const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const hit = subs.find(s => slug(s) === slug(sel[0]))
+    hit || fail(`子职不存在:${sel[0]}(${cls})——合法 ${subs.join(' / ')}`)
+    j.subclass = hit
+    const pi = (j.pending ?? []).findIndex(p => pendingKind(p) === 'subclass')
+    if (pi >= 0) j.pending.splice(pi, 1)
+    writeFileSync(file, JSON.stringify(j, null, 1))
+    logOp(`选择了子职：${hit}`)
+    okR({ who, kind, subclass: j.subclass, pending: j.pending })
+  } else {
+    const c = CHOICES[kind] || fail(`未知成长选项:${kind}——合法 ${Object.keys(CHOICES).join(' / ')}`)
+    const sel = (Array.isArray(inp.selected) ? inp.selected : []).map(s => String(s).trim()).filter(Boolean)
+    sel.length >= c.min && sel.length <= c.max || fail(`选数须 ${c.min}~${c.max}(现 ${sel.length})`)
+    for (const s of sel) (s in c.options) || fail(`选项不存在:${s}(${kind})——合法 ${Object.keys(c.options).join(' / ')}`)
+    const uniq = [...new Set(sel)]
+    uniq.length === sel.length || fail('选项重复')
+    j[c.field] = c.max === 1 ? uniq[0] : uniq
+    const pi = (j.pending ?? []).findIndex(p => pendingKind(p) === kind)
+    if (pi >= 0) j.pending.splice(pi, 1)
+    writeFileSync(file, JSON.stringify(j, null, 1))
+    logOp(`选择了「${kind}」：${sel.join('、')}`)
+    okR({ who, kind, [c.field]: j[c.field], pending: j.pending })
+  }
 } else fail('未知 op:' + inp.op)

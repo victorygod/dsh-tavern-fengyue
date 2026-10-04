@@ -134,7 +134,7 @@ describe('opening_data · meta 整包下发(单源语料解析)', () => {
 describe('opening_commit · 施法者出生即满(RAW L1)', () => {
   it('无 payload 法术 → 服务端 roll:法师 3 戏法+6 进书并册 9 件(全本职业池);训练面/特征时机/中文描述齐活', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.spells_known).toHaveLength(9)                                      // 戏法并册(2026-09-30):0 环+环术同册
@@ -155,10 +155,10 @@ describe('opening_commit · 施法者出生即满(RAW L1)', () => {
   })
   it('payload 带法术 → 校验:越职业表/数量不符 fail-loud;戏法不计入 known', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const bad = run(cwd, 'opening_commit.mjs', { character: baseChar({ spells: { cantrips: ['Sacred Flame', 'Light', 'Fire Bolt'], spells: ['Shield'], prepared: [] } }), scenario: 'hamlet' })
+    const bad = run(cwd, 'opening_commit.mjs', { character: baseChar({ spells: { cantrips: ['Sacred Flame', 'Light', 'Fire Bolt'], spells: ['Shield'], prepared: [] } }), scenario: 'goblin-ambush' })
     expect(bad.ok).toBe(false)
     expect(bad.error).toContain('超出职业表')
-    const tooMany = run(cwd, 'opening_commit.mjs', { character: baseChar({ spells: { cantrips: ['Fire Bolt', 'Light', 'Prestidigitation'], spells: ['Shield'], prepared: [] } }), scenario: 'hamlet' })
+    const tooMany = run(cwd, 'opening_commit.mjs', { character: baseChar({ spells: { cantrips: ['Fire Bolt', 'Light', 'Prestidigitation'], spells: ['Shield'], prepared: [] } }), scenario: 'goblin-ambush' })
     expect(tooMany.ok).toBe(false)
     expect((tooMany as { error: string }).error).toContain('已知法术须 6 个')   // 数量校验先行于表校验(Shield 合法但不满额)
     rmSync(dirname(cwd), { recursive: true, force: true })
@@ -168,20 +168,20 @@ describe('opening_commit · 施法者出生即满(RAW L1)', () => {
 describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)', () => {
   it('技能越白名单 → 拒;选数不符 → 拒( rogue 4 / 法师 2 各按其数)', () => {
     const { cwd } = rig({})
-    const illegal = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'wizard', skills: ['athletics', 'intimidation'] }), scenario: 'hamlet' })
+    const illegal = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'wizard', skills: ['athletics', 'intimidation'] }), scenario: 'goblin-ambush' })
     expect(illegal.ok).toBe(false)
     expect(illegal.error).toContain('白名单')
     const rogueName = { name: '影', class: 'rogue', skills: ['stealth', 'acrobatics', 'deception', 'intimidation'] }
-    const rogueOk = run(cwd, 'opening_commit.mjs', { character: baseChar({ ...rogueName, abilities: { str: 10, dex: 15, con: 12, int: 14, wis: 13, cha: 8 } }), scenario: 'hamlet' })
+    const rogueOk = run(cwd, 'opening_commit.mjs', { character: baseChar({ ...rogueName, abilities: { str: 10, dex: 15, con: 12, int: 14, wis: 13, cha: 8 } }), scenario: 'goblin-ambush' })
     expect(rogueOk.ok).toBe(true)
-    const wrongCount = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'rogue', skills: ['stealth'] }), scenario: 'hamlet' })
+    const wrongCount = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'rogue', skills: ['stealth'] }), scenario: 'goblin-ambush' })
     expect(wrongCount.ok).toBe(false)
     expect(wrongCount.error).toContain('4')
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
   it('cleric:1 级子职 Life 落 subclass;prepared=1+体质调整 满额(准备制)', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'cleric', skills: ['history', 'insight'], abilities: { str: 8, dex: 12, con: 13, int: 10, wis: 15, cha: 14 } }), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'cleric', skills: ['history', 'insight'], abilities: { str: 8, dex: 12, con: 13, int: 10, wis: 15, cha: 14 } }), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.subclass).toBe('Life')
@@ -191,7 +191,7 @@ describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)'
   })
   it('warlock 归施法族:出生 slots_l1=1 + 戏法 2 已知 2 取自本职业池(此前漏排=RAW 错)', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'warlock', skills: ['arcana', 'history'] }), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ class: 'warlock', skills: ['arcana', 'history'] }), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.caster_attr).toBe('cha')
@@ -202,7 +202,7 @@ describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)'
   })
   it('回执透明:rolled 全量可考(戏法/法术/子职/技能)', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'goblin-ambush' })
     const rolled = out.rolled as { cantrips: string[]; spells: string[]; subclass: null; skills: string[] }
     expect(rolled.cantrips).toHaveLength(3)
     expect(rolled.spells).toHaveLength(6)
@@ -213,17 +213,16 @@ describe('opening_commit · 白名单/选数/子职/-warlock(三处 SRD 修补)'
 })
 
 describe('opening_commit · 世界锚定(state.md)', () => {
-  it('玩家所在落新世界地名 + 造访过的地点初始化为起点', () => {
+  it('玩家所在落新世界地名(地点ID/地点名/天气/地形锚定)', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
-    expect(out.narration).toContain('酒桶镇')
+    expect(out.narration).toContain('凡戴尔镇')
     const md = readFileSync(join(cwd, 'state.md'), 'utf8')
-    expect(md).toContain('- 大区：碧野丘陵')
-    expect(md).toContain('- 区域：酒桶镇')
-    expect(md).toContain('- 地点：酒桶镇·井边')
-    expect(md).toContain('## 造访过的地点')
-    expect(md).toContain('- 酒桶镇·井边|碧野丘陵·酒桶镇|首访第1日·18时')
+    expect(md).toContain('- 地点ID：')
+    expect(md).toContain('- 地点名：凡戴尔镇外')
+    expect(md).toContain('- 阴')
+    expect(md).toContain('- 山路')
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
 })
@@ -231,7 +230,7 @@ describe('opening_commit · 世界锚定(state.md)', () => {
 describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)', () => {
   it('缺省(不传 level)=1 级旧路径:exp 0/hd 1/位表单键 L1/pending 空键被裁剪', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar(), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.level).toBe(1)
@@ -246,19 +245,19 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
   it('level 非法(0/21/1.5/字符串)→ fail-loud 中械闸', () => {
     const { cwd } = rig({})
     for (const bad of [0, 21, 1.5, '5']) {
-      const r = run(cwd, 'opening_commit.mjs', { character: baseChar({ level: bad, class: 'fighter', skills: ['athletics', 'intimidation'] }), scenario: 'hamlet' })
+      const r = run(cwd, 'opening_commit.mjs', { character: baseChar({ level: bad, class: 'fighter', skills: ['athletics', 'intimidation'] }), scenario: 'goblin-ambush' })
       expect(r.ok).toBe(false)
       expect((r as { error: string }).error).toContain('level 不合法')
     }
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
-  it('fighter L6 出生:exp=14000/hd 6/满血 hp=classHpMax(基础 con)/特征累积/子职必落/pending 恰 LV4·LV6/平均等级落 state.md', () => {
+  it('fighter L6 出生:exp=14000/hd 6/满血 hp=classHpMax(基础 con)/特征累积/子职必落/pending 恰 LV4·LV6', () => {
     const { cwd } = rig({})
     const out = run(cwd, 'opening_commit.mjs', {
       character: baseChar({
         name: '布兰', class: 'fighter', level: 6, skills: ['athletics', 'intimidation'],
         abilities: { str: 15, dex: 13, con: 14, int: 8, wis: 12, cha: 10 },
-      }), scenario: 'hamlet',
+      }), scenario: 'goblin-ambush',
     })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
@@ -272,14 +271,12 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
     expect(panel.features.join('|')).toContain('Second Wind|短休')
     expect(panel.features.join('|')).toContain('Ability Score Improvement|—')
     expect(panel.pending).toEqual(['LV4·ASI 点选', 'LV6·ASI 点选'])   // fighter 特表 [4,6,8,…] ≤6
-    const md = readFileSync(join(cwd, 'state.md'), 'utf8')
-    expect(md).toContain('- 平均等级：6')
     rmSync(dirname(cwd), { recursive: true, force: true })
   })
   it('fighter L2 出生:未分岔 subclass null/pending 无(ASI 档 4>2)/exp=300/hd 2', () => {
     const { cwd } = rig({})
     const out = run(cwd, 'opening_commit.mjs', {
-      character: baseChar({ name: '壮汉', class: 'fighter', skills: ['athletics', 'intimidation'], level: 2 }), scenario: 'hamlet',
+      character: baseChar({ name: '壮汉', class: 'fighter', skills: ['athletics', 'intimidation'], level: 2 }), scenario: 'goblin-ambush',
     })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
@@ -292,7 +289,7 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
   })
   it('wizard L5 出生:戏法 4+进书 14=并册 18(进书线=4+2·5,1..3 环联合池)/位表 [4,3,2]/exp 6500/subclass Evocation/pending LV4 一档', () => {
     const { cwd } = rig(SPELL_FIXTURE)
-    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ level: 5 }), scenario: 'hamlet' })
+    const out = run(cwd, 'opening_commit.mjs', { character: baseChar({ level: 5 }), scenario: 'goblin-ambush' })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))
     expect(panel.level).toBe(5)
@@ -319,7 +316,7 @@ describe('opening_commit · 高等级成长族出生(2026-09-29b 等级入参)',
       character: baseChar({
         class: 'cleric', level: 3, skills: ['history', 'insight'],
         abilities: { str: 8, dex: 12, con: 13, int: 10, wis: 15, cha: 14 },
-      }), scenario: 'hamlet',
+      }), scenario: 'goblin-ambush',
     })
     expect(out.ok).toBe(true)
     const panel = JSON.parse(readFileSync(join(cwd, 'characters', 'player.json'), 'utf8'))

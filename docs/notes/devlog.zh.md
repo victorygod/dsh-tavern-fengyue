@@ -2,6 +2,13 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-10-03 默认工具主/尾分面矩阵批：`narratorTools` 布尔升级为 `toolFaces` 对象 + 设置页下拉
+
+- **现象（用户报）**：每个卡应能控制主 / 尾 agent 各自可用哪些引擎默认工具；现状只有一枚「叙事agent默认工具」checkbox（`narratorTools` 布尔，只管主面 read pair），写删工具恒归尾面、不可调。
+- **根因 / 定案**：工具面归属零散在两处——卡工具走 `@tavern-schema agents`（脚本内声明）、引擎固定五件走硬编码（读对两面、写删只尾面，主面读对又受 `narratorTools` 布尔单点控制）。定案：固定五件升级为卡身份 `preset/meta.json` 的显式对象字段 **`toolFaces`**（`{工具名: ["main","tail",…]}`，空数组 = 两面都不挂），缺省走旧默认（读对两面 + `narratorTools:false` 摘主面、写删只尾面）；旧 `narratorTools` 布尔保留为读对兜底默认，存量卡零迁移。
+- **修复（引擎 + 前台两侧）**：引擎 `tools.ts` 新 `fixedToolFaces(root, name)` 单源函数（读 meta、显式 `toolFaces` 优先、旧默认兜底），`registerMainAgentTools` / `registerTailAgentTools` 各自按面条件注册五件（写对仍共享一条 path 串行链）；`readCardMeta` 解析 `toolFaces`（非法项整条丢弃）；`state.narratorToolsOn` 改由 `fixedToolFaces(root,'runtimeRead').includes('main')` 派生保持口径。前台 TavernView 动作区把单 checkbox 换成 **「默认工具」下拉**（五工具行 × 主 / 尾两列 checkbox），读 meta → 物化全矩阵 → `writeText` 写回（typert 冻结、沿用既有端点）；`dialogStarted` 后输入置灰（可展开查看）。
+- **验证**：引擎 `tools.spec` 新 4 例（写工具移主面 / 空数组两面关 / 读对摘主面留尾 / 双面覆盖）+ `workspace.spec` 新 1 例（`toolFaces` 解析容错）；UI narrator checkbox 两例改写为下拉 seed/patch 与 lock；全套 59 files / 660 tests 绿，typecheck 双侧 0，oxlint 0 新增。docs 同步（design.zh 工具注册表 + 默认工具开关条，改指 `toolFaces`）。**如实**：改写的 UI 两例在 `packages/ui/tests-client-plane/`（vitest KNOWN GAP，未纳入 include、需 window.__ModuleLoader__ 前置 shim 才能接线），本批未实跑、仅保持逻辑口径一致。
+
 ## 2026-09-30 双批：发布面词表清理（内网网关名等词族中性化）+ Windows `pnpm tavern` 双注册破案
 
 - **现象（用户报）**：Windows 侧 `pnpm tavern` 起宿主即报 `llm-api-extensions(...): Error: service "deepseekLlmApiExtensions" has been registered at <DeepSeekLlmApiExtensionRegistry>`。同批要求：发布面清内网网关名/内网域名字眼（远端 origin 是公网 GitHub，词表扫描远端树 7 处命中：CHANGELOG 1 + 0.1.7 迁移笔记 4 + devlog 2）。

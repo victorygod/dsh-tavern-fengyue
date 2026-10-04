@@ -221,6 +221,15 @@ export function readCardMeta(root: string): TavernCardMeta | null {
   if (typeof record.creator === 'string' && record.creator !== '') meta.creator = record.creator
   if (typeof record.version === 'string' && record.version !== '') meta.version = record.version
   if (typeof record.narratorTools === 'boolean') meta.narratorTools = record.narratorTools
+  if (record.toolFaces !== null && typeof record.toolFaces === 'object' && !Array.isArray(record.toolFaces)) {
+    const faces: Record<string, readonly string[]> = {}
+    for (const [name, value] of Object.entries(record.toolFaces as Record<string, unknown>)) {
+      // 容错：只接受「'main'/'tail'」组成的面数组（空数组合法 = 两面都不挂）；非法项整条丢弃。
+      if (!Array.isArray(value) || value.some(face => face !== 'main' && face !== 'tail')) continue
+      faces[name] = value as string[]
+    }
+    if (Object.keys(faces).length > 0) meta.toolFaces = faces
+  }
   if (Array.isArray(record.tags)) {
     const tags = record.tags.filter((tag): tag is string => typeof tag === 'string' && tag !== '')
     if (tags.length > 0) meta.tags = tags

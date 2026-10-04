@@ -1,6 +1,7 @@
 /** @tavern-schema
 {
-  "description": "休整结算器——一次叙事休整事件走完(短休/长休),逐人结算逐人落盘。何时调:你声明休整发生(短休≥1小时/长休≥8小时)即调,一次调用一个休整事件。短休传 kind:'short'+hd(每人花费的生命骰枚数,可不同则分次调);长休传 kind:'long'.what 结算:短休=掷生命骰回血+hd 扣减+短休池回充+契术师位回满;长休=hp 回满+hd 回充一半+法术位回满+短休长休池全充+力竭-1(有饮食)+专注清+last_long_rest 落账(24h 窗口校验)。",
+  "description": "休整结算器——一次叙事休整事件走完(短休/长休),逐人结算逐人落盘。何时调:你声明休整发生(短休≥1小时/长休≥8小时)即调,一次调用一个休整事件。短休传 kind:'short'+hd(每人花费的生命骰枚数,可不同则分次调);长休传 kind:'long'.what 结算:短休=掷生命骰回血+hd 扣减+短休池回充+契术师位回满;长休=hp 回满+hd 回充一半+法术位回满+短休长休池全充+力竭-1(有饮食)+专注清。",
+  "agents": ["main"],
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概:本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起,后续叙事必须遵守。" },
     "kind": { "type": "string", "required": true, "enum": ["short", "long"], "description": "休整类型(枚举即名录):short(短休)|long(长休)——错值内核硬拦。" },
@@ -11,7 +12,7 @@
   }
 }
 */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const { findCharFile, rollExpr, mod, slotsFor, dropConcentration, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { CLASS_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/class-core-data.mjs').href)
@@ -21,21 +22,16 @@ a.context?.trim() || err('缺必填 context')
 const names = String(a.who ?? '').split(/[,，]/).map(s => s.trim()).filter(Boolean)
 names.length || err('缺必填 who(名单)')
 
-const readState = () => { try { return readFileSync('state.md', 'utf8') } catch { return '' } }
-// 分=2026-09-30 起真值行带分;旧档无分容缺→0(分钟只随行落账,24h 窗口校验仍以小时取整)
-const parseNow = md => { const m = /当前时间：第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md); return m ? { day: +m[1], hour: +m[2], minute: +(m[3] ?? 0) } : null }
-const parseLast = md => { const m = /last_long_rest=第(\d+)日·(\d+)时(?:·?(\d+)分)?/.exec(md); return m ? { day: +m[1], hour: +m[2], minute: +(m[3] ?? 0) } : null }
-const hoursSince = (last, now) => (now.day - last.day) * 24 + (now.hour - last.hour)
-const restMin = now => String(Math.floor(now.minute ?? 0) % 60).padStart(2, '0')
 const hitDie = (j, cls) => j.hit_die ?? (+CLASS_CORE[cls]?.fm?.hit_die || 8)
+// 准备制 4 职(2026-10-04 与 spawn_npc.mjs 同源):有每日已备表可换——长休换备检测据此点名。
+// 法师按「已知制」建模(法术书=spells_known 恒定可施,无每日 prepared 子集),不入此名单;已知制(bard/sorcerer/warlock)与非施法者无换备。
+const PREP_CASTERS = new Set(['cleric', 'druid', 'paladin', 'ranger'])
 // 池回充:features 行 `名|回充时机|已用N` → 已用0
 function recharge(j, mode) {
   if (!Array.isArray(j.features)) return
   j.features = j.features.map(f => { const s = String(f); return new RegExp(`^(.+\\|${mode}\\|)已用\\d+$`).test(s) ? s.replace(/已用\d+$/, '已用0') : s })
 }
 
-const stateMd = readState()
-const now = parseNow(stateMd)
 const lines = []
 
 if (a.kind === 'short') {
@@ -68,10 +64,7 @@ if (a.kind === 'short') {
   // 铁轨一:hp≥1(濒死不能长休)
   const row = []
   for (const name of names) { const f = findCharFile(name); if (f) { const j = JSON.parse(readFileSync(f, 'utf8')); row.push(`${name} hp ${j.hp ?? 0}`); (j.hp ?? 0) < 1 && err(`!${name} hp<1 濒死不能长休(先救醒)`) } }
-  // 铁轨二:24h 窗口
-  const last = parseLast(stateMd)
-  if (last && now) { const hs = hoursSince(last, now); hs < 24 && err(`!距上次长休仅 ${hs} 小时(<24h),不可再长休`); lines.push(`  铁轨: hp≥1 ✓(${row.join(' · ')}) · 距上次长休 ${hs}h ✓`) }
-  else lines.push(`  铁轨: hp≥1 ✓(${row.join(' · ')}) · 无 last_long_rest 记录 ✓`)
+  lines.push(`  铁轨: hp≥1 ✓(${row.join(' · ')})`)
   for (const name of names) {
     const f = findCharFile(name) || err(`查无角色:${name}`)
     const j = JSON.parse(readFileSync(f, 'utf8'))
@@ -101,13 +94,12 @@ if (a.kind === 'short') {
     if (tempHad) parts.push('临时生命清')
     lines.push(`  落盘: ${name} ${parts.join(' · ')} [${f}]${exNote}`)
     for (const r of dc.removed) lines.push(`  落盘: ${r.name} statuses −「${r.key}」 [${r.file}]`)
-  }
-  // 写 last_long_rest
-  if (now) {
-    const newLine = `- 长休窗口：last_long_rest=第${now.day}日·${now.hour}时${restMin(now)}分`
-    const fresh = /长休窗口：/.test(stateMd) ? stateMd.replace(/.*长休窗口：.*/, newLine) : stateMd.replace(/(## 时间敏感项[^\n]*\n)/, `$1${newLine}\n`)
-    writeFileSync('state.md', fresh)
-    lines.push(`  落盘: state.md 长休窗口 last_long_rest=第${now.day}日·${now.hour}时${restMin(now)}分`)
+    // 长休换备点名(准备制职业方能换):玩家停下问是否换备,非玩家自动推演必配;其余不输出(流程指令在 systemPrompt)。
+    if (PREP_CASTERS.has(cls)) {
+      lines.push(j.role === 'pc'
+        ? `  🛑 长休换备: ${name}(玩家) ${cls} 可换已备法术——停下问玩家是否换备(走 update_status.spells_prepared),不换则保持现表`
+        : `  换备: ${name} NPC(${cls}) 准备制职业——已备法术自动推演必配(照人设推演本周期已备,走 update_status.spells_prepared)`)
+    }
   }
 }
 lines.push(`  ◇ 梗概: ${a.context}`)

@@ -34,7 +34,7 @@ CLASS_CN[cls] || fail(`未知职业 ${cls}`)
 const level = ch.level ?? 1
 Number.isInteger(level) && level >= 1 && level <= 20 || fail(`level 不合法:${level}`, '出生等级须为 1..20 的整数(本卡口径:XP 表/位表/职业表都开到 20)')
 const race = (ch.race ?? 'human').toLowerCase()
-const scenarioId = inp.scenario ?? 'hamlet'
+const scenarioId = inp.scenario ?? 'goblin-ambush'
 
 // ── 机械层单源:class 派生体走 lib/class-build.mjs(buildClass 出命中骰/豁免小写/技能白名单/施法位/特征/甲武熟练/起装;hp 走 classHpMax)──
 const rnd = () => Math.random()
@@ -203,17 +203,12 @@ const scenario = (OPENINGS?.scenarios ?? []).find(s => s.id === scenarioId) ?? {
 const st = scenario.state ?? {}
 
 let stateMd = existsSync('state.md') ? readFileSync('state.md', 'utf8') : ''
-stateMd = stateMd.replace(/^(## 时间敏感项\n[\s\S]*?)(^- 当前时间：).*$/m, `$1$2第1日·18时00分`)
-stateMd = stateMd.replace(/(## 玩家所在\n)[\s\S]*?(?=\n## |$)/, `$1`
-  + `- 大区：${st.大区 ?? '碧野丘陵'}\n`
-  + `- 区域：${st.区域 ?? '酒桶镇'}\n`
-  + `- 地点：${st.地点 ?? st.所在 ?? '酒桶镇'}\n`
-  + `- 地形：${st.地形 ?? '缓丘'}\n`
-  + `- 天气：${st.天气 ?? '晨雾'}`)
-// 造访过的地点：起点即首访（累积日志，尾代理后续追加；生成式地名同样可入列）
-const 首访 = `${st.地点 ?? st.所在 ?? '酒桶镇'}|${st.大区 ?? '碧野丘陵'}·${st.区域 ?? '酒桶镇'}|首访第1日·18时`
-stateMd = stateMd.replace(/(## 造访过的地点\n)[\s\S]*?(?=\n## |$)/, `$1- ${首访}`)
-stateMd = stateMd.replace(/(## 队伍\n(?:[^\n]*\n)?- 平均等级：).*/, '$1' + level)
+stateMd = stateMd.replace(/(## 时间\n)- 当前时间：.*/, '$1- 当前时间：第1日·18时00分')
+stateMd = stateMd.replace(/(## 地点\n)[\s\S]*?(?=\n## |$)/, `$1`
+  + `- 地点ID：${st.地点ID ?? ''}\n`
+  + `- 地点名：${st.地点名 ?? st.地点 ?? st.所在 ?? '凡戴尔镇外'}`)
+stateMd = stateMd.replace(/(## 天气\n)[\s\S]*?(?=\n## |$)/, `$1- ${st.天气 ?? '晨雾'}`)
+stateMd = stateMd.replace(/(## 地形\n)[\s\S]*?(?=\n## |$)/, `$1- ${st.地形 ?? '缓丘'}`)
 writeFileSync('state.md', stateMd)
 
 // ── 返回开场白 ──

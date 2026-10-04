@@ -24,6 +24,7 @@ const CARD_CLASS_PREFIX = 'custom-'
 export const RICH_BODY_SCOPE = '.tavern-body '
 
 const markdownOptions: Parameters<typeof micromark>[1] = {
+  allowDangerousHtml: true,
   extensions: [gfm(), math()],
   htmlExtensions: [gfmHtml(), mathHtml()],
 }

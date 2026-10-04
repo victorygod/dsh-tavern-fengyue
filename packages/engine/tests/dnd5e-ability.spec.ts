@@ -65,7 +65,7 @@ describe('怪物豁免能力(真实脚本)', () => {
   it('状态骑手:狼咬命中→DC13 力量豁免,失败自动上倒地', async () => {
     const { cwd: rt, base } = await rig(await dragonArchive())
     writeFileSync(join(rt, 'characters', '冰原狼.json'), JSON.stringify(await monsterArchive(CARD, 'dire-wolf', { name: '冰原狼', role: 'npc', hp: 40, hp_max: 40 })))
-    const r = runTool(rt, 'attack', { context: '扑咬', who: '冰原狼', target: '梅西雅', attack: 'bite', at: '第 2 轮' }, 2)  // seed 2 → d20=8 命中
+    const r = runTool(rt, 'attack', { context: '扑咬', who: '冰原狼', target: '梅西雅', weapon: 'bite', at: '第 2 轮' }, 2)  // seed 2 → d20=8 命中
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/状态骑手: DC 13 strength 豁免/)
     expect(r.stdout).toMatch(/落盘: 梅西雅 hp 60→\d+/)

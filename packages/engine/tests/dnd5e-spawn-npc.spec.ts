@@ -151,7 +151,7 @@ describe('spawn_npc 成长族+ASI 历史成长+法术三检(真实脚本)', () =
     expect(p.exp).toBe(0); expect(p.hd_available).toBe(1)
     rmSync(base, { recursive: true, force: true })
   })
-  it('法术三检:非施法职业拒/查无 err/非本职业表 err/环位超 err;prepared 参数已退役(已备出生空,走 update_character)', () => {
+  it('法术三检:非施法职业拒/查无 err/非本职业表 err/环位超 err;prepared 参数已退役(已备出生空,走 update_status)', () => {
     const { cwd: rt, base } = rig()
     const notCaster = runTool(rt, 'spawn_npc', { context: 'x', name: '武夫', stance: '敌对', class: 'fighter', level: 1, abilities: { str: 14, dex: 10, con: 14, int: 10, wis: 10, cha: 8 }, spells_known: ['magic-missile'] })
     expect(notCaster.status).toBe(1)
@@ -167,7 +167,7 @@ describe('spawn_npc 成长族+ASI 历史成长+法术三检(真实脚本)', () =
     expect(highSlot.stdout).toContain('!法术环位超可施')
     const okCleric = runTool(rt, 'spawn_npc', { context: 'x', name: '正牧', stance: '同伴',class: 'cleric', level: 1, abilities: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 12 }, spells_known: ['guidance'], persona: { lens: '济世为业', reaction: '见伤→先施救', voice: '温言软语', tension: '守贫却能收下香油钱' }, history: '村庙学徒出身' })
     expect(okCleric.status).toBe(0)
-    expect(j(rt, '正牧.json').spells_prepared).toBeUndefined()   // 已备表出生为空——置备走 update_character(叙事期)
+    expect(j(rt, '正牧.json').spells_prepared).toBeUndefined()   // 已备表出生为空——置备走 update_status(叙事期)
     const retired = runTool(rt, 'spawn_npc', { context: 'x', name: '错备', stance: '同伴',class: 'cleric', level: 1, abilities: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 12 }, spells_prepared: ['guidance'] })
     expect(retired.status).toBe(1)
     expect(retired.stdout).toContain('!spells_prepared 已退役')   // 退役守闸(persona.mjs 先例):出生面不收已备表
@@ -211,12 +211,9 @@ describe('spawn_npc 人设三层闸(2026-09-30 persona-threelayer)', () => {
     expect(r.stdout).toContain('◇ 人设缺项(可后补,尾代可补): appearance/never/description')
     rmSync(base, { recursive: true, force: true })
   })
-  it('字数硬闸/退役参数/一句话 persona/alignment 超枚举 → 报错', () => {
+  it('退役参数/一句话 persona/alignment 超枚举 → 报错', () => {
     const { cwd: rt, base } = rig()
     const ab = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 8 }
-    const long = runTool(rt, 'spawn_npc', { context: 'x', name: '超长底色', stance: '敌对', class: 'fighter', level: 1, abilities: ab, persona: { lens: '一'.repeat(31), reaction: '遇X→Y' } })
-    expect(long.status).toBe(1)
-    expect(long.stdout).toContain('!persona.lens 超长(≤30 字,得 31)')
     const legacy = runTool(rt, 'spawn_npc', { context: 'x', name: '旧参', stance: '敌对', class: 'fighter', level: 1, abilities: ab, biography: '老背景' })
     expect(legacy.status).toBe(1)
     expect(legacy.stdout).toContain('!biography/background 已退役')

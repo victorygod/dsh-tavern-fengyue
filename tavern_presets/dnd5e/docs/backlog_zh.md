@@ -20,7 +20,7 @@
 | 编号 | 内容 | 锚点 | 前置 |
 |---|---|---|---|
 | F1(原 A2) | rage 抗三型——attack 抗免段合并 statuses 授予「伤害类型→减半」 | `attack.mjs` 抗免段 | 待对方 rollMods 交付后审;rage 条目落档先行 |
-| F2(原 A3) | bardic inspiration 消费型(持有 d6 待用,用掉即摘——statusMech 模板已带 on_use=1d6) | `update_character.mjs`(statuses 模板) + check/attack 掷点侧 | 待对方交付(掷点侧是 check/attack) |
+| F2(原 A3) | bardic inspiration 消费型(持有 d6 待用,用掉即摘——statusMech 模板已带 on_use=1d6) | `update_status.mjs`(statuses 模板) + check/attack 掷点侧 | 待对方交付(掷点侧是 check/attack) |
 | F3(原 A5) | 力竭效果机械挂接(hp_max 减半/速度) | statuses 引擎 + hp_max 消费 | hp_max 消费闸(F1 类)设计 |
 
 ## G · 怪物面(2026-09-29 消费全落地)

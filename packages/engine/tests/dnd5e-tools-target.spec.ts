@@ -69,7 +69,7 @@ const ATTACK = { mode: 'normal', cover_bonus: 0, context: '梗概' }
 describe('attack 目标解析咽喉(真实脚本)', () => {
   it('事故锚:目标=玩家名,档存 player.json → name 兜底命中,AC 17 带档源标记(不再默 10)', () => {
     const { cwd: rt, base } = rig()
-    const r = runTool(rt, 'attack', { who: '哥布林乙', target: '梅西雅', attack: 'scimitar', ...ATTACK })
+    const r = runTool(rt, 'attack', { who: '哥布林乙', target: '梅西雅', weapon: 'scimitar', ...ATTACK })
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/vs AC 17\(characters\/player\.json\)/)
     expect(r.stdout).not.toMatch(/vs AC 10/)
@@ -77,14 +77,14 @@ describe('attack 目标解析咽喉(真实脚本)', () => {
   })
   it('目标=参战行名 → 数值走档(参战名单化后行不落数值),来源标档', () => {
     const { cwd: rt, base } = rig()
-    const r = runTool(rt, 'attack', { target: '哥布林乙', attack: 'dagger', ...ATTACK })
+    const r = runTool(rt, 'attack', { target: '哥布林乙', weapon: 'dagger', ...ATTACK })
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/vs AC 15\(characters\/哥布林乙\.json\)/)
     rmSync(base, { recursive: true, force: true })
   })
   it('查无目标且未传 ac → 报错退出,绝不静默涂 10', () => {
     const { cwd: rt, base } = rig()
-    const r = runTool(rt, 'attack', { target: '路人甲', attack: 'dagger', ...ATTACK })
+    const r = runTool(rt, 'attack', { target: '路人甲', weapon: 'dagger', ...ATTACK })
     expect(r.status).toBe(1)
     expect(r.stdout).toContain('!查无目标:路人甲')
     rmSync(base, { recursive: true, force: true })
@@ -94,24 +94,24 @@ describe('attack 目标解析咽喉(真实脚本)', () => {
     const pj = JSON.parse(readFileSync(join(rt, 'characters', 'player.json'), 'utf8'))
     pj.shield = false   // 弃盾——装备键翻转,deriveAC 自动 -2(不占 statuses)
     writeFileSync(join(rt, 'characters', 'player.json'), JSON.stringify(pj))
-    const dropped = runTool(rt, 'attack', { target: '梅西雅', attack: 'dagger', ...ATTACK })
+    const dropped = runTool(rt, 'attack', { target: '梅西雅', weapon: 'dagger', ...ATTACK })
     expect(dropped.status).toBe(0)
     expect(dropped.stdout).toMatch(/vs AC 15\(characters\/player\.json\)/)
     pj.shield = true    // 拾回——+2 自动回来
     writeFileSync(join(rt, 'characters', 'player.json'), JSON.stringify(pj))
-    const back = runTool(rt, 'attack', { target: '梅西雅', attack: 'dagger', ...ATTACK })
+    const back = runTool(rt, 'attack', { target: '梅西雅', weapon: 'dagger', ...ATTACK })
     expect(back.stdout).toMatch(/vs AC 17\(characters\/player\.json\)/)
     rmSync(base, { recursive: true, force: true })
   })
-  it('update_character statuses 替换式:盾信术 mods 机械自动落 AC 变,未列即摘除还原', () => {
+  it('update_status statuses 替换式:盾信术 mods 机械自动落 AC 变,未列即摘除还原', () => {
     const { cwd: rt, base } = rig()
-    const st = runTool(rt, 'update_character', { context: '盾信术', target: '梅西雅', statuses: [{ status: 'Shield of Faith', applied_at: '第 2 轮' }] })
+    const st = runTool(rt, 'update_status', { context: '盾信术', target: '梅西雅', statuses: [{ status: 'Shield of Faith', applied_at: '第 2 轮' }] })
     expect(st.status).toBe(0)
     expect(st.stdout).toMatch(/AC: 17→19/)   // mods=spell-data 单源自动落(AC +2)
     expect(st.stdout).toContain('完整状态')
     const pj0 = JSON.parse(readFileSync(join(rt, 'characters', 'player.json'), 'utf8'))
     expect(pj0.statuses['Shield of Faith']).toMatchObject({ applied_at: '第 2 轮', mods: [{ stat: 'ac', magnitude: 2 }] })
-    const off = runTool(rt, 'update_character', { context: '专注断', target: '梅西雅', statuses: [] })   // 空列表=全摘
+    const off = runTool(rt, 'update_status', { context: '专注断', target: '梅西雅', statuses: [] })   // 空列表=全摘
     expect(off.status).toBe(0)
     expect(off.stdout).toMatch(/AC: 19→17/)
     expect(off.stdout).toContain('摘除 Shield of Faith')
@@ -120,7 +120,7 @@ describe('attack 目标解析咽喉(真实脚本)', () => {
   })
   it('即兴无档目标 → 报错退出(写盘需要档),绝不静默', () => {
     const { cwd: rt, base } = rig()
-    const improvised = runTool(rt, 'attack', { target: '酒馆老板', attack: 'dagger', ...ATTACK })
+    const improvised = runTool(rt, 'attack', { target: '酒馆老板', weapon: 'dagger', ...ATTACK })
     expect(improvised.status).toBe(1)   // 完备律:即兴目标须先 spawn 建档(写盘需要档)
     expect(improvised.stdout).toContain('!查无目标:酒馆老板')
     rmSync(base, { recursive: true, force: true })

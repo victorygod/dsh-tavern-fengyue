@@ -1,5 +1,7 @@
 # 人设三层定案 · persona 重构(人格层 / 履历层 / 现况层)
 
+> **2026-10-04 翻案**：人格七键(appearance/lens/reaction/voice/never/tension)字数上限**撤销**——人设字数不设限，内容质量归判据(生成力/辨识度/张力)；仅 `description`(≤40)/`history`(≤120) 保留上限。下文各键 `≤N字` 标注作废，仅作软参考。落点=lib/persona.mjs `PERSONA_LIMITS` + spawn_npc schema 描述。
+
 > 状态:**波1已施工**(2026-09-30;spawn 双侗+tpl v10+lib/persona.mjs+maintenancePrompt+panel-data —vitest 引擎面 20/20 绿)。定案五则 + 女娲质量标准映射 + schema 描述稿 + 施工清单。方法论参照 [女娲 · Skill造人术](file:///Users/wolf/.codefuse/engine/cc/skills/huashu-nuwa/SKILL.md) 的输出框架(extraction-framework.md / skill-template.md / 通过标准),不是其调研流程(六 agent 蒸馏给真实人物用,不适用)。
 
 ## 背景:现行字段的五处欠账
@@ -67,7 +69,7 @@ description: "酒桶镇客栈老板娘,丈夫亡后独撑店面,近来店里流�
 - **分工律**:写法要求分两面,不设第三处——**创造面**(人设怎么写:西幻外观、张力、女娲判据)只进 spawn 两工具的 schema 描述(所有 agent 在调用点即见——创造 NPC 是所有 agent 的工作);**维护面**(history 追加/description 刷新/换装更新/[秘])只进 maintenancePrompt。systemPrompt 不另设方法论段(§6 作废)。
 - **同拍律**(维护面):history 追加与 description 重写是**同一笔 runtimeWrite**,roster 面即现值;无追加=description 保持出生值。
 - **换装律**(维护面):appearance 的服饰段=**当前穿搭**(可见装备,西幻风);换衣(armor/装备变更或叙事换装)后同拍更新穿搭段。
-- **整合律**(维护面,2026-09-30):history 只增律的唯一例外——行数组超 10 行(触发=maintenancePrompt 文首 `{{history_alert()}}` 注入器欠账点名,清零归静默)→ 整合成一条记录(叙事总结 ≤120 字,`[秘]` 子句原样保留);走 runtimeEdit 整段替换数组(old_str=现行整个数组文本——update_character 面只承载追加),落笔后读回核对;不与同拍律联动(整合不改现况)。
+- **整合律**(维护面,2026-09-30):history 只增律的唯一例外——行数组超 10 行(触发=maintenancePrompt 文首 `{{history_alert()}}` 注入器欠账点名,清零归静默)→ 整合成一条记录(叙事总结 ≤120 字,`[秘]` 子句原样保留);走 runtimeEdit 整段替换数组(old_str=现行整个数组文本——update_memory 面只承载追加),落笔后读回核对;不与同拍律联动(整合不改现况)。
 - `[秘]` 行前缀:history 专属(人格层不藏秘);尾代维护;示人面=view(wave 2:NPC 拥有 `[秘]` 行永不显示,玩家去前缀)——biography 时代的约定原样迁移。
 - 追加行带日戳(格式对例「第3日·」),时间真值=state.md「当前时间」行。
 

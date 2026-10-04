@@ -1,6 +1,6 @@
 // 怪物 persona 数据面钉(2026-09-30 persona-threelayer 定案 4:怪人设=数据面预生成,spawn 零 LLM 人设通道):
 // sidecar=lib/monster-persona-data.mjs(merge-persona-batches.mjs 合并产物,手改会被覆盖)——七键白名单/
-// 字数硬闸/alignment 9 值/slug ⊆ MONSTER_CORE/三键必填;buildMonster join+spawn 单只落卡/批量杂兵不落。
+// alignment 9 值/slug ⊆ MONSTER_CORE/三键必填(字数不设限,2026-10-04 翻案);buildMonster join+spawn 单只落卡/批量杂兵不落。
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, writeFileSync, mkdirSync, cpSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -15,9 +15,9 @@ const CARD = join(ROOT, 'tavern_presets', 'dnd5e', 'preset')
 const P7 = ['appearance', 'lens', 'reaction', 'voice', 'never', 'tension', 'alignment']
 
 describe('monster-persona-data 形量钉(2026-09-30 数据批)', () => {
-  it('七键白名单+三键必填+字数硬闸+alignment 9 值(全员过 lib/persona.mjs PERSONA_LIMITS)', async () => {
+  it('七键白名单+三键必填+alignment 9 值(字数不设限,2026-10-04 翻案)', async () => {
     const { MONSTER_PERSONA } = await import(pathToFileURL(join(CARD, 'lib', 'monster-persona-data.mjs')).href)
-    const { PERSONA_LIMITS, PERSONA_ALIGNMENTS } = await import(pathToFileURL(join(CARD, 'lib', 'persona.mjs')).href)
+    const { PERSONA_ALIGNMENTS } = await import(pathToFileURL(join(CARD, 'lib', 'persona.mjs')).href)
     const slugs = Object.keys(MONSTER_PERSONA)
     expect(slugs.length).toBe(333)   // MONSTER_CORE 全部怪齐（commoner 2026-09-30 迁出=spawn_npc 职业）
     for (const s of slugs) {
@@ -29,7 +29,6 @@ describe('monster-persona-data 形量钉(2026-09-30 数据批)', () => {
         expect(P7, `${s}.${k} 键`).toContain(k)
         expect(typeof v === 'string' && !/\d/.test(v), `${s}.${k}=${v}`).toBe(true)   // 中文短串,无数字
         if (k === 'alignment') expect(PERSONA_ALIGNMENTS, `${s} alignment`).toContain(v)
-        else expect(v.length, `${s}.${k} 字数`).toBeLessThanOrEqual(PERSONA_LIMITS[k])
       }
     }
   })

@@ -11,7 +11,7 @@
 }
 */
 import { pathToFileURL } from 'node:url'
-const { rollExpr, resolveTarget, deathHitFail, injure, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rollExpr, resolveTarget, deathHitFail, deathSettleLine, injure, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context')
 a.dice || err('缺必填 dice')
@@ -46,6 +46,9 @@ if (extra) {
   console.log(`  ◇ 0HP 受击——濒死败+1`)
   if (j.death_fail >= 3) console.log(`  ◇ 三败——死亡(终局)`)
 }
-else if (after === 0 && dmg > 0) console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+else if (after === 0 && dmg > 0) {
+  console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+  const settle = deathSettleLine(tg.j); if (settle) console.log(settle)
+}
 console.log(`  ◇ 梗概: ${a.context}`)
 console.log(`  ◇ 铁则: 后续剧情必须遵守梗概与结果，不得篡改！`)

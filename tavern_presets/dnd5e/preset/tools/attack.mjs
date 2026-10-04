@@ -1,14 +1,14 @@
 /** @tavern-schema
 {
-  "description": "攻击结算器——一切攻击检定必经本工具（法术走 cast）：攻检→伤害→抗免→扣血，一次走完。何时调：攻击发生即调，每次一掷（多击＝同回合连调）。攻击数据三来源自动取：怪/原创 NPC 照出生档案材料（spawn 时攻击/能力/特征已全材料化在档——attack 传攻击名如 bite、ability 传豁免能力名如 fire-breath）；PC/同伴照面板武器（背包律硬闸：武器不在其 weapons/gear 行上＝拒）。濒死目标 5 尺内命中自动暴击。细则见各参数；即兴无档目标先 spawn 建档（怪走 spawn_monster、有职业者走 spawn_npc）。",
+  "description": "攻击结算器——一切攻击检定必经本工具（法术走 cast）：攻检→伤害→抗免→扣血，一次走完。何时调：攻击发生即调，每次一掷（多击＝同回合连调）。攻击数据按 who 读档自动取：weapon 传名（如 bite、mace），工具自动分辨档案 attacks（怪/原创 NPC 材料化）还是面板武器（PC/同伴，背包律硬闸）；怪物豁免能力走 ability（如 fire-breath）。濒死目标 5 尺内命中自动暴击。细则见各参数；即兴无档目标先 spawn 建档（怪走 spawn_monster、有职业者走 spawn_npc）。",
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
     "who": { "type": "string", "description": "攻击者姓名，默认玩家。工具按名读档取攻击数据。" },
     "target": { "type": "string", "required": true, "description": "目标名。AC 与抗免自动读目标档——含其 statuses 机械修正（弃盾类状态走档案，不传数字）。" },
-    "attack": { "type": "string", "description": "怪物/原创 NPC 的攻击名，英文原文（如 bite、scimitar）——spawn 回执整卡在档（attacks 键），加值/骰式/类型/触及自动带出。" },
+    "weapon": { "type": "string", "description": "攻击名或武器名，英文原文（如 bite、scimitar、mace）。工具按 who 读档自动分辨：档案 attacks（怪/原创 NPC 材料化）优先，查无走面板武器（PC/同伴）。不传则默认持位第一把。骰式、灵巧、熟练全自动；不在其 weapons/gear 行上＝拒（背包律）。" },
     "ability": { "type": "string", "description": "怪物豁免能力名（如 fire-breath、lightning-breath、wing-attack）——走豁免不走攻检，目标每个生物各调一次，DC/骰式从档案 abilities 自动带出。" },
-    "weapon": { "type": "string", "description": "PC/同伴的面板武器名（默认持位第一把）——骰式、灵巧、熟练全自动。不在其 weapons/gear 行上＝拒（背包律）——拾取/入包走 update_character。" },
-    "off_hand": { "type": "boolean", "description": "双持的后手武器——攻检照常，伤害不加属性调整值。" },
+    "off_hand": { "type": "boolean", "description": "双持的后手武器——攻检照常，伤害不加属性调整值（双武器战斗风格恢复加属性）。" },
+    "two_handed": { "type": "boolean", "description": "双手握持本武器——多用(versatile)武器升骰(d6→d8/d8→d10)；巨武战斗风格的触发判据之一。默认单手；仅多用与双手(two-handed)武器有意义。" },
     "extra_dice": { "type": "string", "description": "特征骰（偷袭/神圣打击类），暴击同翻；条件是否满足由你判断。" },
     "mode": { "type": "string", "description": "攻击检定：adv＝优势，dis＝劣势，默认 normal。是否有优劣势由你按局面判断（隐形、伏击等）。" },
     "cover_bonus": { "type": "integer", "description": "目标掩体加值 0｜2｜5，由你按站位判断。" },
@@ -19,7 +19,7 @@
 }
 */
 import { pathToFileURL } from 'node:url'
-const { rnd, rollExpr, mod, pbOf, readChar, findCharFile, equipmentFM, WEAPON_SLUG, slugify, resolveTarget, resolveSave, deathHitFail, rollMods, injure, consumeBonus, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { rnd, rollExpr, rollGreatWeapon, VERSATILE_UP, mod, pbOf, readChar, findCharFile, equipmentFM, WEAPON_SLUG, slugify, resolveTarget, resolveSave, deathHitFail, deathSettleLine, rollMods, injure, consumeBonus, hasFeature, saveChar, err } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { STATUS_CN } = await import(pathToFileURL(process.cwd() + '/../preset/lib/status.mjs').href)
 const a = globalThis.argv ?? {}
 a.context?.trim() || err('缺必填 context(剧情梗概——反作弊铁则)')
@@ -57,31 +57,44 @@ if (a.ability) {
   if (si.parts.length) console.log(`  状态修正: ${si.parts.join(' · ')}`)
   console.log(`  伤害判定: ${ability.dice} = ${dmg} ${ability.type}${resNote}${inj.absorbed ? `(临时吸 ${inj.absorbed})` : ''}`)
   console.log(`  落盘: ${a.target} hp ${inj.before}→${inj.after}${ability.knockProne && !pass ? ' · 倒地' : ''} [${si.file}]`)
-  if (inj.after === 0 && inj.before > 0) console.log(`  ◇ 0HP——${si.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+  if (inj.after === 0 && inj.before > 0) {
+    console.log(`  ◇ 0HP——${si.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+    const settle = deathSettleLine(si.j); if (settle) console.log(settle)
+  }
   console.log(`  ◇ 梗概: ${a.context}`)
   console.log(`  ◇ 铁则: 后续剧情必须遵守梗概与结果，不得篡改！`)
   process.exit(0)
 }
 
-// ── 攻击数据解析:档案材料(出生登记=spawn 材料化+原创登记) > 语料表(旧档兼容回退) > 面板武器(PC/同伴) ──
-let atkBonus, dmgDice, dmgType = '', dmgMod = 0, panelRanged = false, recReach = null
-const aSlug = a.attack ? String(a.attack).toLowerCase().replace(/[^a-z0-9]+/g, '-') : null
-const born = aSlug ? (char.attacks ?? {})[aSlug] : null
-aSlug && !born && err(`!攻击名查不到:${a.attack}(${who})——在档 attacks 键查无(重 spawn 即补齐)`)
+// ── 攻击数据解析(2026-10-03 统一入口,attack 参数已合入 weapon):name=weapon——按 who 读档后
+// 自动分辨:档案 attacks(怪/原创 NPC 材料化)优先,查无走面板武器(PC/同伴)。
+let atkBonus, dmgDice, dmgType = '', dmgMod = 0, panelRanged = false, recReach = null, gwf = false
+const name = a.weapon ?? ''
+const nSlug = name ? String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-') : null
+const born = nSlug ? (char.attacks ?? {})[nSlug] : null
 if (born) {
   const rec = born
   atkBonus = rec.bonus; dmgDice = rec.dice; dmgType = rec.type
   if (rec.kind === 'melee') recReach = rec.reach ?? 5
   else panelRanged = true
 } else {
-  const wname = (a.weapon ?? (char.weapons ?? [])[0] ?? '').replace(/\s*[x×]\s*\d+\s*$/, '').trim()
+  const wname = (name || (char.weapons ?? [])[0] || '').replace(/\s*[x×]\s*\d+\s*$/, '').trim()
   const fm = equipmentFM(wname)
-  fm || err(`!攻击无源:${wname || '(未传)'}——怪物/原创 NPC 传 attack,PC/同伴传 weapon`)
+  fm || err(`!攻击无源:${wname || '(未传)'}——档案 attacks 与面板 weapons 皆查无(怪/NPC 攻击名打错?PC/同伴武器没带/名字不对?豁免能力走 ability)`)
   holdGate(char, fm, wname)
   dmgDice = fm.damage; dmgType = String(fm.damage_type ?? '').toLowerCase()
   const prop = JSON.stringify(fm.properties ?? '').toLowerCase()
   const finesse = prop.includes('finesse'), ranged = String(fm.weapon ?? '').toLowerCase().includes('ranged') || (prop.includes('range') && !thrownOnly(prop))
   panelRanged = ranged
+  // Reach 面板透出(2026-10-04):panel 武器的 Reach 属性(戟/长枪/长鞭/骑枪/矛枪)→触及 10 尺,
+  // 濒死 5 尺自动暴击的 beyond_5ft 判据与 born 分支对齐(此前 panel 面 recReach 恒 null,触及数据漏透)。
+  if (prop.includes('reach')) recReach = 10
+  // 多用升骰(2026-10-04):two_handed 且 versatile → 骰面升档(d6→d8/d8→d10),在暴击翻骰前升(RAW:基础骰先变)。
+  if (a.two_handed === true && prop.includes('versatile'))
+    dmgDice = String(dmgDice).replace(/^(\d+)d(\d+)/, (m, n, d) => `${n}d${VERSATILE_UP[d] ?? d}`)
+  // 巨武战斗(2026-10-04):双手握持近战武器伤害骰 1/2 重掷——判据=two_handed 或 two-handed 属性,且近战。
+  const twoHandedGrip = a.two_handed === true || prop.includes('two-handed')
+  gwf = char.fighting_style === 'great_weapon_fighting' && twoHandedGrip && !panelRanged
   // 属性律(RAW):灵巧←STR/DEX 择高(远近皆然——飞镖类灵巧远程同享);无灵巧远程←DEX;其余(含投掷无灵巧的矛/标枪)←STR。
   const st = finesse ? (mod(char.str ?? 10) >= mod(char.dex ?? 10) ? 'str' : 'dex') : ranged ? 'dex' : 'str'
   // 熟练桥(2026-09-30 修:weapon_prof 全中文=PROF_WEAPON 单源,对英文 fm 的 includes 永假——
@@ -96,8 +109,8 @@ if (born) {
     if (slug) return fmSlug === slug || fmPath.includes(slug)
     return JSON.stringify(fm).toLowerCase().includes(s.toLowerCase())
   })
-  atkBonus = mod(char[st] ?? 10) + (prof ? PB : 0)   // 吞零修复:显式 0 也尊重
-  dmgMod = a.off_hand === true ? 0 : mod(char[st] ?? 10)        // 后手:伤害不加属性
+  atkBonus = mod(char[st] ?? 10) + (prof ? PB : 0) + (char.fighting_style === 'archery' && panelRanged ? 2 : 0)   // 吞零修复:显式 0 也尊重;射术+2(远程,2026-10-03)
+  dmgMod = a.off_hand === true ? (char.fighting_style === 'two_weapon_fighting' ? mod(char[st] ?? 10) : 0) : mod(char[st] ?? 10) + (char.fighting_style === 'dueling' && !panelRanged && a.off_hand !== true ? 2 : 0)   // 后手:伤害不加属性(双武器战斗风格恢复);决斗+2(单手近战)
 }
 function thrownOnly(prop) { return prop.includes('thrown') && !prop.includes('range') }
 // ── 持有闸(背包律,2026-09-30):panel 武器路径的战斗用物必须在 weapons/gear 行上——没带即拒 ──
@@ -113,7 +126,7 @@ function holdGate(char, fm, wname) {
     if (equipmentFM(t)?.path === fm.path) return true
     return cns.some(cn => t.includes(cn)) || (en && t.toLowerCase().includes(en))
   })
-  held || err(`!武器没带:${wname}(${who})——weapons/gear 行查无(背包律:战斗用物须随身)——拾取/入包=update_character(weapons/gear)再攻`)
+  held || err(`!武器没带:${wname}(${who})——weapons/gear 行查无(背包律:战斗用物须随身)——拾取/入包=update_inventory(weapons/gear)再攻`)
 }
 
 // ── 攻击侧机械 buff(rollMods 单源,2026-09-28 审计批 B1):attack/attack_save 双通道,骰式每掷独立 ──
@@ -136,7 +149,7 @@ const d1 = rnd(20), d2 = rnd(20)
 const d = a.mode === 'adv' ? Math.max(d1, d2) : a.mode === 'dis' ? Math.min(d1, d2) : d1
 const nat20 = d === 20, nat1 = d === 1
 const hit = nat20 || (!nat1 && d + atkBonus + buffFlat >= acFinal)
-console.log(`[攻击 · ${who}→${a.target} · ${a.attack ?? a.weapon ?? '面板武器'}]`)
+console.log(`[攻击 · ${who}→${a.target} · ${a.weapon ?? '面板武器'}]`)
 console.log(`  命中判定: d20${atkBonus ? (atkBonus >= 0 ? '+' + atkBonus : atkBonus) : ''}${a.mode === 'adv' ? `(优:${d1},${d2})` : a.mode === 'dis' ? `(劣:${d1},${d2})` : ''}${a.cover_bonus ? '-' + a.cover_bonus + '(掩体)' : ''}${buffFlat ? (buffFlat >= 0 ? '+' + buffFlat : buffFlat) : ''} = ${d + atkBonus + buffFlat} vs AC ${acFinal}(${tg.source}) → ${nat1 ? 'nat1 必失' : nat20 ? 'nat20 必中+暴击' : hit ? '命中' : '未命中'}`)
 if (buffParts.length) console.log(`  状态修正: ${buffParts.join(' · ')}`)
 if (hit) {
@@ -148,11 +161,34 @@ if (hit) {
   const immuneList = [...(tg.immune ?? []), ...stImmune]
   for (const ex of [dmgDice, ...(a.extra_dice ? [a.extra_dice] : [])]) {
     const base = (nat20 || autoCrit) ? ex.replace(/^(\d+)d/, (m, n) => `${+n * 2}d`) : ex
-    const r = rollExpr(base); r || err(`!骰式不合法:${base}`)
-    dmg += r.total; parts.push(`${base}=${r.total}${nat20 ? '(暴击已翻骰)' : autoCrit ? '(濒死自动暴击·翻骰)' : ''}`)
+    // GWF 只重掷主武器骰(巨武战斗);extra_dice(偷袭/神圣打击)非武器骰,照常 rollExpr。
+    const r = (gwf && ex === dmgDice) ? rollGreatWeapon(base) : rollExpr(base); r || err(`!骰式不合法:${base}`)
+    dmg += r.total; parts.push(`${base}=${r.total}${(gwf && r.rerolled) ? '(巨武重掷)' : ''}${nat20 ? '(暴击已翻骰)' : autoCrit ? '(濒死自动暴击·翻骰)' : ''}`)
+  }
+  // 凶蛮暴击(2026-10-03):暴击时追加 N 颗武器骰(9/13/17 级=1/2/3 颗,取武器骰面)——机械进工具
+  if ((nat20 || autoCrit) && hasFeature(char, 'brutal critical')) {
+    const lv = char.level ?? 1
+    const n = lv >= 17 ? 3 : lv >= 13 ? 2 : lv >= 9 ? 1 : 0
+    const wm = /^(\d+)d(\d+)/.exec(String(dmgDice))
+    if (n > 0 && wm) {
+      const extra = `${n}d${wm[2]}`
+      const r = gwf ? rollGreatWeapon(extra) : rollExpr(extra); r || err(`!凶蛮暴击骰不合法:${extra}`)
+      dmg += r.total; parts.push(`${extra}=${r.total}${(gwf && r.rerolled) ? '(巨武重掷)' : ''}(凶蛮暴击)`)
+    }
   }
   const rider = rollMods(char, 'damage', nat20 || autoCrit)   // 附伤骑手(B1 扩面):divine-favor/branding-smite 的 damage mods——骰式暴击同翻,定值不翻(与 extra_dice 同律)
   dmg += dmgMod + rider.flat
+  // 高等神圣打击(2026-10-03):近战命中附带 1d8 光耀(独立类型,独立抗免)——机械进工具
+  if (!panelRanged && hasFeature(char, 'improved divine smite')) {
+    const rr = rollExpr('1d8'); rr || err('!神圣打击骰不合法')
+    let rdmg = rr.total
+    const rtype = 'radiant'
+    let rnote = ''
+    if (immuneList.some(x => rtype.includes(String(x).toLowerCase()))) { rdmg = 0; rnote = '(免疫)' }
+    else if (resistList.some(x => rtype.includes(String(x).toLowerCase()))) { rdmg = Math.floor(rdmg / 2); rnote = '(抗性↓)' }
+    dmg += rdmg
+    parts.push(`1d8=${rr.total}(神圣打击 ${rtype}${rnote})`)
+  }
   // 怪物骑手(G2):Weapon 攻击 plus 第二段(龙焰咬)——独立骰+独立类型+独立抗免(档案材料优先,旧档回退表)
   const monRiders = born?.riders ?? null
   for (const rd of (monRiders ?? [])) {
@@ -188,7 +224,10 @@ if (hit) {
     console.log(`  ◇ 0HP 受击——濒死败+${(nat20 || autoCrit) ? 2 : 1}${nat20 ? '(暴击源)' : autoCrit ? '(濒死·5尺自动暴击)' : ''}`)
     if (tg.j.death_fail >= 3) console.log(`  ◇ 三败——死亡(终局)`)
   }
-  else if (after === 0 && dmg > 0) console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+  else if (after === 0 && dmg > 0) {
+    console.log(`  ◇ 0HP——${tg.j.role === 'pc' ? '濒死计数起算' : '即死'}`)
+    const settle = deathSettleLine(tg.j); if (settle) console.log(settle)
+  }
   // 状态骑手(2026-09-29):Weapon 命中后怪物若有 DC 豁免 or 状态,自动掷豁免,失败自动写状态(applied_at=at 或空)
   // 2026-09-29b:档案材料优先(born.status_rider),旧档回退语料表 join
   const sr = born?.status_rider ?? null
