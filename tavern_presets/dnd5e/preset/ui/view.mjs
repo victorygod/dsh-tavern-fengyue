@@ -285,6 +285,19 @@ export function rightPanel(data, extra = {}) {
 // ── 渲染：宽幅数据册（acts 以模态挂出;同构成 v8 全列）──
 const fmtWeapon = w => !w.damage ? esc(cn(WEAPON_CN, w.name))
   : `${esc(cn(WEAPON_CN, w.name))} <span class="dv">${esc(w.damage)}${w.damage_type ? ' ' + esc(cn(DMG_CN, w.damage_type)) : ''}${w.props?.length ? ' ' + w.props.map(p => esc(cn(PROP_CN, p))).join('·') : ''}</span>`
+// 背包堆叠(2026-10-06):同名物品合并「名×N」展示;数据层逐件原样。已带「×N」后缀的条目先拆再合计。
+const stackItems = (arr) => {
+  const count = new Map()
+  for (const t of arr ?? []) {
+    const s = String(t).trim()
+    if (!s) continue
+    const m = /^(.+?)[×x]\s*(\d+)\s*$/.exec(s)
+    const base = m ? m[1].trim() : s
+    const n = m ? +m[2] : 1
+    count.set(base, (count.get(base) ?? 0) + n)
+  }
+  return [...count.entries()].map(([k, n]) => (n > 1 ? `${k}×${n}` : k))
+}
 function radarSvg(c, d) {
   const CX = 100, CY = 95, RR = 66
   const a = i => -Math.PI / 2 + i * Math.PI / 3
@@ -394,7 +407,7 @@ export function bookHtml(c, avatars = {}) {
         </div>
         <div class="bk-sec" style="margin-top:8px">
           <div class="bk-cap" data-tip="${esc(CAP_TIPS.gear)}">背包</div>
-          <div class="bk-rows bk-note-rows">${(c.gear ?? []).map(t => `<div class="bk-row"><span class="a">${esc(t)}</span></div>`).join('') || NONE_ROW}</div>
+          <div class="bk-rows bk-note-rows">${stackItems(c.gear).map(t => `<div class="bk-row"><span class="a">${esc(t)}</span></div>`).join('') || NONE_ROW}</div>
         </div>`, CAP_TIPS.equip)
   const ftHtml = `<div class="bk-sec">${capPend('特征', choicePend, 'choice', CAP_TIPS.feats)}
         <div class="bk-rows bk-note-rows">

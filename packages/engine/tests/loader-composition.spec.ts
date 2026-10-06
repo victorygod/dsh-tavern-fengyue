@@ -929,11 +929,13 @@ describe('tavern engine REAL composition through the shipping loop', () => {
     // F1 结构面:runScript 返回 {text, failure?},脚本失败不抛——这里顺带断言 failure 缺席。
     const panelValue = await engine.runScript(sessionId, 'gal_data.mjs', [JSON.stringify({ op: 'panel' })], new AbortController().signal)
     expect(panelValue.failure).toBeUndefined()
-    const panel = JSON.parse(panelValue.text) as { ok: boolean; assetKeys: string[]; data: { lastAssistant: { text: string } } }
+    const panel = JSON.parse(panelValue.text) as { ok: boolean; assetKeys: string[]; data: { lastAssistant: { orig: string }; history: unknown[]; historyTotal: number } }
     expect(panel.ok).toBe(true)
     expect(panel.assetKeys).toEqual(['preset/assets/cg/1.png'])
-    expect(panel.data.lastAssistant.text).toContain('水色灯光亮起')
-    expect(panel.data.lastAssistant.text).not.toContain('<!--')
+    expect(panel.data.lastAssistant.orig).toContain('水色灯光亮起')
+    expect(panel.data.lastAssistant.orig).toContain('<!--')      // orig 保留指令注释(段级 CG 判定源,text 已随去冗余移除)
+    expect(panel.data.historyTotal).toBeGreaterThan(0)
+    expect(panel.data.history.length).toBeLessThanOrEqual(15)     // 分页批:panel 只带最近一页,上界钉死
     // 指令块不在册的软化路径:钩子 warn 后保留现值,回合照常收束(下面的第二轮用 1 号重复幂等)。
     await submit(engine, sessionId, '换个场景')
     await agent!.whenIdle()

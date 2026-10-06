@@ -4,7 +4,7 @@
 // 心跳协议就此退役(从未接线,由 rev 参数短路取代,少一跳)。契约:docs/ui_zh.md 数据流架构。
 import { statSync, existsSync, readdirSync, readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
-const { mod, pbOf, parseCombat, deriveAC, XP_THRESHOLDS, presence, hasFeature } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
+const { mod, pbOf, deriveAC, XP_THRESHOLDS, presence, hasFeature } = await import(pathToFileURL(process.cwd() + '/../preset/lib/core.mjs').href)
 const { spellCn, SPELL_INTRO_CN, SKILL_TIP_CN, FEATURE_INTRO_CN, SUBCLASS_CN, norm: normCn } = await import(pathToFileURL(process.cwd() + '/../preset/lib/glossary-cn.mjs').href)
 const { SPELL_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/spell-core-data.mjs').href)
 const { EQ_CORE } = await import(pathToFileURL(process.cwd() + '/../preset/lib/equip-core-data.mjs').href)
@@ -61,20 +61,6 @@ if (op === 'panel' && typeof a.rev === 'string' && a.rev !== '') {
 
 // ── 面板数据装配(op=panel 落到此路;op 缺席/未知 = fail-visible 报错,不再有 v9 全量投影) ──
 const player = readJ('characters/player.json')
-// 战斗＝state.md「## 战斗」节（combat.json 已废——2026-09-20 定案,解析归 core.parseCombat,语法见 core.mjs）
-const combat = parseCombat()
-// 先攻 join + 参战者挂 character 档（HUD ctx 全卡）——参战名单化(2026-09-29b)后行只记名/状态,HP/AC 从档 join
-for (const e of combat?.fighters ?? []) {
-  const hit = (combat.order ?? []).find(o => o.who === e.name || o.who.includes(e.name) || String(e.name).includes(o.who))
-  if (hit) e.init = hit.init
-  e.character = existsSync(`characters/${e.name}.json`) ? `${e.name}.json` : null
-  if (e.character) {
-    try {
-      const ej = JSON.parse(readFileSync(`characters/${e.character}`, 'utf8'))
-      e.hp = ej.hp ?? null; e.hp_max = ej.hp_max ?? null; e.ac = ej.ac ?? deriveAC(ej)
-    } catch { e.hp = e.hp_max = e.ac = null }  // 档坏 → 缺席保真(???),不涂默认
-  }
-}
 let state = { time: '', place: '', tasks: [] }
 try {
   const md = readFileSync('state.md', 'utf8')
@@ -234,10 +220,7 @@ const projMate = r => r.j === null
   : withSpells({ ...r.j, _file: r.file, derived: derive(r.j) })
 const projFoe = r => {
   if (r.j === null) return { name: r.name, _file: r.file, _missing: true }
-  const row = (combat?.fighters ?? []).find(f => f.name === r.name)
-  const eff = row && row.hp != null ? { ...r.j, hp: row.hp, hp_max: row.hp_max ?? r.j.hp_max } : r.j
-  const init = row && row.init != null ? { init: row.init } : {}
-  return withSpells({ ...eff, ...init, _file: r.file, derived: derive(eff) })
+  return withSpells({ ...r.j, _file: r.file, derived: derive(r.j) })
 }
 if (op === 'choices') {  // 成长选项待办(2026-10-03):pending 里「待选」→选项集下发(前端对话框用);子职按职业动态取
   const c = player

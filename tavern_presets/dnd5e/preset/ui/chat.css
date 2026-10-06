@@ -37,10 +37,11 @@
   background: rgba(127, 127, 127, 0.07);
 }
 
-/* 行动选项：点击复制到输入框 */
+/* 行动选项：点击复制到输入框（一行一条，纵向排列） */
 .custom-choice-options {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 0.6em;
 }

@@ -195,6 +195,74 @@ mkdirSync('characters', { recursive: true })  // 种子无此目录（角色未�
 // ── 裁剪律落地（模板 _tpl：没有什么能力就没有相关字段；stripEmptyArrays 单源 core.mjs）──
 writeFileSync(`characters/player.json`, JSON.stringify(stripEmptyArrays(panel), null, 1))
 
+// ── 开局同伴种子(2026-10-05 dnd5e-combat):两名结伴 NPC——精灵女游侠 艾琳 + 人类女牧师 莉拉 ──
+const COMPANION_SEEDS = [
+  {
+    name: '艾琳', race: 'elf', gender: 'female', class: 'ranger', subclass: 'Hunter', level: 3,
+    abilities: { str: 10, dex: 15, con: 13, int: 12, wis: 14, cha: 8 },
+    skills: ['perception', 'stealth', 'survival'],
+    spells_known: ["Hunter's Mark", 'Cure Wounds', 'Goodberry'],
+    persona: {
+      appearance: '银白长发编成单条长辫垂到腰际，发间缀着几片风干的槲寄生叶；浅灰绿的眼睛像雾中苔原，看人时微微眯起，左眉骨一道极细的旧箭疤。身形精瘦，披一件洗得发白的墨绿斗篷，内里是深色软皮甲，腰上挂着短弓和一柄带豁口的猎刀，靴帮沾着洗不掉的山泥。',
+      lens: '把世界看成一整片彼此相连的森林——每只鸟、每个脚印、每句谎话都长在某个根上，顺着根就能摸到真相。她不信偶然，只信痕迹。',
+      reaction: '日常：话不多但接得住话，与人保持半步距离，却默默记住同行者提过的喜好；宿营时会无声地修好别人漏看的马具、补好裂开的箭羽。冒险：进陌生地形先找高处、辨风向、记退路；对陷阱和伏击有近乎本能的不安，总走在队伍外圈。战斗：冷静到近乎冷酷，先射对方的弓手和施法者；同伴有难会一声不吭扑上去挡，事后轻描淡写带过。情感：把在意藏进行动，不擅言辞；被戳破关心会耳朵发红、用「顺手」搪塞；对背叛有极深的旧伤，信任一旦被辜负，就沉默地走远，很难再回头。',
+      voice: '嗓音偏低、语速慢，像在陈述事实；句尾常带一个轻轻向上的「……是吧」；喊「小心」时声音会突然拔高；偶尔冒出一句精灵语式的古雅措辞（「风从东边来，带着铁锈味」）。',
+      never: '不猎杀怀着幼崽的野兽；不出卖同行者——哪怕对方先背叛，她也只会离开，绝不设局；不碰腐坏的尸体与死灵法术。',
+      tension: '向往安稳定居，却总在下一个岔路口找出「非走不可」的理由；对森林有近乎宗教的眷恋，又对放逐自己的那场火灾闭口不谈；渴望被理解，却把软肋都编进一句「我没事」里。',
+      alignment: '混乱善良',
+    },
+    history: '精灵部族的巡林长女，部族森林毁于一场来路不明的夜火，追着箭尾标记离乡做了游侠；[秘]那夜她没能叫醒的人里，有她亲手送走的婚约者。',
+    description: '追查故乡大火的精灵游侠，正与主角结伴护送物资去凡戴尔镇。',
+  },
+  {
+    name: '莉拉', race: 'human', gender: 'female', class: 'cleric', subclass: 'Life', level: 3,
+    abilities: { str: 13, dex: 8, con: 14, int: 10, wis: 15, cha: 12 },
+    skills: ['medicine', 'insight'],
+    spells_known: ['Sacred Flame', 'Spare the Dying', 'Guidance', 'Cure Wounds', 'Healing Word', 'Bless', 'Guiding Bolt', 'Prayer of Healing', 'Lesser Restoration'],
+    persona: {
+      appearance: '一头蓬松的浅金色卷发挽在耳后，用一条褪色的蓝丝带系着，几缕碎发总在额前飘；眼睛是暖褐色，看人时像在笑；脸颊上有几粒淡雀斑。身形丰润，罩一件朴素的米白祭司袍，领口别着一枚小小的日轮圣徽，腰间挎一个鼓鼓囊囊的草药包，袖口和裙摆沾着洗不掉的药渍与旅途尘泥。',
+      lens: '把每个人都看成一颗需要照料的种子——伤口会好、心结会解、天总会亮，只要有人愿意蹲下来，耐心地陪一会儿。她相信善良是要动手去做的，光说不算数。',
+      reaction: '日常：热络又爱操心，会追着人问「吃了吗」「睡了吗」，把所有人的冷暖记在心上；见人皱眉就伸手探额头。冒险：胆子不大但见不得人疼，越是危险越往伤员身边靠；对黑暗和死灵有本能的厌恶。战斗：不冲锋陷阵，躲在后面给队友挂祝福、驱散伤痛，嘴里念着祈祷；看到有人倒下会不顾一切冲过去。情感：温柔到近乎啰嗦，把「没事的」挂在嘴边；其实自己藏着一段没愈合的往事，越疼越想先安慰别人。',
+      voice: '嗓音柔和、语速不紧不慢，像在哄人；说话爱用「乖」「别怕」；紧张时语速会加快，祈祷时会不自觉地放轻；口头禅是「有我在」和「会好起来的」。',
+      never: '见死不救（哪怕对方是敌人，倒下后也会止血包扎）；不滥用神术去惩罚或报复；不替别人决定「什么对他最好」。',
+      tension: '拼命照顾所有人，却拒绝被任何人照顾；对「救不回来的人」有解不开的愧疚，那串没念完的祷词是她的旧伤；渴望被需要，又害怕自己只是「有用的工具」而非「被爱的人」。',
+      alignment: '中立善良',
+    },
+    history: '边陲小庙里跟着老祭司长大的孤女，老祭司死于一场瘟疫，她接过圣徽与草药包，一路行医济世；[秘]那场瘟疫本不会夺走老祭司，是有人偷走了最后一剂药。',
+    description: '四处行医的人类女祭司，正与主角结伴护送物资去凡戴尔镇。',
+  },
+]
+function seedCompanions() {
+  return COMPANION_SEEDS.map(s => {
+  const c = buildClass(s.class, s.level)
+  const hpMax = classHpMax(s.class, c.hit_die, s.abilities.con, s.level, s.subclass)
+  const raceFM = RACE_CORE[s.race]?.fm ?? {}
+  const eq = c.equipment ?? {}
+  const spellDetails = materializeSpellDetails(s.spells_known)
+  const j = stripEmptyArrays({
+    name: s.name, role: 'companion',
+    class: s.class, subclass: s.subclass, level: s.level,
+    hp: hpMax, hp_max: hpMax, exp: XP_THRESHOLDS[s.level - 1] ?? 0, hd_available: s.level,
+    str: s.abilities.str, dex: s.abilities.dex, con: s.abilities.con, int: s.abilities.int, wis: s.abilities.wis, cha: s.abilities.cha,
+    save_prof: c.save_prof, skill_prof: s.skills,
+    ...(c.feature_details?.length ? { feature_details: c.feature_details } : {}),
+    armor_prof: c.armor_prof, weapon_prof: c.weapon_prof,
+    features: c.features,
+    caster_attr: c.caster_attr, spells_known: s.spells_known, ...(spellDetails.length ? { spell_details: spellDetails } : {}), concentrating: null,
+    ...Object.fromEntries((c.slots ?? []).map((v, i) => [`slots_l${i + 1}`, v])),
+    race: s.race, gender: s.gender,
+    ...(raceFM.speed ? { speed: raceFM.speed } : {}), ...(raceFM.darkvision ? { darkvision: raceFM.darkvision } : {}), ...(raceFM.languages ? { languages: raceFM.languages } : {}), ...(raceFM.resist ? { resist: raceFM.resist } : {}),
+    weapons: [eq.weapon], ...(Array.isArray(eq.gear) && eq.gear.length ? { gear: eq.gear } : {}),
+    gp: eq.gp ?? 0, sp: eq.sp ?? 0, cp: eq.cp ?? 0,
+    persona: s.persona, history: [s.history], description: s.description,
+    pending: [], statuses: {},
+  })
+    writeFileSync(`characters/${s.name}.json`, JSON.stringify(j, null, 1))
+    return s.name
+  })
+}
+const companionNames = seedCompanions()
+
 // ── patch state.md ──
 let OPENINGS
 try { OPENINGS = JSON.parse(readFileSync('openings.json', 'utf8')) } catch { }
@@ -209,6 +277,7 @@ stateMd = stateMd.replace(/(## 地点\n)[\s\S]*?(?=\n## |$)/, `$1`
   + `- 地点名：${st.地点名 ?? st.地点 ?? st.所在 ?? '凡戴尔镇外'}`)
 stateMd = stateMd.replace(/(## 天气\n)[\s\S]*?(?=\n## |$)/, `$1- ${st.天气 ?? '晨雾'}`)
 stateMd = stateMd.replace(/(## 地形\n)[\s\S]*?(?=\n## |$)/, `$1- ${st.地形 ?? '缓丘'}`)
+stateMd = stateMd.replace(/(## 附近 NPC[^\n]*\n)[\s\S]*?(?=\n## |$)/, `$1${companionNames.map(n => `- ${n} | 同伴`).join('\n')}`)
 writeFileSync('state.md', stateMd)
 
 // ── 返回开场白 ──

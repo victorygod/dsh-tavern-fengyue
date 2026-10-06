@@ -45,14 +45,6 @@ const renderNearby = (list) => {
   const rows = (Array.isArray(list) ? list : []).map(n => `- ${String(n?.name ?? '').trim()} | ${n?.stance ?? '中立'}`).filter(r => r !== '-  | 中立')
   return rows.length ? rows.join('\n') : '- （无）'
 }
-const renderCombat = (c) => {
-  if (!c) return '- （无战斗）'
-  const lines = []
-  if (c.round != null) lines.push(`- 回合：${c.round}`)
-  if (Array.isArray(c.order) && c.order.length) lines.push(`- 先攻：${c.order.map(o => typeof o === 'string' ? o : `${o.who}:${o.init}`).join(' > ')}`)
-  for (const f of (Array.isArray(c.fighters) ? c.fighters : [])) lines.push(`- 参战行：${f.name}${f.status ? ' | ' + f.status : ''}`)
-  return lines.length ? lines.join('\n') : '- （无战斗）'
-}
 let md = ''
 try { md = readFileSync('state.md', 'utf8') } catch { /* 缺档=首回合前,按空处理 */ }
 function buildState() {
@@ -63,7 +55,6 @@ function buildState() {
   const nearby = 'nearby' in data ? renderNearby(data.nearby) : readSection(md, '附近 NPC')
   const quests = 'quests' in data ? (Array.isArray(data.quests) ? data.quests.map(q => `- ${q}`).join('\n') : '') : readSection(md, '任务')
   const foreshadow = 'foreshadow' in data ? (Array.isArray(data.foreshadow) ? data.foreshadow.map(q => `- ${q}`).join('\n') : '') : readSection(md, '伏笔')
-  const combat = 'combat' in data ? renderCombat(data.combat) : readSection(md, '战斗')
   return [
     '# 世界状态',
     `## 时间\n${time}`,
@@ -73,7 +64,6 @@ function buildState() {
     `## 附近 NPC\n${nearby}`,
     `## 任务\n${quests}`,
     `## 伏笔\n${foreshadow}`,
-    `## 战斗\n${combat}`,
   ].join('\n\n') + '\n'
 }
 writeFileSync('state.md', buildState())

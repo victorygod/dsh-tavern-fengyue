@@ -31,7 +31,7 @@ interface Call { name: string; op: string }
 
 /** 制式 rig:可变 panel 应答 + 受控 files face(记录 listener、退订真实生效)
  *  + G3 停靠面(记录卡注册的槽与解停次数)+ turnError face(同法,2026-09-27 通道批)。 */
-function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean; noDockFace?: boolean; noTurnErrorFace?: boolean }) {
+function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean; noDockFace?: boolean; noTurnErrorFace?: boolean; history?: (offset: number, limit: number) => { rows: unknown[]; total: number } }) {
   const calls: Call[] = []
   const filesListeners: Array<() => void> = []
   const files = {
@@ -64,10 +64,15 @@ function rig(opts?: { data?: () => Record<string, unknown>; failPanel?: boolean;
   // rev 恒随拍递增(真身=快照 mtime:size;落盘即变)——死值会被 poll 的 rev 短路拦住。
   let revSeq = 0
   const runScript = (name: string, ...args: string[]) => {
-    const op = args.length > 0 ? (JSON.parse(args[0] as string) as { op?: string }).op : undefined
+    const parsed = args.length > 0 ? (JSON.parse(args[0] as string) as { op?: string; offset?: number; limit?: number }) : {}
+    const op = parsed.op
     calls.push({ name, op: op ?? '' })
     if (name === 'gal_data.mjs') {
       if (op === 'manifest') return Promise.resolve(JSON.stringify({ ok: true, cgs: {} }))
+      if (op === 'history') {
+        const page = opts?.history ? opts.history(parsed.offset ?? 0, parsed.limit ?? 15) : { rows: [], total: 0 }
+        return Promise.resolve(JSON.stringify({ ok: true, rows: page.rows, total: page.total }))
+      }
       if (opts?.failPanel === true) return Promise.resolve(JSON.stringify({ ok: false, error: '数据源未就绪' }))
       revSeq += 1
       return Promise.resolve(JSON.stringify({ ok: true, rev: `rev-${revSeq}`, assetKeys: [], data: data() }))
@@ -381,6 +386,50 @@ describe('芙宁娜 galgame 卡(v10 零轮询)', () => {
     clickDialog()                                  // 队尾推进到段4 → 历史完整入史
     await vi.advanceTimersByTimeAsync(0)
     expect(bl()).toContain('其四')                                              // 点到队尾=全读,回复完整入史
+  })
+
+  it('backlog 上拉加载更早(分页批):滚到顶 → op:history 拉上一页前插;无更早不再拉', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    vi.useFakeTimers()
+    // panel 只带最近一页(2 条),historyTotal=4 → 还有 2 条更早(histStart=2)
+    const data = () => ({
+      session: 'session-gg',
+      history: [
+        { role: 'user', seq: 4, text: '玩家问' },
+        { role: 'assistant', seq: 5, text: '最新回复' },
+      ],
+      lastUser: { seq: 4, text: '玩家问' },
+      lastAssistant: { seq: 5, orig: '最新回复' },
+      cg: { id: 'cg0', layers: [] },
+      historyTotal: 4,
+    })
+    const history = (offset: number, limit: number) => ({
+      rows: [
+        { role: 'user', seq: 1, text: '更早玩家' },
+        { role: 'assistant', seq: 2, text: '更早回复' },
+      ],
+      total: 4,
+    })
+    const { calls, tavern } = rig({ data, history })
+    const host = STAGE()
+    mount(tavern)
+    await vi.advanceTimersByTimeAsync(600)
+
+    host.querySelector('.gg-expand')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))   // 打开 backlog
+    const blBody = host.querySelector('.gg-bl-body') as HTMLElement
+    const texts = (): string[] => Array.from(host.querySelectorAll('.bl-row .bl-text')).map(n => n.textContent ?? '')
+
+    blBody.scrollTop = 0
+    blBody.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(0)
+    const histCalls = calls.filter(c => c.name === 'gal_data.mjs' && c.op === 'history')
+    expect(histCalls).toHaveLength(1)                                            // 拉到更早页
+    expect(texts()).toContain('更早玩家')
+    expect(texts()).toContain('更早回复')
+
+    blBody.dispatchEvent(new Event('scroll'))                                    // histStart 已 0 → 不再重复拉
+    await vi.advanceTimersByTimeAsync(0)
+    expect(calls.filter(c => c.name === 'gal_data.mjs' && c.op === 'history')).toHaveLength(1)
   })
 
   it('unmount 清理纪律:订阅表清空、定时器清、停靠解停、全量停摆', async () => {

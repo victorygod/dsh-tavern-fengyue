@@ -3,10 +3,12 @@
 // applyMoney(钱包 toCp/normWallet)、applyExp(经验升级级联 XP_THRESHOLDS/ASI_LEVELS/特征/位表)、
 // applyMemory(记忆三层 history 专用 append/overwrite + description/thought 恒覆写)。
 // 校验失败一律 throw(非 process.exit)——mvu_commit 按条 try/catch,warn 后继续,不因单条坏账杀整轮。
-import { toCp, normWallet, classRow, pbOf, rollExpr, XP_THRESHOLDS, ASI_LEVELS, slotsFor } from './core.mjs'
+import { toCp, normWallet, classRow, pbOf, rollExpr, rnd, XP_THRESHOLDS, ASI_LEVELS, slotsFor } from './core.mjs'
 import { CLASS_CORE } from './class-core-data.mjs'
+import { SPELL_CORE } from './spell-core-data.mjs'
+import { materializeSpellDetails } from './spell-build.mjs'
 import { FEATURES_RECHARGE } from './opening-meta.mjs'
-import { resolveChoice, pendingKind } from './choice-data.mjs'
+import { resolveChoice, pendingKind, CHOICES } from './choice-data.mjs'
 import { PERSONA_LIMITS } from './persona.mjs'
 
 const fail = (m) => { throw new Error(m) }
@@ -25,8 +27,65 @@ export function applyMoney(j, direction, amount) {
 }
 
 // ── 经验升级级联(原 gain_exp):inc 每人增量;hp 默认 avg。返回 ups 列表+是否升级 ──
+// 2026-10-05 dnd5e-combat 分叉:玩家(pc)升级挂 pending(前端点);NPC(companion/npc)全自动随机——
+// ASI 随机 +2 某属性、wizard 随机学 2 法术、成长选项随机挑,零 pending。
+const ATTRS = ['str', 'dex', 'con', 'int', 'wis', 'cha']
+const spellSlug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+// NPC 自动 ASI:+2 到随机未满 20 属性;全满跳过。返回描述。
+function autoAsi(j) {
+  const pool = ATTRS.filter(a => (j[a] ?? 10) < 20)
+  if (!pool.length) return 'ASI 全属性已 20'
+  const a = pool[rnd(pool.length) - 1]
+  const before = j[a] ?? 10
+  j[a] = Math.min(20, before + 2)
+  return `ASI ${a} ${before}→${j[a]}`
+}
+// NPC 自动学法术:本职业表 ∩ 环位≤可施 ∩ 未收录 ∩ 非戏法,随机挑 n 个。返回名串(空=无候选)。
+function autoLearnSpells(j, n) {
+  const cls = String(j.class ?? '').toLowerCase()
+  const lv = Math.min(Math.max(Number(j.level ?? 1), 1), 20)
+  const maxLv = (slotsFor(cls, lv) ?? []).reduce((m, t, i) => t > 0 ? i + 1 : m, 0)
+  const known = new Set((Array.isArray(j.spells_known) ? j.spells_known : []).map(spellSlug))
+  const candidates = []
+  for (const [slug, e] of Object.entries(SPELL_CORE)) {
+    const fm = e.fm ?? e
+    if (!fm.name || fm.level == null) continue
+    if (!(fm.level >= 1 && fm.level <= maxLv)) continue
+    const classes = Array.isArray(fm.classes) ? fm.classes.map(x => String(x).toLowerCase()) : []
+    if (!classes.includes(cls)) continue
+    if (known.has(spellSlug(fm.name)) || known.has(spellSlug(slug))) continue
+    candidates.push(fm.name)
+  }
+  if (!candidates.length) return ''
+  const picked = []
+  for (let i = 0; i < n && candidates.length; i++) picked.push(candidates.splice(rnd(candidates.length) - 1, 1)[0])
+  j.spells_known = [...(Array.isArray(j.spells_known) ? j.spells_known : []), ...picked]
+  const details = materializeSpellDetails(picked)
+  j.spell_details = [...(Array.isArray(j.spell_details) ? j.spell_details : []), ...details]
+  return picked.join('、')
+}
+// NPC 自动挑成长选项:子职/静态选项随机挑;他职法术偷学(spells)v1 跳过。返回描述(空=跳过)。
+function autoPickChoice(j, kind, cls, f) {
+  if (kind === 'subclass') {
+    const subs = (CLASS_CORE[cls]?.fm?.subclass ?? []).map(s => String(s))
+    if (!subs.length) return ''
+    const sel = subs[rnd(subs.length) - 1]
+    j.subclass = sel
+    return `子职 ${sel}`
+  }
+  if (kind === 'spells') return ''   // 偷学他职法术 v1 不自动(不挂 pending,静默略)
+  const c = CHOICES[kind]
+  if (!c) return ''
+  const opts = Object.keys(c.options)
+  const n = c.max === 1 ? 1 : c.min
+  const picked = []
+  for (let i = 0; i < n && opts.length; i++) picked.push(opts.splice(rnd(opts.length) - 1, 1)[0])
+  j[c.field] = c.max === 1 ? picked[0] : picked
+  return `${f}→${picked.join('/')}`
+}
 export function applyExp(j, inc, hpMode = 'avg') {
   Number.isInteger(inc) && inc > 0 || fail('!exp 变更量必须为正整数')
+  const isPc = j.role === 'pc'
   const beforeLevel = j.level ?? 1
   j.exp += inc
   let newLevel = 1
@@ -44,10 +103,14 @@ export function applyExp(j, inc, hpMode = 'avg') {
       j.hp_max = (j.hp_max ?? 0) + Math.max(1, hpGain); j.hp = (j.hp ?? 0) + Math.max(1, hpGain)
       const st = slotsFor(cls, L)
       if (st && st.length) for (let k = 1; k <= 9; k++) j['slots_l' + k] = st[k - 1] ?? (j['slots_l' + k] ?? 0)
+      const auto = []
       const asi = (ASI_LEVELS[cls] ?? ASI_LEVELS.default).includes(L)
-      if (asi) (j.pending ??= []).push(`LV${L}·ASI 点选`)
-      if (cls === 'wizard') (j.pending ??= []).push(`LV${L}·新法术×2`)
-      // 特征入库(与 spawn 同格式 `名|回充|已用0`;选择特征推 pending 待选)
+      if (asi) { if (isPc) (j.pending ??= []).push(`LV${L}·ASI 点选`); else auto.push(autoAsi(j)) }
+      if (cls === 'wizard') {
+        if (isPc) (j.pending ??= []).push(`LV${L}·新法术×2`)
+        else { const r = autoLearnSpells(j, 2); if (r) auto.push(`学法术 ${r}`) }
+      }
+      // 特征入库(与 spawn 同格式 `名|回充|已用0`;选择特征:pc 推 pending / npc 随机挑)
       const featNames = String(row?.features ?? '').split(',').map(s => s.trim()).filter(Boolean)
       if (featNames.length) {
         const feats = Array.isArray(j.features) ? j.features.slice() : []
@@ -57,16 +120,18 @@ export function applyExp(j, inc, hpMode = 'avg') {
           const rowStr = `${f}|${key ? FEATURES_RECHARGE[key] : '—'}|已用0`
           const kind = resolveChoice(f)
           if (kind === 'spells') {
-            if (!(j.pending ?? []).some(p => String(p).includes('新法术'))) (j.pending ??= []).push(`LV${L}·新法术×2`)
+            if (isPc) { if (!(j.pending ?? []).some(p => String(p).includes('新法术'))) (j.pending ??= []).push(`LV${L}·新法术×2`) }
+            else { const r = autoLearnSpells(j, 2); if (r) auto.push(`学法术 ${r}`) }
           } else if (kind) {
-            if (!(j.pending ?? []).some(p => pendingKind(p) === kind)) (j.pending ??= []).push(`LV${L}·${f} 待选`)
+            if (isPc) { if (!(j.pending ?? []).some(p => pendingKind(p) === kind)) (j.pending ??= []).push(`LV${L}·${f} 待选`) }
+            else { const r = autoPickChoice(j, kind, cls, f); if (r) auto.push(r) }
           } else if (!dup) {
             feats.push(rowStr)
           }
         }
         j.features = feats
       }
-      ups.push(`LV${L}: PB+${pbOf(L)} · 特征[${row?.features ?? '—'}] · HP+${Math.max(1, hpGain)}${asi ? ' · ASI 待选' : ''}${cls === 'wizard' ? ' · 新法术待选' : ''}`)
+      ups.push(`LV${L}: PB+${pbOf(L)} · 特征[${row?.features ?? '—'}] · HP+${Math.max(1, hpGain)}${auto.length ? ' · ' + auto.join(' · ') : ''}${isPc && asi ? ' · ASI 待选' : ''}${isPc && cls === 'wizard' ? ' · 新法术待选' : ''}`)
     }
   }
   return { ups, leveled: newLevel > beforeLevel }

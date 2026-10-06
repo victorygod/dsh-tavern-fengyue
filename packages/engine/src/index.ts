@@ -35,7 +35,7 @@ import type { TavernImportFile, TavernLibraryCard, TavernSave, TavernSessionStat
 import type { ScriptRenderFailure } from './prompting.ts'
 import { resolveSessionForDirectory, wireFileEvents, type WireInjectCtx } from './file-events.ts'
 import { runHookPhase, type HookEvent } from './hooks.ts'
-import { textOfBlocks, writeChatSnapshot, writeTailSnapshot } from './chat-snapshot.ts'
+import { textOfBlocks, turnToolCalls, writeChatSnapshot, writeTailSnapshot, writeToolsSnapshot } from './chat-snapshot.ts'
 import {
   autosaveStamped, commitImportedCard, createWorkspaceDirs, deleteSave, deleteSaveStamp, hasCard, importCardPreset,
   listLibrary, listSaves, listTree, loadSave, manualSave, newWorkspaceRoot, PRESET_DIR, presetDiffers,
@@ -1748,6 +1748,11 @@ export class TavernRuntime extends Service {
       : this.spawnTailPhase(session, root, run, turnSeq)
     const settled = (async (): Promise<void> => {
       try {
+        // 工具快照(2026-10-04 动态提醒缝):把刚收束回合的工具调用落 runtime/.chat.tools.jsonl,
+        // 供下一回合 postPrompt 的 {{output_alert()}} 检测「上轮是否调了工具」。独立文件、无并发写手,
+        // 同步直写(小 JSON + 原子 rename)——不入写队列微任务链,收束信号时序零扰动(尾代理关闭的
+        // completed 回合必须当拍照发落定信号,多一微任务都会拖过 whenIdle 的读点)。
+        writeToolsSnapshot(root, { sessionId: String(session.id), turnSeq, tools: turnToolCalls(session.snapshotEvents(), turnSeq) })
         try {
           await this.settlePhase('main.after', root, controller.signal)
         } finally {

@@ -1,6 +1,6 @@
 {
   "title": "DND 5e · 原味跑团",
-  "desc": "D&D 5e 原味单人跑团，去尾代理：主面文末结算块 + main.after 钩子机械维护 state.md；SRD 语料 1164 篇，六件骰算计算器，悬浮 HUD。",
+  "desc": "D&D 5e 原味单人跑团（战斗自动化版）：LLM=纯叙事 DM，一切战斗封进一个 combat 工具（全自动互丢攻击/法术→战报回执）；注入面板缩窄为叙事画像（身份/擅长/特长/语言/背包/钱/人设），战斗数值六维/HP/环位/法术/状态全隐；日常判定走 check、休整走 rest、成长玩家前端点、NPC 自动随机。",
   "cover": "preset/assets/cover.webp",
   "creator": "fengyue 卡工坊",
   "version": "0.1.0",

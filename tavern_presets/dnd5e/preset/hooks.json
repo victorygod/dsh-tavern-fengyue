@@ -1,5 +1,5 @@
 {
   "hooks": {
-    "main.after": ["mvu_commit.mjs"]
+    "main.after": ["mvu_commit.mjs", "debug_post.mjs"]
   }
 }

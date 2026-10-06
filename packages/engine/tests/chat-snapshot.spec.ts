@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import { chatSnapshotRows, CHAT_SNAPSHOT_FILE, chatSnapshotPath, TAIL_SNAPSHOT_FILE, tailSnapshotPath, writeChatSnapshot, writeTailSnapshot } from '../src/chat-snapshot.ts'
+import { chatSnapshotRows, CHAT_SNAPSHOT_FILE, chatSnapshotPath, TAIL_SNAPSHOT_FILE, tailSnapshotPath, turnToolCalls, TOOLS_SNAPSHOT_FILE, toolsSnapshotPath, writeChatSnapshot, writeTailSnapshot, writeToolsSnapshot } from '../src/chat-snapshot.ts'
 import { writeCardSkeleton } from '../src/workspace.ts'
 
 const tempDirs: string[] = []
@@ -145,5 +145,56 @@ describe('tail output file', () => {
     expect(lines).toHaveLength(1)
     expect(lines[0]).toMatchObject({ type: 'head', turnSeq: 2 })
     expect(JSON.stringify(tailLines(root))).not.toContain('上一轮')
+  })
+})
+
+describe('tools file', () => {
+  function toolCallEvent(seq: number, name: string, args: string): { type: string; seq: number; data?: unknown } {
+    return { type: 'tool/call', seq, data: { name, arguments: args, callId: `c${seq}` } }
+  }
+  function turnStartEvent(seq: number): { type: string; seq: number } { return { type: 'turn/start', seq } }
+
+  function toolsLines(root: string): Record<string, unknown>[] {
+    return readFileSync(toolsSnapshotPath(root), 'utf8').trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>)
+  }
+
+  it('turnToolCalls extracts only the settled turn calls, bounded by turn/start', () => {
+    const events = [
+      turnStartEvent(1),
+      toolCallEvent(2, 'attack', '{"target":"哥布林"}'),   // 上一轮
+      { type: 'turn/end', seq: 3 },
+      turnStartEvent(4),
+      toolCallEvent(5, 'gain_money', '{"amount":10}'),
+      toolCallEvent(6, 'cast', '{"spell":"fireball"}'),
+      { type: 'turn/end', seq: 7 },
+    ]
+    expect(turnToolCalls(events, 7)).toEqual([
+      { name: 'gain_money', detail: 'amount' },
+      { name: 'cast', detail: 'spell' },
+    ])
+  })
+
+  it('turnToolCalls is empty for a tool-less turn and tolerates malformed args', () => {
+    expect(turnToolCalls([turnStartEvent(1), { type: 'turn/end', seq: 2 }], 2)).toEqual([])
+    expect(turnToolCalls([turnStartEvent(1), toolCallEvent(2, 'attack', 'not-json'), { type: 'turn/end', seq: 3 }], 3)).toEqual([
+      { name: 'attack', detail: '8 chars' },
+    ])
+  })
+
+  it('writeToolsSnapshot writes head + tool rows into runtime/, empty run leaves head only', () => {
+    const root = freshRoot()
+    writeToolsSnapshot(root, { sessionId: 'session-x', turnSeq: 7, tools: [{ name: 'gain_money', detail: 'amount' }, { name: 'cast', detail: 'spell' }] })
+    expect(existsSync(join(root, 'runtime', TOOLS_SNAPSHOT_FILE))).toBe(true)
+    const lines = toolsLines(root)
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toMatchObject({ type: 'head', sessionId: 'session-x', turnSeq: 7 })
+    expect(typeof lines[0].ranAt).toBe('string')
+    expect(lines[1]).toEqual({ role: 'tool', name: 'gain_money', detail: 'amount' })
+    expect(lines[2]).toEqual({ role: 'tool', name: 'cast', detail: 'spell' })
+
+    writeToolsSnapshot(root, { sessionId: 'session-x', turnSeq: 8, tools: [] })
+    expect(toolsLines(root)).toHaveLength(1)
+    expect(toolsLines(root)[0]).toMatchObject({ type: 'head', turnSeq: 8 })
+    expect(readFileSync(toolsSnapshotPath(root), 'utf8').endsWith('\n')).toBe(true)
   })
 })

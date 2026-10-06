@@ -6,8 +6,9 @@
 // nodes 由组装一次建好传入(不再逐拍重查);降级自理:舞台/书签/宿主 face 缺位不在此感知。
 const TYPE_MS = 26
 
-export function createPresenter({ bookmark, stage, views, nodes, opening, stopper }) {
+export function createPresenter({ bookmark, stage, views, nodes, opening, stopper, runScript }) {
   const WAIT_TIMEOUT_MS = 120_000   // waiting 兜底:超时未结算回落输入态(一次性看门狗,不寄生拉取)
+  const PAGE = 15                   // 历史分页页大小(与 gal_data.mjs 的 PAGE 一致)
   let disposed = false
   let mode = 'boot', r = 0
   let liveTail = ''                 // 流式中未遇 \n 的活性行(实时上屏)
@@ -17,6 +18,9 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
   let typing = null
   let waitGuard = null
   let errJust = false               // 回声锁:失败拍早于本回合玩家行落盘(快败竞态)时,首拍 ② = 回声
+  // backlog 历史分页状态(2026-10-05 分页批):已加载行升序 + 总数 + 已加载段起始 offset。
+  let histRows = [], histTotal = 0, histStart = 0
+  let loadingEarlier = false        // 上拉加载防重入
   const stops = []
   const add = fn => { if (typeof fn === 'function') stops.push(fn) }
 
@@ -108,12 +112,53 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     renderThink()
   }
 
-  /* ── backlog(防剧透口径与渲染在 views,此处只换装+滚动)── */
-  function renderBacklog() {
+  /* ── backlog(防剧透口径与渲染在 views,此处只换装+滚动)──
+     历史源=累积的 histRows(panel 最近一页 + 上拉加载的更早页);当前轮截断仍走
+     script.raw/lineEnds(visibleHistory 里 seq 匹配命中当前轮)。scrollToBottom
+     仅用于首次打开/换装;上拉加载后由 loadEarlier 自行恢复滚动锚点。 */
+  function renderBacklog(scrollToBottom = true) {
     if (nodes.root == null) return
-    const rows = views.visibleHistory(script, { r, asstSeq: bookmark.get().asstSeq })
+    const rows = views.visibleHistory({ raw: script.raw, lineEnds: script.lineEnds, history: histRows }, { r, asstSeq: bookmark.get().asstSeq })
     nodes.blBody.innerHTML = views.renderHistoryHTML(rows)
-    nodes.blBody.scrollTop = nodes.blBody.scrollHeight
+    if (scrollToBottom) nodes.blBody.scrollTop = nodes.blBody.scrollHeight
+  }
+
+  /* ── 历史数据接拍:boot/settle 以 panel 最近一页为基线重置累积(新轮落定=历史真变了)。
+     fact 无独立 history 字段——panel 的最近一页在 fact.script.history(makeScript 产物)里。── */
+  function adoptHistory(fact) {
+    histRows = [...(fact.script?.history ?? [])]
+    histTotal = fact.historyTotal ?? histRows.length
+    histStart = Math.max(0, histTotal - histRows.length)
+  }
+
+  /* ── 上拉加载更早:滚到 backlog 顶且仍有更早页 → op:history 拉上一页前插,
+     恢复滚动锚点(顶部插入会推高内容,需把 scrollTop 顶回原视觉位)。── */
+  async function loadEarlier() {
+    if (loadingEarlier || disposed || histStart <= 0 || nodes.blBody == null) return
+    loadingEarlier = true
+    try {
+      const prevHeight = nodes.blBody.scrollHeight
+      const limit = Math.min(PAGE, histStart)
+      const newStart = histStart - limit
+      const text = await runScript('gal_data.mjs', JSON.stringify({ op: 'history', offset: newStart, limit }))
+      const value = JSON.parse(text)
+      if (value?.ok !== true || !Array.isArray(value.rows)) return
+      histRows = [...value.rows, ...histRows]
+      histTotal = value.total ?? histTotal
+      histStart = newStart
+      renderBacklog(false)
+      nodes.blBody.scrollTop = nodes.blBody.scrollHeight - prevHeight
+    } catch (error) {
+      console.warn('[gg] 历史加载失败:', error instanceof Error ? error.message : String(error))
+    } finally {
+      loadingEarlier = false
+    }
+  }
+
+  /* 上拉阈值判定:升序列表更早在顶部,滚到顶(阈内)即触发。 */
+  function onBlScroll() {
+    if (nodes.blBody == null) return
+    if (nodes.blBody.scrollTop <= 8 && histStart > 0 && !loadingEarlier) void loadEarlier()
   }
   function openBacklog() {
     if (nodes.root == null) return
@@ -225,6 +270,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     errJust = false    // 成功拍同时解回声锁(失败链彻底翻篇)
     const prevR = r
     adopt(fact.script)
+    adoptHistory(fact)
     liveTail = ''
     r = Math.min(prevR, paras.length - 1)
     bookmark.touch({ r })
@@ -244,6 +290,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
     clearInterrupt()
     errJust = false    // 新开场样 = 成功拍族:锁一并解
     adopt(fact.script)
+    adoptHistory(fact)
     void stage.warm()                                   // manifest 索引本拍预载(boot 原序)
     void stage.show(fact.cg?.id ?? null, fact.cg?.layers)
     void stage.prime(fact.assetKeys)
@@ -322,6 +369,7 @@ export function createPresenter({ bookmark, stage, views, nodes, opening, stoppe
   nodes.stop?.addEventListener('click', e => { e.stopPropagation(); requestStop() })
   nodes.expand.addEventListener('click', e => { e.stopPropagation(); if (blOpen) closeBacklog(); else openBacklog() })
   nodes.collapse.addEventListener('click', e => { e.stopPropagation(); closeBacklog() })
+  nodes.blBody?.addEventListener('scroll', onBlScroll)   // 上拉自动加载更早(随 DOM 销毁)
   const onResize = () => { placeThink() }
   window.addEventListener('resize', onResize)
   add(() => window.removeEventListener('resize', onResize))

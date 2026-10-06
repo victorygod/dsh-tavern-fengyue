@@ -98,6 +98,7 @@ export function mount(tavern) {
       bookmark, stage, views, nodes,
       opening: tavern.opening ?? null,
       stopper: () => tavern.stop?.(),
+      runScript: tavern.runScript,   // backlog 上拉加载更早走 op:history
     })
     const repo = factoryOf.feed({
       runScript: tavern.runScript, views,

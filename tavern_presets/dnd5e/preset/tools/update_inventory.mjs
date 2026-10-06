@@ -1,6 +1,6 @@
 /** @tavern-schema
 {
-  "description": "背包区更新器——叙事可变的「随身之物」单源落档器：weapons 武器名全量替换 + gear 随身物品全量替换 + armor 护甲名(标量) + shield 持盾/弃盾翻转。什么情况调:拾取/缴获/买/卖/遗失/丢弃/转赠/换装——背包律:战斗用物/消耗品/任务道具必须在 weapons/gear 行上才能被使用/交付,不在行上=身上没带。护甲变更 AC 回执自动前后上报,并触发换装律(persona.appearance 穿搭段同拍更新,归维护代理)。钱款(gp/sp/cp)走 gain_money,不在此。回执返回逐键变化+改后整卡 JSON。",
+  "description": "非战斗背包更新器——叙事可变的「随身之物」单源落档器（战斗战利品的装备已由 combat 工具自动归主角，勿走此）：weapons 武器名全量替换 + gear 随身物品全量替换 + armor 护甲名(标量) + shield 持盾/弃盾翻转。什么情况调:拾取/缴获/买/卖/遗失/丢弃/转赠/换装——背包律:战斗用物/消耗品/任务道具必须在 weapons/gear 行上才能被使用/交付,不在行上=身上没带。护甲变更 AC 回执自动前后上报,并触发换装律(persona.appearance 穿搭段同拍更新,归维护代理)。钱款(gp/sp/cp)走 gain_money,不在此。回执返回逐键变化+改后整卡 JSON。",
   "agents": ["main"],
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概：本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起，后续叙事必须遵守。" },
@@ -22,13 +22,13 @@ a.target || err('缺必填 target')
 // 属分面裁决:非背包区字段点名所属(直接编辑=越区)——任一传入即拒,特殊修档=维护代理 runtimeEdit 兜底。
 const DENY = new Map([
   ['gp', '钱款走 gain_money'], ['sp', '钱款走 gain_money'], ['cp', '钱款走 gain_money'],
-  ['statuses', '在施状态走 update_status'], ['exhaustion', '力竭走 update_status'], ['role', '入队/离队翻转走 update_status'],
-  ['spells_prepared', '已备法术走 update_status'], ['spells_known', '已知法术=建档/前端/维护——本工具不收'],
-  ['history', '履历走 update_memory(history_append 只增)'], ['description', '现况一句走 update_memory'], ['thought', '当前想法走 update_memory'],
+  ['statuses', '状态由战斗/成长自动管理——本工具不收'], ['exhaustion', '力竭归维护代理——本工具不收'], ['role', '入队/离队翻转归建档面/维护代理'],
+  ['spells_prepared', '已备法术=施法面(战斗内)——本工具不收'], ['spells_known', '已知法术=建档/前端——本工具不收'],
+  ['history', '履历走 mvu 块 memory'], ['description', '现况一句走 mvu 块 memory'], ['thought', '当前想法走 mvu 块 memory'],
   ['languages', '语言=建档面/维护代理(runtimeEdit 兜底)——本工具不收'],
   ['persona', '人设七键=建档生成面/维护代理(换装律同拍)'],
-  ['abilities', '六维=成长面(ASI 点选)'], ['features', '特征=职业行'], ['pending', '待办=成长面(gain_exp 挂/前端消费)'],
-  ['hp', '受伤/治疗走 hp_change'], ['hp_max', '写入口=成长/升级链'], ['temp_hp', '临时生命走 hp_change'],
+  ['abilities', '六维=成长面(前端点/NPC 自动)'], ['features', '特征=职业行'], ['pending', '待办=成长面(前端消费)'],
+  ['hp', '生命值由战斗/成长自动管理——本工具不收'], ['hp_max', '写入口=成长/升级链'], ['temp_hp', '临时生命由战斗/成长自动管理——本工具不收'],
 ])
 
 // 可更新键白名单(=schema 平铺参数)——名单外的具名参数一律点名

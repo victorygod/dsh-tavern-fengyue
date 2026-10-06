@@ -176,3 +176,93 @@ export function writeTailSnapshot(root: string, content: { sessionId: string; tu
   writeFileSync(scratch, body)
   renameSync(scratch, target)
 }
+
+/**
+ * The tools file's name inside `runtime/` — the just-settled turn's tool calls.
+ *
+ * The conversation snapshot deliberately excludes tool traffic (they are
+ * model/display-face derivations, not history), so cards that need to check
+ * "did the previous turn call any tool" had no runtime view. This file fills
+ * that opt-in seam (card-hooks doc §明确不做: deferred to real need): one
+ * whole-file replace per settled turn, consumed at the next turn's post render.
+ */
+export const TOOLS_SNAPSHOT_FILE = '.chat.tools.jsonl'
+
+/** Absolute path of one workspace's tools file. */
+export function toolsSnapshotPath(root: string): string {
+  return join(root, 'runtime', TOOLS_SNAPSHOT_FILE)
+}
+
+/** The tools file's first-line descriptor; `turnSeq` is the settled turn's end seq. */
+export interface ToolsSnapshotHead {
+  readonly type: 'head'
+  readonly sessionId: string
+  readonly turnSeq: number
+  readonly ranAt: string
+}
+
+/** One projected tool call: the name plus a bounded argument digest, never raw args. */
+export interface ToolsSnapshotRow {
+  readonly role: 'tool'
+  readonly name: string
+  readonly detail: string
+}
+
+/** The bounded argument digest for one tool call: keyed field names, or a char count. */
+function toolDetail(argsJson: string): string {
+  try {
+    const args = JSON.parse(argsJson) as Record<string, unknown>
+    const keys = Object.keys(args)
+    return keys.length === 0 ? '' : keys.slice(0, 3).join(', ')
+  } catch {
+    return `${argsJson.length} chars`
+  }
+}
+
+/**
+ * The tool calls of one settled turn: `tool/call` events whose seq sits strictly
+ * after the turn's `turn/start` and at or before its `turn/end` (`turnSeq`).
+ * Pure and testable against event fixtures (same shape as {@link scanSettlement}).
+ * @param events - the session's snapshot events, in order.
+ * @param turnSeq - the settled turn's `turn/end` seq.
+ * @returns compact `{ name, detail }` rows, in event order.
+ */
+export function turnToolCalls(events: Iterable<{ type: string; seq: number; data?: unknown }>, turnSeq: number): { name: string; detail: string }[] {
+  const list = Array.from(events)
+  let lastTurnStart = -1
+  for (const event of list) {
+    if (event.type === 'turn/start' && event.seq < turnSeq) lastTurnStart = event.seq
+  }
+  const tools: { name: string; detail: string }[] = []
+  for (const event of list) {
+    if (event.type !== 'tool/call' || event.seq <= lastTurnStart || event.seq > turnSeq) continue
+    const data = event.data as { name?: unknown; arguments?: unknown } | undefined
+    const name = typeof data?.name === 'string' ? data.name : '?'
+    const args = typeof data?.arguments === 'string' ? data.arguments : ''
+    tools.push({ name, detail: toolDetail(args) })
+  }
+  return tools
+}
+
+/**
+ * Replace the whole tools file from one settled turn's tool calls — same
+ * whole-file replace contract as {@link writeTailSnapshot}; a skipped/aborted
+ * turn never writes it, leaving the last completed turn's file in place
+ * (the head's `turnSeq` is the staleness marker, mirroring the tail file).
+ * @param root - absolute workspace root.
+ * @param content - the settled turn's identity and tool calls.
+ */
+export function writeToolsSnapshot(root: string, content: { sessionId: string; turnSeq: number; tools: readonly { name: string; detail: string }[] }): void {
+  const head: ToolsSnapshotHead = {
+    type: 'head',
+    sessionId: content.sessionId,
+    turnSeq: content.turnSeq,
+    ranAt: new Date().toISOString(),
+  }
+  const lines: (ToolsSnapshotHead | ToolsSnapshotRow)[] = [head, ...content.tools.map(tool => ({ role: 'tool' as const, name: tool.name, detail: tool.detail }))]
+  const body = lines.map(line => JSON.stringify(line)).join('\n') + '\n'
+  const target = toolsSnapshotPath(root)
+  const scratch = `${target}.tmp-${process.pid}`
+  writeFileSync(scratch, body)
+  renameSync(scratch, target)
+}

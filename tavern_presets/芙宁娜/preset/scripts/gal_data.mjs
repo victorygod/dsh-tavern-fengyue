@@ -13,10 +13,13 @@ if (op === 'manifest') {
   process.stdout.write(JSON.stringify({ ok: true, cgs }))
   process.exit(0)
 }
-if (op !== 'panel') { console.log(JSON.stringify({ ok: false, error: `未知 op:${a.op}` })); process.exit(1) }
+if (op !== 'panel' && op !== 'history') { console.log(JSON.stringify({ ok: false, error: `未知 op:${a.op}` })); process.exit(1) }
 
 const stat = (p) => { try { const s = statSync(p); return `${s.mtimeMs}:${s.size}` } catch { return null } }
 const strip = (t) => String(t ?? '').replace(/<!--[\s\S]*?-->/g, '').trim()
+// 面板单页历史条数(2026-10-05 分页批):panel 热路径只带最近一页,上界=当前轮+15 条;
+// 更早历史走 op:history 按 offset/limit 拉,不再全量进 panel(全量曾超 64KB stdout 边界)。
+const PAGE = 15
 
 // ── 快照:最近的 player 行与 assistant 行 + 全量历史(backlog 防剧透原料) ──
 const stripD = t => String(t ?? '').replace(/<!--[\s\S]*?-->/g, '').trim()
@@ -42,6 +45,16 @@ const layers = cg?.layers ?? []
 const assetKeys = layers.map(l => l.img)
 
 const rev = `${stat('.chat.snapshot.jsonl')}:${stat('cg.json')}:${stat('../preset/assets/cg/manifest.json')}`
+
+// ── op:history(backlog 翻更早):旧轮分页切片,升序;offset 越界空页,total=全量行数 ──
+if (op === 'history') {
+  const offset = Number.isInteger(a.offset) ? Math.max(0, a.offset) : 0
+  const limit = Number.isInteger(a.limit) ? Math.max(1, a.limit) : PAGE
+  process.stdout.write(JSON.stringify({ ok: true, rows: history.slice(offset, offset + limit), total: history.length }))
+  process.exit(0)
+}
+
+// ── op:panel:最近一页 + 总数;lastAssistant 只留 orig(text 由前端 stripDirectives 现算) ──
 process.stdout.write(JSON.stringify({
   ok: true,
   rev,
@@ -49,9 +62,10 @@ process.stdout.write(JSON.stringify({
   data: {
     session,
     lastUser: lastUser ? { seq: lastUser.seq, text: strip(lastUser.plain) } : null,
-    // orig = 保留注释原样(text 为去注释展示用);段级 CG 判定必须从 orig 取
-lastAssistant: lastAssistant ? { seq: lastAssistant.seq, text: strip(lastAssistant.orig), orig: lastAssistant.orig } : null,
+    // orig = 保留注释原样(段级 CG 判定必须从 orig 取);去注释展示文本前端 stripDirectives 现算
+    lastAssistant: lastAssistant ? { seq: lastAssistant.seq, orig: lastAssistant.orig } : null,
     cg: { id, layers },
-    history,
+    history: history.slice(-PAGE),
+    historyTotal: history.length,
   },
 }))

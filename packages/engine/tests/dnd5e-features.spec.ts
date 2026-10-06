@@ -78,15 +78,4 @@ describe('dnd5e 特征机械化——hasFeature/无甲防御/成长选项/被动
     expect(r.stdout).toContain('万事通+1')
     rmSync(dirname(rt), { recursive: true, force: true })
   })
-
-  it('狂暴状态:mods(力攻+2)+resist(钝刺砍)由 status.mjs 单源,rollMods 读 mods', () => {
-    const { cwd: rt } = rig({ name: '蛮', role: 'pc', class: 'barbarian', level: 1, hp: 20, hp_max: 20, str: 16, dex: 12, con: 14, int: 8, wis: 10, cha: 8, features: ['Rage|长休|已用0'] })
-    // update_status 施加 Rage——statusMech 从 STATUS_TEXT 自动落 mods/resist
-    const r = runTool(rt, 'update_status', { context: '狂暴', target: '蛮', statuses: [{ status: 'Rage', applied_at: '第2轮' }] })
-    expect(r.status).toBe(0)
-    const p = j(rt)
-    expect(p.statuses.Rage.mods).toEqual([{ stat: 'damage', magnitude: '2' }])
-    expect(p.statuses.Rage.resist).toEqual(['bludgeoning', 'piercing', 'slashing'])
-    rmSync(dirname(rt), { recursive: true, force: true })
-  })
 })

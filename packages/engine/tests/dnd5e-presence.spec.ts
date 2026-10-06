@@ -108,21 +108,6 @@ describe('dnd5e 附近 NPC 三态名单——注入与前端逐行镜像(2026-09
     rmSync(dirname(rt), { recursive: true, force: true })
   })
 
-  it('参战行 join=档案值+先攻;非参战者不带 init;玩家与池隔离', () => {
-    const { cwd: rt } = rig()
-    const right = pump(rt, 'hud-right')
-    const foe = right.data?.foes?.[0]
-    expect(foe.name).toBe('石牙')
-    expect(foe.hp).toBe(9)          // 参战行不落 HP——档案值即敌卡值(工具当拍写档,行只记身份/状态)
-    expect(foe.hp_max).toBe(9)
-    expect(foe.init).toBe(11)       // 先攻行 join
-    const left = pump(rt, 'hud-left')
-    expect(left.data?.player?.name).toBe('洛克')
-    for (const c of left.data?.companions ?? []) expect(c.init).toBeUndefined()
-    expect((left.data?.neutrals ?? []).find((c: any) => c.name === '掌柜')?.init).toBeUndefined()
-    rmSync(dirname(rt), { recursive: true, force: true })
-  })
-
   it('时间真值带分投影(2026-09-30):time_minute 出泵;旧档无分容缺→0', () => {
     const withMin = rig(STATE_MD.replace('- 当前时间：第1日·18时', '- 当前时间：第1日·18时05分'))
     const a = pump(withMin.cwd, 'hud-right')

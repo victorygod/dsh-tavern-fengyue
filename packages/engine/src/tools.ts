@@ -38,7 +38,7 @@ const WRITE_CAP = 1_000_000
 /** Line cap on one grep result. */
 const GREP_LINES = 200
 /** Byte cap on one tool-script invocation's captured stdout. */
-const TOOL_OUTPUT_CAP = 8_000
+const TOOL_OUTPUT_CAP = 64_000
 /** Timeout of one tool-script invocation. */
 const TOOL_TIMEOUT_MS = 10_000
 

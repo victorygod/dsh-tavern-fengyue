@@ -25,7 +25,7 @@ export function createRepo({ runScript, views, onScript, onDead }) {
     const script = views.makeScript(d.lastAssistant ?? null, d.history ?? [])
     onScript({
       reason,
-      hasAsst: Boolean(d.lastAssistant?.orig || d.lastAssistant?.text),
+      hasAsst: Boolean(d.lastAssistant?.orig),
       session: d.session ?? null,
       aSeq: d.lastAssistant?.seq ?? 0,
       uSeq: d.lastUser?.seq ?? 0,
@@ -34,6 +34,7 @@ export function createRepo({ runScript, views, onScript, onDead }) {
       script,
       cg: d.cg ?? null,
       assetKeys: value.assetKeys ?? [],
+      historyTotal: d.historyTotal,
     })
   }
 

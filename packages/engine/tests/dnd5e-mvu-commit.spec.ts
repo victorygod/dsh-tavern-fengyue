@@ -55,7 +55,6 @@ describe('dnd5e mvu_commit 钩子(真实脚本:抽块→写 state.md 八节+memo
     expect(m).toContain('## 附近 NPC\n- 西德 | 中立\n- 奥里安 | 同伴')
     expect(m).toContain('## 任务\n- 【主线】前往凡戴尔\n- ✓ 另一件')
     expect(m).toContain('## 伏笔\n- 待回收：黑蜘蛛的身份')
-    expect(m).toContain('## 战斗\n- （无战斗）')
     rmSync(base, { recursive: true, force: true })
   })
 
@@ -117,15 +116,14 @@ describe('dnd5e mvu_commit 钩子(真实脚本:抽块→写 state.md 八节+memo
   })
 
   it('缺键节保留旧值不空(全量声明是契约,缺键=模型失误保旧)', () => {
-    const seed = '# 世界状态\n\n## 任务\n- 【主线】前往凡戴尔\n\n## 战斗\n- （无战斗）\n'
-    const data = JSON.stringify({ time: '第1日·19时30分', location: { id: 'L01', name: '凡戴尔镇' }, weather: '阴', terrain: '山路', nearby: [], quests: [], foreshadow: [], combat: null })
+    const seed = '# 世界状态\n\n## 任务\n- 【主线】前往凡戴尔\n'
+    const data = JSON.stringify({ time: '第1日·19时30分', location: { id: 'L01', name: '凡戴尔镇' }, weather: '阴', terrain: '山路', nearby: [], quests: [], foreshadow: [] })
     // 塞一个「缺 quests 键」的块:直接构造对象后删 key
     const obj = JSON.parse(data); delete obj.quests; delete obj.foreshadow
     const { cwd, base } = rig(snap(block(JSON.stringify(obj))), seed)
     run(cwd)
     const m = md(cwd)
     expect(m).toContain('## 任务\n- 【主线】前往凡戴尔')        // 旧值保留
-    expect(m).toContain('## 战斗\n- （无战斗）')                 // 旧值保留(combat 键在但其余节保留)
     rmSync(base, { recursive: true, force: true })
   })
 })

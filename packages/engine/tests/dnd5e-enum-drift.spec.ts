@@ -19,23 +19,7 @@ describe('枚举漂移钉(schema=单源/正本)', () => {
       .toEqual(schemaOf('spawn_npc').parameters.stance.enum)
     expect(schemaOf('spawn_npc').parameters.stance.enum).toEqual(['同伴', '中立', '敌对'])
   })
-    it('damage type 13 型==glossary-cn DAMAGE_TYPE_CN 单源;数据面(spell-data/EQ_CORE)全在 13 内', async () => {
-    const { DAMAGE_TYPE_CN } = await import(pathToFileURL(join(CARD, 'lib', 'glossary-cn.mjs')).href)
-    const thirteen = [...Object.keys(DAMAGE_TYPE_CN)]
-    expect(thirteen).toHaveLength(13)
-    expect(schemaOf('damage').parameters.type.enum).toEqual(thirteen)
-    const { SPELL_DATA } = await import(pathToFileURL(join(CARD, 'lib', 'spell-data.mjs')).href)
-    const { EQ_CORE } = await import(pathToFileURL(join(CARD, 'lib', 'equip-core-data.mjs')).href)
-    const bad: string[] = []
-    for (const sp of Object.values(SPELL_DATA)) if (sp.type && !thirteen.includes(String(sp.type))) bad.push(String(sp.type))
-    for (const e of Object.values(EQ_CORE)) {
-      const t = e.fm?.damage_type
-      if (t && !thirteen.includes(String(t).toLowerCase())) bad.push(String(t))   // Title Case 归一比较
-    }
-    expect(bad).toEqual([])   // 数据面超 13 型=正本漏改,钉先红
-  })
-  it('rest kind/role 闭域枚举闭环', () => {
+  it('rest kind 闭域枚举闭环', () => {
     expect(schemaOf('rest').parameters.kind.enum).toEqual(['short', 'long'])
-    expect(schemaOf('update_status').parameters.role.enum).toEqual(['companion', 'npc'])
   })
 })

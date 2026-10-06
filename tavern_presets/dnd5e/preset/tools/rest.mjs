@@ -23,9 +23,6 @@ const names = String(a.who ?? '').split(/[,，]/).map(s => s.trim()).filter(Bool
 names.length || err('缺必填 who(名单)')
 
 const hitDie = (j, cls) => j.hit_die ?? (+CLASS_CORE[cls]?.fm?.hit_die || 8)
-// 准备制 4 职(2026-10-04 与 spawn_npc.mjs 同源):有每日已备表可换——长休换备检测据此点名。
-// 法师按「已知制」建模(法术书=spells_known 恒定可施,无每日 prepared 子集),不入此名单;已知制(bard/sorcerer/warlock)与非施法者无换备。
-const PREP_CASTERS = new Set(['cleric', 'druid', 'paladin', 'ranger'])
 // 池回充:features 行 `名|回充时机|已用N` → 已用0
 function recharge(j, mode) {
   if (!Array.isArray(j.features)) return
@@ -94,12 +91,6 @@ if (a.kind === 'short') {
     if (tempHad) parts.push('临时生命清')
     lines.push(`  落盘: ${name} ${parts.join(' · ')} [${f}]${exNote}`)
     for (const r of dc.removed) lines.push(`  落盘: ${r.name} statuses −「${r.key}」 [${r.file}]`)
-    // 长休换备点名(准备制职业方能换):玩家停下问是否换备,非玩家自动推演必配;其余不输出(流程指令在 systemPrompt)。
-    if (PREP_CASTERS.has(cls)) {
-      lines.push(j.role === 'pc'
-        ? `  🛑 长休换备: ${name}(玩家) ${cls} 可换已备法术——停下问玩家是否换备(走 update_status.spells_prepared),不换则保持现表`
-        : `  换备: ${name} NPC(${cls}) 准备制职业——已备法术自动推演必配(照人设推演本周期已备,走 update_status.spells_prepared)`)
-    }
   }
 }
 lines.push(`  ◇ 梗概: ${a.context}`)

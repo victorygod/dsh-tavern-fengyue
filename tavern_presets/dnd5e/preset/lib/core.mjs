@@ -68,44 +68,8 @@ export function hasFeature(j, name) {
   })
 }
 
-// ── 战斗节（state.md「## 战斗」——combat.json 已废,2026-09-20 定案战斗入 state.md）──
-// 行语法(2026-09-29b 参战名单化)：- 回合：N ／ - 先攻：名:init > 名:init ／ - 参战行：名 [| 状态文本]
-// (旧 敌行|友行 行式=兼容读——存量 state.md 平滑,敌我判断退役,解析即归参战者)。
-// HP/AC 不在行里——一律走各角色档案(单一居所;行只记身份/情境状态)。
-export function combatSectionLines() {
-  try {
-    const md = readFileSync('state.md', 'utf8')
-    const m = /## 战斗[^\n]*\n([\s\S]*?)(?=\n## |$)/.exec(md)
-    return (m?.[1] ?? '').split('\n').map(l => l.trim().replace(/^-\s*/, '')).filter(l => l && l !== '（无战斗）')
-  } catch { return [] }
-}
-export function parseCombat() {
-  const lines = combatSectionLines()
-  const fighters = []
-  for (const l of lines) {
-    for (const tag of ['参战行', '敌行', '友行']) {
-      if (l.startsWith(`${tag}：`) || l.startsWith(`${tag}:`)) {
-        const seg = l.slice(`${tag}：`.length).trim()
-        const parts = seg.split('|').map(s => s.trim())
-        const pa = /path[:：]\s*(\S+)/.exec(seg)
-        const statusSeg = parts.filter((p, i) => i > 0 && !/^path[:：]/.test(p)).join(' ')
-        fighters.push({ name: parts[0], path: pa ? pa[1] : null, statuses: statusSeg ? [{ name: statusSeg }] : [] })
-        break
-      }
-    }
-  }
-  if (!fighters.length) return null
-  const ord = []
-  const im = /^先攻[:：]\s*(.+)$/.exec(lines.find(l => /^先攻[:：]/.test(l)) ?? '')
-  if (im) for (const tok of im[1].split('>').map(s => s.trim()).filter(Boolean)) {
-    const t = /^([^:：]+)[:：]\s*(\d+)\s*$/.exec(tok); if (t) ord.push({ who: t[1].trim(), init: +t[2] })
-  }
-  const rd = /^回合[:：]\s*(\d+)/.exec(lines.find(l => /^回合[:：]/.test(l)) ?? '')
-  return { round: rd ? +rd[1] : null, order: ord, fighters }
-}
-
 // ── 附近 NPC 三态名单(2026-09-30 stance 回锅:在场关系快照——三态列驱动前端分区/注入标注;
-//    战斗节仍=参战名单,不受此判;行式 `- 名 | 同伴/中立/敌对`,兼容读单列旧行=中立(敌对必须显式))──
+//    行式 `- 名 | 同伴/中立/敌对`,兼容读单列旧行=中立(敌对必须显式))──
 // 名单=唯一在场真源(v4,2026-09-25);无 role 兜底(漏更=漏);消费者:get_npc_state(注入)与 ui_data(前端泵)。
 export function presence() {
   const rows = []
@@ -380,8 +344,8 @@ export const saveChar = (file, j) => {
   if (!v.ok) err(`!statuses 非法键(临时状态枚举外):${v.bad.join(',')}`)
   writeFileSync(file, JSON.stringify(j, null, 1))
 }
-// presence 行追加(spawn 工具用):插在「## 附近 NPC」节首(行序即注入序,新登场在前);节缺则建于「## 战斗」前。
-// 2026-09-30 三态回锅——`- 名 | 同伴/中立/敌对`(在场关系快照;战斗节仍=参战名单)。
+// presence 行追加(spawn 工具用):插在「## 附近 NPC」节首(行序即注入序,新登场在前);节缺则缀于文末。
+// 2026-09-30 三态回锅——`- 名 | 同伴/中立/敌对`(在场关系快照)。
 // 2026-10-03 幂等:同名已上榜则就地改态(单列旧行补态列),不追加第二行。补档场景=spawn 的 saveChar+presenceAdd
 // 双写,而该名已因「缺档」在册——再插一遍会因 presence() 不去重(见上注)而前端同名双卡。
 export function presenceAdd(name, stance) {
@@ -391,8 +355,8 @@ export function presenceAdd(name, stance) {
   let md = readFileSync('state.md', 'utf8')
   const secRe = /## 附近 NPC[^\n]*\n([\s\S]*?)(?=\n## |$)/
   const secM = secRe.exec(md)
-  if (!secM) {  // 节缺:建于「## 战斗」前(历史行为保持);无战斗节则缀于文末
-    md = /## 战斗/.test(md) ? md.replace(/(## 战斗)/, `## 附近 NPC\n${row}\n\n$1`) : md.replace(/\s*$/, `\n## 附近 NPC\n${row}\n`)
+  if (!secM) {  // 节缺:缀于文末
+    md = md.replace(/\s*$/, `\n## 附近 NPC\n${row}\n`)
     writeFileSync('state.md', md)
     return
   }
@@ -406,16 +370,4 @@ export function presenceAdd(name, stance) {
   }).join('\n')
   md = md.slice(0, secM.index) + header + (hit ? body : row + '\n' + body) + md.slice(secM.index + secM[0].length)
   writeFileSync('state.md', md)
-}
-// 战斗节整节重写(initiative 物化/尾代清场用):state=null → 清回「（无战斗）」。
-// 2026-09-29b 参战名单化:敌行/友行三态退役——`- 参战行：名 [| 状态]` 全参战者一行(先攻序即战斗序);
-// fighters 可缺省(=order 全量、无状态段,initiative 物化用),尾代回合重写时带状态。
-export function combatWrite(state) {
-  const md = readFileSync('state.md', 'utf8')
-  const lines = state ? [
-    `- 回合：${state.round}`,
-    `- 先攻：${state.order.map(o => `${o.who}:${o.init}`).join(' > ')}`,
-    ...(state.fighters ?? state.order.map(o => ({ who: o.who }))).map(f => `- 参战行：${f.name ?? f.who}${f.status || f.statuses?.length ? ' | ' + (f.status ?? f.statuses.map(s => s.name).join('·')) : ''}`),
-  ] : ['（无战斗）']
-  writeFileSync('state.md', md.replace(/(## 战斗[^\n]*\n)[\s\S]*?(?=\n## |$)/, `$1${lines.join('\n')}\n`))
 }

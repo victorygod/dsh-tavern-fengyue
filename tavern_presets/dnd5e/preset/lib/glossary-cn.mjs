@@ -270,6 +270,38 @@ export const FEATURE_INTRO_CN = {
   wild_shape: '荒野变形：变身野兽（随级解锁更强）',
 }
 
+// ── 技能中文短名（2026-10-05 dnd5e-combat）:skill_prof 存英文下划线键(SKILL_STAT 同键)，
+//    值=「中文名（要点）」供注入面板叙事画像用;日常判定面 check 仍吃英文键,不冲突。 ──
+export const SKILL_CN = {
+  acrobatics: '特技（平衡·翻滚·挣脱）', animal_handling: '驭兽（安抚·骑乘·动物交流）', arcana: '奥秘（法术·符号·位面）',
+  athletics: '运动（攀爬·跳跃·游泳）', deception: '欺瞒（撒谎·伪装）', history: '历史（历史·王国）',
+  insight: '洞悉（识谎·读意图）', intimidation: '威吓（威胁·逼供）', investigation: '调查（找线索·推理）',
+  medicine: '医药（诊断·稳定）', nature: '自然（地形·动植物）', perception: '察觉（注意·偷听）',
+  performance: '表演（取悦）', persuasion: '游说（交涉·说服）', religion: '宗教（神祇·仪式）',
+  sleight_of_hand: '巧手（偷窃·手法）', stealth: '隐匿（潜行·躲藏）', survival: '生存（追踪·采食·导航）',
+}
+
+// ── 特征叙事分类（2026-10-05 dnd5e-combat）:FEATURE_KIND 只显式标「narrative(剧情,进面板)」与
+//    「growth(成长选项,前端/NPC 自动消费)」;缺席=combat(战斗,默认隐)。panel-view 据此只透出 narrative 桶。
+//    键=FEATURE_CN 同键(norm 单源);新增特征漏标即落入默认 combat,不会把战斗数值漏进面板。 ──
+export const FEATURE_KIND = {
+  // 剧情(进面板):被动特质/感官/语言/神迹/环境/判定增强
+  blindsense: 'narrative', cleansing_touch: 'narrative', divine_health: 'narrative', divine_intervention: 'narrative',
+  divine_sense: 'narrative', druidic: 'narrative', hide_in_plain_sight: 'narrative', land_s_stride: 'narrative',
+  primeval_awareness: 'narrative', purity_of_body: 'narrative', stillness_of_mind: 'narrative', thieves_cant: 'narrative',
+  timeless_body: 'narrative', tongue_of_the_sun_and_moon: 'narrative', vanish: 'narrative', jack_of_all_trades: 'narrative',
+  reliable_talent: 'narrative', indomitable_might: 'narrative', slow_fall: 'narrative', favored_enemy: 'narrative',
+  natural_explorer: 'narrative', wild_shape: 'narrative', beast_spells: 'narrative',
+  // 成长(前端点/NPC 自动随机;不进面板)
+  ability_score_improvement: 'growth', arcane_tradition: 'growth', bard_college: 'growth', divine_domain: 'growth',
+  druid_circle: 'growth', eldritch_invocations: 'growth', expertise: 'growth', fighting_style: 'growth',
+  magical_secrets: 'growth', martial_archetype: 'growth', metamagic: 'growth', monastic_tradition: 'growth',
+  mystic_arcanum: 'growth', oath_spells: 'growth', otherworldly_patron: 'growth', pact_boon: 'growth',
+  path_feature: 'growth', primal_path: 'growth', ranger_archetype: 'growth', roguish_archetype: 'growth',
+  sacred_oath: 'growth', signature_spell: 'growth', sorcerous_origin: 'growth', spell_mastery: 'growth',
+  domain_spells: 'growth',
+}
+
 // ── 便捷出口（泵/表单统一调用，避免各自拼 cn）。特征/武器/语言/子职的消费在 view 展示层
 //    （浏览器裸串加载不能 import，自带同源副本+同名 featureNameCn）——正本只留数据表。 ──
 export const spellCn = n => cn(SPELL_CN, n)
