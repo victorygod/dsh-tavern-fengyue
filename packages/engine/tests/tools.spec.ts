@@ -110,7 +110,7 @@ describe('card tools', () => {
     registerMainAgentTools(ctx, root, fakeShell((command) => {
       seen.push(command)
       return 'done'
-    }))
+    }), ctx)
     const value = await defs.get('legacy')?.execute({ args: '1d20' }, { signal: undefined }) as string
     expect(seen[0]).toContain('node ')
     expect(seen[0]).toContain('runner.cjs')
@@ -128,7 +128,7 @@ describe('card tools', () => {
     registerMainAgentTools(ctx, root, fakeShell((command) => {
       seen.push(command)
       return 'ok'
-    }))
+    }), ctx)
     await defs.get('roll')?.execute({ city: 'xi\'an' }, { signal: undefined })
     expect(seen[0]).toContain(Buffer.from(JSON.stringify({ city: 'xi\'an' })).toString('base64'))
   })
@@ -150,10 +150,62 @@ describe('card tools', () => {
           stdout: { text: 'ok', truncated: false }, stderr: { text: '', truncated: false },
         }),
       }),
-    })
+    }, ctx)
     const controller = new AbortController()
     await defs.get('roll')?.execute({ args: '' }, { signal: controller.signal })
     expect(seen[0]?.signal).toBe(controller.signal)
+  })
+
+  it('a noTimeout schema tool resolves with onExpiry:"none"', async () => {
+    const root = join(base, 'notimeout')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/tools/combat.mjs'), '/** @tavern-schema\n{"description":"结算","noTimeout":true,"parameters":{"who":{"type":"string","required":true}}}\n*/\n')
+    const seen: Array<{ onExpiry: unknown }> = []
+    const { defs, ctx } = registry()
+    registerMainAgentTools(ctx, root, {
+      resolve: (request) => {
+        seen.push({ onExpiry: request.onExpiry })
+        return { command: request.command } as unknown as ShellExecSpec
+      },
+      execute: () => Promise.resolve({
+        result: () => Promise.resolve({
+          exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
+          stdout: { text: 'ok', truncated: false }, stderr: { text: '', truncated: false },
+        }),
+      }),
+    }, ctx)
+    await defs.get('combat')?.execute({ who: 'x' }, { signal: undefined })
+    expect(seen[0]?.onExpiry).toBe('none')
+  })
+
+  it('a schema tool without noTimeout keeps onExpiry:"kill"', async () => {
+    const root = join(base, 'killdefault')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/tools/check.mjs'), '/** @tavern-schema\n{"description":"判定","parameters":{"who":{"type":"string","required":true}}}\n*/\n')
+    const seen: Array<{ onExpiry: unknown }> = []
+    const { defs, ctx } = registry()
+    registerMainAgentTools(ctx, root, {
+      resolve: (request) => {
+        seen.push({ onExpiry: request.onExpiry })
+        return { command: request.command } as unknown as ShellExecSpec
+      },
+      execute: () => Promise.resolve({
+        result: () => Promise.resolve({
+          exitCode: 0, aborted: false, timedOut: false, signal: null, timeoutMs: 10_000,
+          stdout: { text: 'ok', truncated: false }, stderr: { text: '', truncated: false },
+        }),
+      }),
+    }, ctx)
+    await defs.get('check')?.execute({ who: 'x' }, { signal: undefined })
+    expect(seen[0]?.onExpiry).toBe('kill')
+  })
+
+  it('a non-boolean noTimeout value fails loud at registration', () => {
+    const root = join(base, 'notimeout-bad')
+    writeCardSkeleton(root)
+    writeFileSync(join(root, 'preset/tools/broken.mjs'), '/** @tavern-schema\n{"description":"x","noTimeout":"yes","parameters":{}}\n*/\n')
+    const { ctx } = registry()
+    expect(() => registerMainAgentTools(ctx, root, fakeShell(() => ''))).toThrow(/noTimeout/)
   })
 
   it('a marker block that fails to parse or validate throws at registration', () => {

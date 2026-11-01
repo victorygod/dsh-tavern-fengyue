@@ -61,6 +61,13 @@ export interface CardToolSchema {
    * 依据:docs/architecture/design.zh.md「工具归属与引擎能力边界」归属声明制。
    */
   agents: readonly string[]
+  /**
+   * When true, the tool script runs with no fixed deadline (`onExpiry: 'none'`)
+   * — the turn's abort signal and the process kill are the only stop paths.
+   * Declared per tool in its `@tavern-schema` block for scripts whose honest
+   * runtime (a full battle resolution, a mass spawn) can outlast the default.
+   */
+  noTimeout: boolean
 }
 
 /** The `@tavern-schema` marker opens the leading block comment of a card tool script. */
@@ -171,7 +178,7 @@ function parseCardToolSchema(text: string, path: string): CardToolSchema | null 
   } catch (error) {
     throw new Error(`tavern: tool script "${path}" has an invalid @tavern-schema block: ${error instanceof Error ? error.message : String(error)}`)
   }
-  const { description, parameters, agents } = (parsed ?? {}) as { description?: unknown; parameters?: unknown; agents?: unknown }
+  const { description, parameters, agents, noTimeout } = (parsed ?? {}) as { description?: unknown; parameters?: unknown; agents?: unknown; noTimeout?: unknown }
   if (typeof description !== 'string' || description.trim() === '') {
     throw new Error(`tavern: tool script "${path}" @tavern-schema block lacks a non-empty "description"`)
   }
@@ -185,9 +192,16 @@ function parseCardToolSchema(text: string, path: string): CardToolSchema | null 
     }
     faces = agents as string[]
   }
+  let noDeadline = false
+  if (noTimeout !== undefined) {
+    if (typeof noTimeout !== 'boolean') {
+      throw new Error(`tavern: tool script "${path}" @tavern-schema "noTimeout" must be a boolean`)
+    }
+    noDeadline = noTimeout
+  }
   const spec = parameters as ParameterSchemaSpec
   parameterSchemaSpecToJsonSchema(spec)
-  return { description, parameters: spec, agents: faces }
+  return { description, parameters: spec, agents: faces, noTimeout: noDeadline }
 }
 
 /**
@@ -211,6 +225,7 @@ async function runCardTool(
   toolsDir: string,
   name: string,
   argv: string | undefined,
+  noTimeout: boolean,
   shell: ShellSeam,
   signal: AbortSignal | undefined,
 ): Promise<string> {
@@ -222,6 +237,7 @@ async function runCardTool(
     command: cardScriptCommand(path, argv ?? 'null'),
     workdir: join(root, RUNTIME_DIR),
     timeoutMs: TOOL_TIMEOUT_MS,
+    onExpiry: noTimeout ? 'none' : 'kill',
     stdoutMaxBytes: TOOL_OUTPUT_CAP,
     // 卡面直写工具同样受信(归属声明制,与卡 prompt/泵 face 同一信任级):
     // 不继承会话沙盒——见 trustedScriptPolicy 的 Windows 拒绝案。
@@ -395,7 +411,7 @@ function registerCardTool(
     async execute(args: unknown, exec: ToolRunContext) {
       const { args: argv } = args as { args?: string }
       const payload = schemaless ? JSON.stringify([argv]) : JSON.stringify(args)
-      return await runCardTool(root, toolsDir, name, payload, shell, exec.signal)
+      return await runCardTool(root, toolsDir, name, payload, schema?.noTimeout ?? false, shell, exec.signal)
     },
   }))
 }
