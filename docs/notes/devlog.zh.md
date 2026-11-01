@@ -2,6 +2,22 @@
 
 按时间倒序记录每次排查的根因与修复。约定：现象 → 证据链 → 根因 → 修复 → 验证 → 防复发，与 [git-artifact-pollution.zh.md](../notes/git-artifact-pollution.zh.md) 同一体例。
 
+## 2026-11-01 写卡列装配失败：卡身份字段里的字面卡宏撞内核严格插值（writer-guide 改 `interpolate: false`）
+
+- **现象（用户报）**：写卡列发送后回合直接失败：`malformed prompt variable reference "{{st('user')}}" in section "tavern:writer-guide" (variable names match /^[a-z][a-z0-9_]*$/)`。
+- **证据链**：引导正文 = `prompts/writer-guide.md`（模板自身零 `{{`，`grep` 实证）+ `__CARD_TITLE__`/`__CARD_DESC__` 替换 + `writerInventory`。工作区 `ws-20261004-083121-755-2/preset/meta.json` 的 `desc` 恰为 `"{{st('user')}}: Brief introduction? {{st('char')}}: …"`——ST 导入把宏译成 `{{st(...)}}` 后写进身份字段，属于卡数据合法形态。引导 section 当时按默认规则走内核严格插值（`dsh-system-prompt` 的 `interpolate` 缺省 true，`GROUP_AT=/^\{\{([^{}]*)\}\}/`），`st('user')` 不是合法变量名 ⇒ 抛错。2026-09-14 的旧约定「引导文本按构造不含双大括号」只约束了静态模板，漏掉了**动态嵌入的卡数据**这条入口。
+- **修复**：`registerWriterGuide` 的 section 显式 `interpolate: false`——引导是纯说明文本、不消费任何内核变量；退出插值后卡片身份与清单原样到达 writer（与磁盘内容逐字节一致）。同步订正 2026-09-14 笔记的双语「brace-free by construction」表述。
+- **验证**：REAL 用例（`loader-composition.spec.ts` 写卡助手第一例）导入后把工作区 `preset/meta.json` 的 `desc` 改为 `"{{st('user')}} 的冒险"`，断言 writer 首回合 `system` 含该字面 token 且回合正常到达适配器；**反证**：临时把 `interpolate` 改回 true 单跑同例 → 回合不进入适配器（`call` undefined）红，恢复后 27/27 绿。
+- **防复发**：凡是把**卡数据**嵌进 system prompt section 的地方，默认问一句「这段会不会带卡宏」；需要字面保真就整段 `interpolate: false`，不要靠「模板无大括号」的静态约定兜动态数据。
+
+## 2026-11-01 写卡列「能打字、发不出去」：0.1.7 retain 迁移遗漏 + 发送静默吞错
+
+- **现象（用户报）**：编辑页写卡 agent 输入框焦点正常、草稿能敲，但发送毫无反应；转写永远空白，也没有任何错误行。
+- **证据链**：0.1.7 客户端 sessions 重写后，契约 `ISessions.binding(id)` 只在 scope 被 retain 物化时返回值（`lib/client.js` 实现即 `this.scopes.get(id)?.binding`），`openWindow`/懒创建 binding 均已退役。`WriterColumn.tsx` 仍是 0.1.5 写法——直接借 `binding(writerId)` 再走 `openWindow ?? binding.session.open()`；写卡会话不是当前会话（主会话由 `TavernApp` 以 `tavern` 源 retain），没有任何引用 ⇒ binding 恒 undefined。转写 effect 早退、`useSessionSurface(undefined)` 无错误，`send()` 的 `binding === undefined` 分支直接 return——整列表现为「打字正常、发送无反应、零证据」。迁移提交 `da8887b` 明写 UI 会话层待续，`a16c4eb` 只迁了 `TavernApp`；`WriterColumn` 最后一次改动停在 9-22（迁移前）。测试未拦：写卡列旧假面仍在提供懒 binding + `openWindow`，且 `packages/ui/tests-client-plane/**` 本就不在 vitest include（config KNOWN GAP）。
+- **修复**：`WriterChat` 挂载即 `sessions.retain(writerId, { source: 'tavern-writer' })`（retain 顺带触发 open，历史窗口/事件流都在同一条通道上），`ready` 落定后才把 binding 交给转写与 composer；换标签/卸载 `release`，`released` 布尔防双放。新增 `'tavern-writer'` 到 `SessionReferenceSourceMap` 声明。错误可见性补两处：`ready` 拒绝并入 `TranscriptErrorRow` 的 openBroken 行；未就绪时发送不再静默，落 `writer.notReady` 错误行（中英词条）。
+- **验证**：新增 `packages/ui/tests/writer-column.client.spec.tsx`（5 例，默认 glob 内实跑）锚定——①挂载以 `tavern-writer` 源 retain 且不再调用 `binding(id)`；②发送经 retain 得到的 `binding.session.prompt`；③卸载释放；④换标签释放旧引用并重新 retain；⑤未就绪/打开失败都必须上屏。UI 三套（writer-column/saves-load/transcript-landing）11/11 绿；`tsc -b tsconfig.client.json` 0 错；oxlint 0 新增；`pnpm build` 双面重建且产物含 `tavern-writer`/`writer.notReady`。**如实**：首轮全套曾出现 `dnd5e-grow.browser.spec.ts` 两例波动（对话框居中量测与 pending 计数），隔离复跑亦红一次；随后同一工作树全套重跑 **652/652 全绿**，同 spec 在 HEAD 干净 worktree 上也 6/6 绿——判为并行负载下的浏览器时序抖动，与本修复零代码交集。
+- **防复发**：写卡列今后只认 `retain` 契约；`tests-client-plane` 的旧假面已同步改为 retain（该目录仍未接线，新锚钉放在默认 glob 的 `tests/` 下）。
+
 ## 2026-10-03 默认工具主/尾分面矩阵批：`narratorTools` 布尔升级为 `toolFaces` 对象 + 设置页下拉
 
 - **现象（用户报）**：每个卡应能控制主 / 尾 agent 各自可用哪些引擎默认工具；现状只有一枚「叙事agent默认工具」checkbox（`narratorTools` 布尔，只管主面 read pair），写删工具恒归尾面、不可调。

@@ -28,6 +28,8 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
     'tavern': unknown
     /** The tail-live module's one-shot subagent follow (tail-live.ts 直跟尾子会话). */
     'tavern-tail': unknown
+    /** The writer column's own pin on each non-current card-writing session. */
+    'tavern-writer': unknown
   }
 }
 

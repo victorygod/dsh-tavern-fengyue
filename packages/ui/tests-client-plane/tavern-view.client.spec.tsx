@@ -117,7 +117,7 @@ function rpc(state: {
 
 const t = makeTranslate(zh) as TavernViewProps['t']
 
-/** Faces the writer column binds through: one lazily bound writer session, no models, no occupancy. */
+/** Faces the writer column binds through: one retained writer session, no models, no occupancy. */
 function writerFaces(promptImpl?: (...args: unknown[]) => unknown, entries: readonly unknown[] = []): {
   sessions: ISessions & { prompt: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }
   models: undefined
@@ -131,23 +131,25 @@ function writerFaces(promptImpl?: (...args: unknown[]) => unknown, entries: read
   // object identity changes, so the fake must return one stable instance.
   const snapshot = { running: false, openState: 'open', openError: null, promptError: null }
   const window = { entries: entries.map(event => (event as { type?: string }).type === 'transient' ? event : { type: 'event', event }) }
+  const binding = {
+    eventSource: {
+      getSnapshot: () => window,
+      subscribe: () => () => undefined,
+    },
+    session: {
+      subscribe: () => () => undefined,
+      getSnapshot: () => snapshot,
+      prompt,
+      cancel,
+      projections: { faceOf: () => undefined },
+    },
+  }
+  // 0.1.7 contract: writer sessions are never current, so the column must
+  // retain its own reference (binding(id) alone returns undefined).
   const sessions = {
-    binding: () => ({
-      eventSource: {
-        getSnapshot: () => window,
-        subscribe: () => () => undefined,
-      },
-      session: {
-        subscribe: () => () => undefined,
-        getSnapshot: () => snapshot,
-        prompt,
-        cancel,
-        projections: { faceOf: () => undefined },
-      },
-    }),
+    retain: vi.fn(() => ({ sessionId: 'session-writer', binding, ready: Promise.resolve(binding), release: vi.fn() })),
     prompt,
     cancel,
-    openWindow: () => undefined,
   } as unknown as ISessions & { prompt: ReturnType<typeof vi.fn>; cancel: ReturnType<typeof vi.fn> }
   return {
     sessions,

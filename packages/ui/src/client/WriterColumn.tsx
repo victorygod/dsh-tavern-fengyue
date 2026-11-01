@@ -14,10 +14,16 @@
  * The per-workspace session registry lives at `runtime/.writer-sessions.json`
  * (dot-prefixed → invisible in the editor tree; fenced like any client write).
  * The transcript and composer render through the shared chat-view layer.
+ *
+ * 0.1.7 retain 模型：写卡会话永远不是「当前会话」，没人替它持引用。客户端
+ * `sessions.binding(id)` 只在 scope 已被 retain 物化时返回实例（否则
+ * undefined），旧版的 openWindow / 懒创建 binding 都已随 0.1.7 重写退役。
+ * 本列因此自持一个 `tavern-writer` 保留源：挂载即 retain（顺带打开历史窗口），
+ * 换标签/卸载 release；ready 失败与未就绪时的发送都必须上屏，绝不静默。
  * @module dsh-tavern-fengyue-ui/writer-column
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionBinding, SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ContextBreakdownProjection, ContextPressureProjection, TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -274,33 +280,52 @@ function WriterChat(props: {
   t: TranslateNS<typeof NS>
 }): ReactNode {
   const { t } = props
-  // A writer id is a plain wire string; the client list store brands ids.
-  // Memoized: the binding must be identity-stable across renders — the
-  // aggregation effect subscribes through it.
-  const binding = useMemo(
-    () => props.sessions.binding(props.writerId as unknown as SessionId),
-    [props.sessions, props.writerId],
-  )
-  // The writer is never the current session, so its history window stays cold
-  // until someone opens it. Two carriers, same effect (pull the tail page +
-  // live tail into this column's own eventSource WITHOUT moving the current
-  // selection): fork hosts carry the `openWindow` service method; stock hosts
-  // expose the public per-session `open()`
-  // ("First open: pull the tail page", idempotent, selection untouched —
-  // selection is the separately-addressed manager.select()). Both are read
-  // pulls over the writer session's own log; neither appends durable events.
+  // 写卡会话不是当前会话：没人替它 retain，`binding(id)` 必为 undefined。
+  // 本列自持引用——retain 同时触发一次 open（历史窗口 + 事件流），
+  // ready 落定后才把 binding 交给转写与 composer；换标签/卸载 release。
+  // bound 带 id：换 writerId 的渲染拍先失配为 undefined，不误订阅旧会话。
+  const [bound, setBound] = useState<{ id: string; binding: SessionBinding } | undefined>(undefined)
+  const [retainError, setRetainError] = useState<{ message: string } | null>(null)
   useEffect(() => {
-    const sessions = props.sessions as ISessions & { openWindow?: (id: SessionId) => void }
-    if (typeof sessions.openWindow === 'function') {
-      sessions.openWindow(props.writerId as unknown as SessionId)
-      return
+    let disposed = false
+    let released = false
+    let reference: SessionReference
+    setBound(undefined)
+    setRetainError(null)
+    try {
+      reference = props.sessions.retain(props.writerId as unknown as SessionId, { source: 'tavern-writer' })
+    } catch (error: unknown) {
+      console.warn('[tavern] writer retain failed', props.writerId, error)
+      setRetainError({ message: error instanceof Error ? error.message : String(error) })
+      return () => { disposed = true }
     }
-    if (binding === undefined) return
-    void (binding.session as { open?: () => Promise<void> }).open?.()
-  }, [props.sessions, props.writerId, binding])
+    const live = reference
+    const release = (): void => {
+      if (released) return
+      released = true
+      live.release()
+    }
+    void live.ready.then((binding) => {
+      if (disposed) { release(); return }
+      setBound({ id: props.writerId, binding })
+    }, (error: unknown) => {
+      if (disposed) return
+      // 打开失败没有第二条自愈路径（open 只在新 retain 时重试）——
+      // 释放引用并把原因交给错误行，绝不留空转的假输入框。
+      console.warn('[tavern] writer open failed', props.writerId, error)
+      setRetainError({ message: error instanceof Error ? error.message : String(error) })
+      release()
+    })
+    return () => { disposed = true; release() }
+  }, [props.sessions, props.writerId])
+  const binding = bound?.id === props.writerId ? bound.binding : undefined
   // The Session snapshot drives the stop seat and the admission-failure row,
   // exactly like the stock chat and the RP transcript.
-  const { running, openBroken, promptBroken } = useSessionSurface(binding)
+  const surface = useSessionSurface(binding)
+  const { running, promptBroken } = surface
+  // 打开失败两条来源：retain.ready 拒绝（本地 state）与打开后的 session
+  // openError（快照）——同一行呈现，不留隐形挂起。
+  const openBroken = surface.openBroken ?? retainError
   const [lines, setLines] = useState<readonly ChatLine[]>([])
   const [draft, setDraft] = useState('')
   const [turnError, setTurnError] = useState<{ message: string; missingKey: boolean } | null>(null)
@@ -431,7 +456,13 @@ function WriterChat(props: {
 
   const send = (): void => {
     const text = draft.trim()
-    if (text === '' || binding === undefined) return
+    if (text === '') return
+    // 未就绪/打开失败时发送必须可见地失败——旧实现在这里静默 return，
+    // 让整列表现为「打字正常、发送无反应」且没有任何证据。
+    if (binding === undefined) {
+      setTurnError({ message: retainError?.message ?? t('writer.notReady'), missingKey: false })
+      return
+    }
     if (running || pending) return
     void props.checkKey().then((missing) => {
       if (missing) { props.onNeedKey(); return }

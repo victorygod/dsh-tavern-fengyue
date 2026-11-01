@@ -78,14 +78,16 @@ function failingLoadRpc(reason: string): TavernRpc {
 function writerFaces(): { sessions: object; models: undefined; conversation: { conversationStoreKey: () => string }; checkKey: () => Promise<boolean>; onNeedKey: () => void } {
   const noop = (): Promise<{ ok: true; value: { accepted: true } }> => Promise.resolve({ ok: true as const, value: { accepted: true } })
   const snapshot = { running: false, openState: 'open', openError: null, promptError: null }
+  const window = { entries: [] }
+  const binding = {
+    eventSource: { getSnapshot: () => window, subscribe: () => () => undefined },
+    session: { subscribe: () => () => undefined, getSnapshot: () => snapshot, prompt: noop, cancel: noop, projections: { faceOf: () => undefined } },
+  }
   const sessions = {
-    binding: () => ({
-      eventSource: { getSnapshot: () => ({ entries: [] }), subscribe: () => () => undefined },
-      session: { subscribe: () => () => undefined, getSnapshot: () => snapshot, prompt: noop, cancel: noop, projections: { faceOf: () => undefined } },
-    }),
+    // 0.1.7 retain contract (writer sessions are never the current one).
+    retain: () => ({ sessionId: 'session-writer', binding, ready: Promise.resolve(binding), release: () => undefined }),
     prompt: noop,
     cancel: noop,
-    openWindow: () => undefined,
   }
   return {
     sessions,

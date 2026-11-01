@@ -412,6 +412,13 @@ describe('写卡助手 agent REAL composition', () => {
     const sessionId = await engine.createSession()
     engine.importFromLibrary(sessionId, 'probe-card')
     const rootPath = engine.workspaceOf(sessionId) as string
+    // 2026-11-01 回归钉：导入卡的身份字段可以合法携带字面卡宏
+    // （ST 导入产生的 `{{st('user')}}`）。writer-guide 把它原样嵌进正文，
+    // 必须 `interpolate: false` 穿过内核严格插值层——否则整次装配抛
+    // malformed prompt variable reference，写卡列首回合即失败。
+    writeFileSync(join(rootPath, 'preset', 'meta.json'), JSON.stringify({
+      title: '钩子卡', desc: "{{st('user')}} 的冒险", cover: '',
+    }))
 
     // ensureWriter: idempotent per workspace, persisted in the marker.
     const writerId = await engine.ensureWriter(sessionId)
@@ -435,6 +442,8 @@ describe('写卡助手 agent REAL composition', () => {
     expect(call?.system).toContain('card-writing assistant')
     expect(call?.system).toContain('preset/prompt/')
     expect(call?.lastUserText).toBe('帮我打磨 systemPrompt')
+    // 卡宏原样到达 writer（不被插值，也不炸装配）。
+    expect(call?.system).toContain("{{st('user')}} 的冒险")
     const names = call?.tools.map(tool => tool.name) ?? []
     expect(names).not.toContain('weather')
     expect(names).not.toContain('runtimeCreate')

@@ -23,4 +23,4 @@ Status: implemented
 
 ## 后果
 
-writer 的引导文本**按构造不含双大括号**——section 文本里的字面 `{{name}}` 会撞上内核严格插值层直接抛错（卡提示词能活下来是因为主/尾的 assemble 监听先渲染了占位符；writer 没有这个监听）。agent 落盘经 2 秒轮询到达编辑器（树结构、meta.json、以及仅在文本框未聚焦时重读的当前打开文件）；编辑器 RPC 写 `preset/tools/` 同请求重同步主代理工具面，而 writer 用 fs 工具的落盘在下一次组装才重同步——晚一个请求。拒绝清单是维护者契约：新增 shell 或 subagent provider 时必须扩充。
+writer 的引导 section 以 **`interpolate: false` 注册**（2026-11-01 修正，取代早期「引导文本按构造不含双大括号」的做法）——引导正文会原样嵌入卡片身份（`meta.title/desc`）与实时清单，而导入卡的身份字段可以合法携带 `{{st('user')}}` 这类卡内宏；交给内核严格插值层会抛 malformed prompt variable reference 并炸掉整次装配。退出插值后卡数据原样到达 writer。agent 落盘经 2 秒轮询到达编辑器（树结构、meta.json、以及仅在文本框未聚焦时重读的当前打开文件）；编辑器 RPC 写 `preset/tools/` 同请求重同步主代理工具面，而 writer 用 fs 工具的落盘在下一次组装才重同步——晚一个请求。拒绝清单是维护者契约：新增 shell 或 subagent provider 时必须扩充。

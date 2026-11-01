@@ -54,6 +54,7 @@ export type TavernKey =
   | 'writer.tabPrev' | 'writer.tabNext' | 'writer.tabNew' | 'writer.tabClose'
   | 'writer.tabClear' | 'writer.tabClearTitle' | 'writer.tabClearBody'
   | 'writer.tabCloseTitle' | 'writer.tabCloseBody' | 'writer.none' | 'writer.createFailed'
+  | 'writer.notReady'
   | 'dialog.ok' | 'dialog.move' | 'dialog.overwrite'
   | 'chat.thinkRow' | 'chat.tailRow' | 'chat.tailActions'
   | 'chat.tailStatusStopped' | 'chat.tailStatusError' | 'chat.tailStatusArchived'
@@ -221,6 +222,7 @@ export const zh: Record<TavernKey, string> = {
   'writer.tabCloseBody': '会话记录将删除（磁盘文件在宿主下次启动时清空），不可恢复。卡片文件不受影响。',
   'writer.none': '暂无写卡会话 — 点上方 ＋ 新开',
   'writer.createFailed': '写卡会话创建失败 — 确认 tavern 引擎已就绪后重试',
+  'writer.notReady': '写卡会话尚未就绪 — 稍候重试；若持续失败请重新打开编辑页',
   'dialog.ok': '知道了',
   'dialog.move': '移动',
   'dialog.overwrite': '覆盖',
@@ -405,6 +407,7 @@ export const en: Record<TavernKey, string> = {
   'writer.tabCloseBody': 'The session log is deleted (its disk files drain at the next host start); this cannot be undone. Card files are untouched.',
   'writer.none': 'No writer sessions yet — press ＋ above to start one',
   'writer.createFailed': 'Failed to create the writer session — check the tavern engine and retry',
+  'writer.notReady': 'The writer session is not ready yet — retry shortly; reopen the editor if it keeps failing',
   'dialog.ok': 'OK',
   'dialog.move': 'Move',
   'dialog.overwrite': 'Overwrite',

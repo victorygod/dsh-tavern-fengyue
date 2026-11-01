@@ -490,7 +490,17 @@ function replaceSectionText(assembly: PromptAssembly, name: string, text: string
  * @param root - absolute workspace root.
  */
 export function registerWriterGuide(agentCtx: Context, root: string): void {
-  agentCtx.systemPrompt.section({ name: WRITER_GUIDE_SECTION_NAME, order: -50, text: () => writerGuide(root) })
+  // interpolate:false — 引导是纯说明文本，不消费任何内核变量；而它会把
+  // 卡片身份（meta title/desc）与实时清单原样嵌进正文。导入卡的身份字段
+  // 可以合法携带 `{{st('user')}}` 这类卡内宏（writer-guide 本就以字面形态
+  // 展示现卡内容），交给内核严格插值层会直接抛 malformed prompt variable
+  // reference 并炸掉整次装配。整段退出插值，卡数据原样到达 writer。
+  agentCtx.systemPrompt.section({
+    name: WRITER_GUIDE_SECTION_NAME,
+    order: -50,
+    text: () => writerGuide(root),
+    interpolate: false,
+  })
 }
 
 /** Compose the writer guide: fixed workspace/UI facts plus the current card's identity. */
@@ -500,9 +510,12 @@ export function registerWriterGuide(agentCtx: Context, root: string): void {
  * loaded fresh at every assembly (a small file; reads keep the
  * "provider text is always current" contract) with the card's identity
  * substituted for the three placeholder slots and the live workspace
- * inventory appended as the Live card inventory block. The template must never carry
- * literal `{{…}}` sequences — writer-guide output joins the harness's strict
- * prompt-interpolation layer, and unknown names there throw.
+ * inventory appended as the Live card inventory block. The section is
+ * registered with `interpolate: false` (2026-11-01): the guide consumes no
+ * kernel variables, and card identity fields legally carry literal card macros
+ * (`{{st('user')}}` …) that the strict interpolation layer would reject. The
+ * section deliberately passes that text through verbatim — the writer must see
+ * the card as it is on disk.
  */
 const WRITER_GUIDE_TEMPLATE_PATH = 'prompts/writer-guide.md'
 
