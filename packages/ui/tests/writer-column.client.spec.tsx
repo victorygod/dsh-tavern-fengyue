@@ -160,8 +160,12 @@ describe('写卡列 0.1.7 retain 契约', () => {
     renderColumn(fake.sessions)
 
     const textarea = await screen.findByPlaceholderText(zh['writer.placeholder'])
-    expect(fake.retain).toHaveBeenCalledTimes(1)
-    expect(fake.retain).toHaveBeenCalledWith(WRITER_A, { source: 'tavern-writer' })
+    // The retain effect runs after paint — assert through waitFor (CI on a
+    // slower runner otherwise samples the frame before the effect).
+    await waitFor(() => {
+      expect(fake.retain).toHaveBeenCalledTimes(1)
+      expect(fake.retain).toHaveBeenCalledWith(WRITER_A, { source: 'tavern-writer' })
+    })
     // 旧实现的入口：非当前会话借 binding(id) 恒 undefined——钉死不再走它。
     expect(fake.bindingSpy).not.toHaveBeenCalled()
 
@@ -180,7 +184,7 @@ describe('写卡列 0.1.7 retain 契约', () => {
     const fake = makeSessions()
     const { unmount } = renderColumn(fake.sessions)
     await screen.findByPlaceholderText(zh['writer.placeholder'])
-    expect(fake.refs).toHaveLength(1)
+    await waitFor(() => { expect(fake.refs).toHaveLength(1) })
 
     unmount()
     expect(fake.refs[0]?.release).toHaveBeenCalledTimes(1)
@@ -191,8 +195,10 @@ describe('写卡列 0.1.7 retain 契约', () => {
     renderColumn(fake.sessions, [WRITER_A, WRITER_B])
 
     await screen.findByPlaceholderText(zh['writer.placeholder'])
-    // 注册表取最新一个：先钉 B。
-    expect(fake.retain).toHaveBeenLastCalledWith(WRITER_B, { source: 'tavern-writer' })
+    // 注册表取最新一个：先钉 B（同样等 effect 落定）。
+    await waitFor(() => {
+      expect(fake.retain).toHaveBeenLastCalledWith(WRITER_B, { source: 'tavern-writer' })
+    })
 
     fireEvent.click(screen.getByLabelText(zh['writer.tabPrev']))
     await waitFor(() => {
