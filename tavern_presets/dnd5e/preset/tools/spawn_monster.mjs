@@ -95,7 +95,7 @@ for (const n of names) {
     ...(coins.gp ? { gp: coins.gp } : {}),
     ...(coins.sp ? { sp: coins.sp } : {}),
     ...(coins.cp ? { cp: coins.cp } : {}),
-    statuses: {},
+    affinity: 0, statuses: {},
     ...(m.persona && !a.count ? { persona: m.persona } : {}),   // 数据面 persona 行(每怪预生成)——批量杂兵不配个体人设;缺席=裁剪
   })
   const file = `characters/${n}.json`

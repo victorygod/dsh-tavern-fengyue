@@ -255,7 +255,7 @@ function seedCompanions() {
     weapons: [eq.weapon], ...(Array.isArray(eq.gear) && eq.gear.length ? { gear: eq.gear } : {}),
     gp: eq.gp ?? 0, sp: eq.sp ?? 0, cp: eq.cp ?? 0,
     persona: s.persona, history: [s.history], description: s.description,
-    pending: [], statuses: {},
+    affinity: 0, pending: [], statuses: {},
   })
     writeFileSync(`characters/${s.name}.json`, JSON.stringify(j, null, 1))
     return s.name

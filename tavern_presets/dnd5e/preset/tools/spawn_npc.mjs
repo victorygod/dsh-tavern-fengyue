@@ -172,7 +172,7 @@ const j = stripEmptyArrays({
   ...(pg.persona ? { persona: pg.persona } : {}),
   ...(pg.history ? { history: [pg.history] } : {}),
   ...(pg.description ? { description: pg.description } : {}),
-  pending: [], statuses: {},
+  affinity: 0, pending: [], statuses: {},
 })
 
 const file = `characters/${a.name}.json`

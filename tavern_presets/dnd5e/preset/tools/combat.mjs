@@ -1,6 +1,7 @@
 /** @tavern-schema
 {
   "description": "战斗结算器——一切战斗必经本工具(v1 全自动):点名交战双方→无档敌方按怪种当场建档→按先攻自动互丢攻击/战斗法术→战报回执。何时调:敌意显现、接战触发即调,一次调用走完一场。日常叙事不碰任何战斗数值;我方默认=玩家+附近「同伴」,敌方点名(怪种如 goblin 当场建档、已在册者只传名)。",
+  "noTimeout": true,
   "parameters": {
     "context": { "type": "string", "required": true, "description": "一句已定型的剧情梗概:本调用前你对剧情走向的承诺——回执把梗概与结果钉在一起,后续叙事必须遵守。" },
     "allies": { "type": "array", "items": { "type": "string" }, "description": "我方名单。默认=玩家+附近「同伴」(presence 读);可显式覆盖。" },
@@ -63,7 +64,7 @@ for (const e of a.enemies) {
       ...(Object.keys(m.attacks).length ? { attacks: m.attacks } : {}),
       ...(Object.keys(m.abilities).length ? { abilities: m.abilities } : {}),
       ...(baseGear.length ? { gear: baseGear } : {}),
-      statuses: {},
+      affinity: 0, statuses: {},
       ...(coins.gp ? { gp: coins.gp } : {}), ...(coins.sp ? { sp: coins.sp } : {}), ...(coins.cp ? { cp: coins.cp } : {}),
     })
     saveChar(`characters/${n}.json`, j)

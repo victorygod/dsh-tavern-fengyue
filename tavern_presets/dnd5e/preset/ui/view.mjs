@@ -95,11 +95,8 @@ function heroCard(p, avatars) {
         <div class="row1">
           <div class="h-av ${g.cls}">${avatarFor(p, avatars)}<span class="h-lv">LV${esc(p.level ?? '???')}</span></div>
           <div class="h-names">
-            <div class="h-nm">${esc(p.name ?? '')}</div>
-            <div class="h-tags">
-              <span class="h-tag">${esc(cn(RACE_CN, p.race) ?? '')}</span>
-              ${g.glyph ? `<span class="g-glyph ${g.cls}" data-tip="性别">${g.glyph}</span>` : ''}
-            </div>
+            <div class="h-nm">${esc(p.name ?? '')}${g.glyph ? `<span class="g-glyph ${g.cls}" data-tip="性别">${g.glyph}</span>` : ''}</div>
+            <div class="m-sub">${esc(cn(RACE_CN, p.race) ?? '')}${p.class ? ' · ' + esc(cn(CLS_CN, p.class)) : ''}${p.subclass ? ' · ' + esc(cn(SUBCLASS_CN, p.subclass)) : ''}</div>
           </div>
         </div>
         <div class="h-hp">
@@ -111,6 +108,23 @@ function heroCard(p, avatars) {
         ${xb ? `<div class="h-exp" data-tip="EXP ${esc(xb.exp)}${xb.next === null ? '（已到 20 级顶）' : ' / 升至 LV' + esc(p.level == null ? '?' : p.level + 1) + ' 需 ' + esc(xb.next)}"><div class="bar"><div class="fill" style="width:${xp}%"></div></div><span class="lb">EXP ${esc(xb.exp)}/${xb.next === null ? 'MAX' : esc(xb.next)}</span></div>` : ''}
         ${Object.keys(p.statuses ?? {}).length || (p.pending ?? []).length ? `<div class="h-status">${chipsSmall(p.statuses)}${(p.pending ?? []).length ? `<span class="stc i pending" data-tip="存在未分配的成长项（属性点/新法术）——点卡打开数据册，进对应节分配"><span class="k">◆</span>未分配成长${(p.pending ?? []).length > 1 ? '·' + (p.pending ?? []).length : ''}</span>` : ''}</div>` : ''}
       </div>`
+}
+
+// ── 好感度条(2026-10-06):竖直,0 居中,正=上红,负=下绿,下方数值+档位 ──
+const AFF_TIERS = [
+  [-100, -81, '极度仇恨'], [-80, -61, '深仇大恨'], [-60, -41, '敌视'], [-40, -21, '厌恶'], [-20, -1, '不满'],
+  [0, 0, '漠不关心'],
+  [1, 20, '友善'], [21, 40, '信任'], [41, 60, '亲近'], [61, 80, '倾心'], [81, 100, '极度喜爱'],
+]
+const affTier = (a) => AFF_TIERS.find(([lo, hi]) => a >= lo && a <= hi)?.[2] ?? '漠不关心'
+const affinityBar = (c) => {
+  const a = Math.max(-100, Math.min(100, c.affinity ?? 0))
+  const pct = Math.abs(a) / 2   // 每侧 0~50%
+  return `<div class="m-aff" data-tip="好感度 ${a}（${affTier(a)}）">
+    <div class="aff-bar"><span class="aff-up" style="height:${a > 0 ? pct : 0}%"></span><span class="aff-down" style="height:${a < 0 ? pct : 0}%"></span><span class="aff-zero"></span></div>
+    <div class="aff-num">${a}</div>
+    <div class="aff-tier">${affTier(a)}</div>
+  </div>`
 }
 
 // ── 渲染：人际三区（v4,2026-09-25）——同伴/中立住左,敌对住右,同卡形;区空则整区隐 ──
@@ -131,10 +145,12 @@ function personCard(c, avatars) {
       <div class="m-av ${g.cls}">${avatarFor(c, avatars)}<span class="m-lv">LV${esc(c.level ?? '???')}</span></div>
       <div class="m-main">
         <div class="m-top"><span class="m-nm">${esc(c.name ?? '')}</span>${g.glyph ? `<span class="m-gd ${g.cls}">${g.glyph}</span>` : ''}${c.init != null ? `<span class="m-init" data-tip="先攻">◆${esc(c.init)}</span>` : ''}</div>
+        <div class="m-sub">${esc(cn(RACE_CN, c.race) ?? '')}${c.class ? ' · ' + esc(cn(CLS_CN, c.class)) : ''}${c.subclass ? ' · ' + esc(cn(SUBCLASS_CN, c.subclass)) : ''}</div>
         <div class="m-hp"><span class="tk"><span class="fl" style="width:${hpP}%"></span></span><span class="nn">${esc(hpText(c))}</span></div>
         ${d.expBar ? `<div class="m-exp" data-tip="EXP ${esc(d.expBar.exp)}${d.expBar.next === null ? '（已到 20 级顶）' : ' / 升至 LV' + esc(c.level == null ? '?' : c.level + 1) + ' 需 ' + esc(d.expBar.next)}"><div class="bar"><div class="fill" style="width:${d.expBar.next === null ? 100 : Math.max(0, Math.min(100, Math.round(((d.expBar.exp - d.expBar.min) / Math.max(1, d.expBar.next - d.expBar.min)) * 100)))}%"></div></div><span class="lb">EXP ${esc(d.expBar.exp)}/${d.expBar.next === null ? 'MAX' : esc(d.expBar.next)}</span></div>` : ''}
         ${Object.keys(c.statuses ?? {}).length ? `<div class="m-status">${chipsSmall(c.statuses)}</div>` : ''}
       </div>
+      ${affinityBar(c)}
     </div>`
 }
 function zoneHtml(zone, label, list, avatars) {
@@ -283,8 +299,11 @@ export function rightPanel(data, extra = {}) {
 }
 
 // ── 渲染：宽幅数据册（acts 以模态挂出;同构成 v8 全列）──
-const fmtWeapon = w => !w.damage ? esc(cn(WEAPON_CN, w.name))
-  : `${esc(cn(WEAPON_CN, w.name))} <span class="dv">${esc(w.damage)}${w.damage_type ? ' ' + esc(cn(DMG_CN, w.damage_type)) : ''}${w.props?.length ? ' ' + w.props.map(p => esc(cn(PROP_CN, p))).join('·') : ''}</span>`
+// 武器 hover 浮签:名称行内,伤害/类型/属性进 data-tip(vtip 悬停出)
+const fmtWeapon = w => {
+  const tip = !w.damage ? '' : `伤害 ${w.damage}${w.damage_type ? ' ' + cn(DMG_CN, w.damage_type) : ''}${w.props?.length ? ' · ' + w.props.map(p => cn(PROP_CN, p)).join('·') : ''}`
+  return `<span${tip ? ` data-tip="${esc(tip)}"` : ''}>${esc(cn(WEAPON_CN, w.name))}</span>`
+}
 // 背包堆叠(2026-10-06):同名物品合并「名×N」展示;数据层逐件原样。已带「×N」后缀的条目先拆再合计。
 const stackItems = (arr) => {
   const count = new Map()
@@ -357,6 +376,7 @@ export function bookHtml(c, avatars = {}) {
           ${d.expBar ? `<div class="bke" data-tip="EXP ${esc(d.expBar.exp)}${d.expBar.next === null ? '（20 级顶）' : ' / 升至 LV' + esc(c.level == null ? '?' : c.level + 1) + ' 需 ' + esc(d.expBar.next)}"><div class="fl" style="width:${d.expBar.next === null ? 100 : Math.round(((d.expBar.exp - d.expBar.min) / Math.max(1, d.expBar.next - d.expBar.min)) * 100)}%"></div><div class="cap"><span class="lb">EXP</span><span class="nn">${esc(d.expBar.exp)}/${d.expBar.next === null ? 'MAX' : esc(d.expBar.next)}</span></div></div>` : ''}
           <div class="bk-coin" data-tip="钱包（不属于装备——挂在账条下,右对齐）">${esc(val(c.gp))}gp · ${esc(val(c.sp))}sp · ${esc(val(c.cp))}cp</div>
         </div>
+        ${c.role !== 'pc' ? affinityBar(c) : ''}
         <button class="bk-x" data-act="bookClose" data-tip="合上册子">✕</button>
       </div>`
 
@@ -402,8 +422,8 @@ export function bookHtml(c, avatars = {}) {
   const eqHtml = sec('装备', `
         <div class="bk-rows">
           ${(d.weapons ?? []).map(w => `<div class="bk-row"><span class="a">${fmtWeapon(w)}</span></div>`).join('')}
-          ${c.armor ? `<div class="bk-row"><span class="a">${esc(cn(ARMOR_CN, c.armor))}</span><span class="b">AC ${esc(d.ac != null && d.ac_base != null && d.ac !== d.ac_base ? `${d.ac}(${d.ac_base})` : (d.ac ?? '—'))}</span></div>` : `<div class="bk-row"><span class="a">护甲</span><span class="b">无</span></div>`}
-          ${(c.shield === true || c.shield === 'true') ? `<div class="bk-row"><span class="a">盾牌</span><span class="b">+2 AC</span></div>` : ''}
+          ${c.armor ? `<div class="bk-row"><span class="a" data-tip="${esc(`护甲 AC ${d.ac_base ?? d.ac ?? '—'}${d.ac != null && d.ac !== d.ac_base ? `（总 ${d.ac} 含状态修正）` : ''}`)}">${esc(cn(ARMOR_CN, c.armor))}</span><span class="b">AC ${esc(d.ac != null && d.ac_base != null && d.ac !== d.ac_base ? `${d.ac}(${d.ac_base})` : (d.ac ?? '—'))}</span></div>` : `<div class="bk-row"><span class="a">护甲</span><span class="b">无</span></div>`}
+          ${(c.shield === true || c.shield === 'true') ? `<div class="bk-row"><span class="a" data-tip="${esc('盾牌 AC +2')}">盾牌</span><span class="b">+2 AC</span></div>` : ''}
         </div>
         <div class="bk-sec" style="margin-top:8px">
           <div class="bk-cap" data-tip="${esc(CAP_TIPS.gear)}">背包</div>

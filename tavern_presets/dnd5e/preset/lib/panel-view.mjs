@@ -56,8 +56,8 @@ export function panelView(j) {
   for (const k of ['gp', 'sp', 'cp']) {
     if (j[k] !== undefined && j[k] !== null) out[k] = j[k]
   }
-  // 人设三层 + 内心(推演核心,原样)
-  for (const k of ['persona', 'history', 'description', 'thought']) {
+  // 人设三层 + 内心 + 好感度(推演核心,原样)
+  for (const k of ['persona', 'history', 'description', 'thought', 'affinity']) {
     if (j[k] !== undefined && j[k] !== null) out[k] = j[k]
   }
   return out

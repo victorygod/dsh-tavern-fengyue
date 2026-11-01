@@ -178,5 +178,15 @@ export function applyMemory(j, entry) {
     delete j.thought
     lines.push('thought: 删键(还原缺省)')
   }
+  // 好感度(2026-10-06):affinity_delta ±1~5 累加,clamp [-100,100];须带 affinity_reason(命中哪条规则)
+  if (entry.affinity_delta !== undefined && entry.affinity_delta !== null) {
+    const delta = +entry.affinity_delta
+    ;(Number.isInteger(delta) && delta !== 0 && Math.abs(delta) <= 5) || fail(`!affinity_delta 须为 ±1~5 的整数,得 ${entry.affinity_delta}`)
+    const reason = String(entry.affinity_reason ?? '').trim()
+    reason || fail('!affinity_delta 须带 affinity_reason(命中哪条规则)')
+    const before = j.affinity ?? 0
+    j.affinity = Math.max(-100, Math.min(100, before + delta))
+    lines.push(`affinity: ${before}→${j.affinity}(${delta >= 0 ? '+' + delta : delta},${reason})`)
+  }
   return lines
 }

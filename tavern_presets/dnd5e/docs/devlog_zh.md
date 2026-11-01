@@ -2,6 +2,16 @@
 
 卡自包含的开发档案（卡根 `tavern_presets/dnd5e/`，与 `preset/`、`assemble.mjs` 平级；engine 不扫描）。本目录即全量卡档案：design_zh.md（定案唯一口径）· rules_zh.md（规则汇编）· tools_zh.md（工具设计）。本日志专职记卡内生事务。
 
+## 2026-10-07 combat 超时无上限(noTimeout 声明)
+
+**定位**:combat 全自动一场结算(建档+多轮先攻互丢+法术)可越过 10s 死线,被 `TOOL_TIMEOUT_MS` 击杀。引擎加 `@tavern-schema` 可选字段 `noTimeout`(布尔,缺省 false,非布尔注册期抛错)——`CardToolSchema` 增 `noTimeout`,解析后 `runCardTool` 的 `shell.resolve` 挂 `onExpiry: noTimeout ? 'none' : 'kill'`。`onExpiry:'none'` 为 dsh-shell 原生语义:不挂超时定时器,只留取消信号停路径。
+
+- **只针对 combat**:`tools/combat.mjs` schema 块加 `"noTimeout": true`;其余 9 件卡工具照旧 10s。
+- **安全网**:`runCardTool` 仍把回合 `AbortSignal` 传进 shell——取消/中止回合照样杀进程,去掉的只是固定死线,不是"永挂"。
+- **存量同步**:`tavern_workspace/ws-20261006-235208-560-1/preset/tools/combat.mjs` 快照同加旗(改卡库不传导,交付必须同步存量 ws)。
+- **测试**:`packages/engine/tests/tools.spec.ts` 新 3 钉(onExpiry:none / 缺省 kill / 非布尔抛错);engine 全套 278 绿;`build:lib:host` 通过。
+- **生效**:引擎 `lib/index.js` 需宿主重启加载;旗是组装期 mtime 重评估,加载后次回合即生效。
+
 ## 2026-10-03 特征三桶机械化:特质释义/成长选项/战斗机制(用户「全部做完」批)
 
 **定位**:特征(features)从「整卡注入英文原文+工具只喊不写」重构为三桶正交——①成长选项(需决定)→前端分配面板落字段;②特质(叙事面)→FEATURE_INTRO_CN 一行释义单源,LLM 面板+前端 hover 同源;③战斗机制(硬数值)→hasFeature 判据+工具自动结算。判据=「机械进工具,LLM 只判断」;LLM 面板只留演绎事实,`hp` 回数值(用户令),feature_details/spell_details 全文不再每回合注入。
